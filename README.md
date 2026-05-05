@@ -12,7 +12,7 @@
 ## Install
 
 ```bash
-cargo install --path .
+make install
 ```
 
 ## License
