@@ -1,6 +1,9 @@
 [package]
 name = "marten"
 version = "0.1.0"
+authors = ["Jones Dias"]
+description = "A small Rust Git TUI for reviewing work and understanding history."
+keywords = ["tui", "terminal", "git"]
 edition = "2024"
 
 [dependencies]
