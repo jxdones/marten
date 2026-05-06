@@ -9,6 +9,8 @@ help:
 	@printf "Usage: make <target>\n\n"
 	@printf "Targets:\n"
 	@printf "  %-12s %s\n" "build" "Build the project (debug)."
+	@printf "  %-12s %s\n" "run" "Run the project (debug)."
+	@printf "  %-12s %s\n" "run-release" "Run the release binary."
 	@printf "  %-12s %s\n" "check" "Type-check and compile without linking."
 	@printf "  %-12s %s\n" "test" "Run tests."
 	@printf "  %-12s %s\n" "fmt" "Format Rust code."
@@ -26,6 +28,13 @@ build:
 
 run:
 	cargo run --
+
+run-release:
+	@if [ ! -x target/release/marten ]; then \
+		echo "Binary not found. Building release first..."; \
+		$(MAKE) release; \
+	fi
+	@./target/release/marten
 
 check:
 	cargo check --all-targets
