@@ -1,6 +1,12 @@
+use crate::app::App;
+
+mod action;
+mod app;
+mod event;
 mod terminal;
 mod tui;
 
 fn main() -> std::io::Result<()> {
-    terminal::run()
+    let mut app = App::new();
+    terminal::run(&mut app)
 }

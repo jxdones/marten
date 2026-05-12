@@ -1,16 +1,27 @@
-use crossterm::{
-    event::{self, Event, KeyCode, KeyEventKind},
-    execute,
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
-};
-use ratatui::{DefaultTerminal, TerminalOptions, Viewport, prelude::CrosstermBackend};
 use std::io;
 
-use crate::tui;
+use crossterm::{
+    event::{self, Event as CrosstermEvent, KeyEventKind},
+    execute,
+    terminal::{
+        disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+    },
+};
 
-pub fn run() -> io::Result<()> {
+use ratatui::{
+    prelude::CrosstermBackend,
+    DefaultTerminal, TerminalOptions, Viewport,
+};
+
+use crate::{
+    app::App,
+    event::Event,
+    tui,
+};
+
+pub fn run(app: &mut App) -> io::Result<()> {
     let mut terminal = init_terminal()?;
-    let result = run_loop(&mut terminal);
+    let result = run_loop(&mut terminal, app);
     restore_terminal(terminal)?;
     result
 }
@@ -27,18 +38,31 @@ fn init_terminal() -> io::Result<DefaultTerminal> {
     )
 }
 
-fn run_loop(terminal: &mut DefaultTerminal) -> io::Result<()> {
-    loop {
-        terminal.draw(tui::draw)?;
+fn run_loop(terminal: &mut DefaultTerminal, app: &mut App) -> io::Result<()> {
+    while !app.should_quit() {
+        terminal.draw(|frame| tui::draw(frame, app))?;
 
-        if let Event::Key(key) = event::read()?
-            && key.kind == KeyEventKind::Press
-            && matches!(key.code, KeyCode::Char('q'))
-        {
-            break;
+        let event = read_event()?;
+        let action = app.handle_event(event);
+
+        app.update(action);
+    }
+
+    Ok(())
+}
+
+fn read_event() -> io::Result<Event> {
+    loop {
+        match event::read()? {
+            CrosstermEvent::Key(key) if key.kind == KeyEventKind::Press => {
+                return Ok(Event::Key(key));
+            }
+            CrosstermEvent::Resize(width, height) => {
+                return Ok(Event::Resize(width, height));
+            }
+            _ => {}
         }
     }
-    Ok(())
 }
 
 fn restore_terminal(mut terminal: DefaultTerminal) -> io::Result<()> {
