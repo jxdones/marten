@@ -3,6 +3,7 @@ use crate::app::App;
 mod action;
 mod app;
 mod event;
+mod git;
 mod state;
 mod terminal;
 mod tui;

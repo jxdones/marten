@@ -2,6 +2,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::action::Action;
 use crate::event::Event;
+use crate::git::repository::{self, RepositoryStatus};
 use crate::state::{Focus, Screen};
 use crate::tui::theme::{self, Theme};
 
@@ -11,15 +12,19 @@ pub struct App {
     focus: Focus,
     theme: Theme,
     should_quit: bool,
+
+    repository_status: Option<RepositoryStatus>,
 }
 
 impl App {
     pub fn new() -> Self {
+        let repository_status = repository::status(".").ok();
         Self {
             screen: Screen::Home,
             focus: Focus::Files,
             theme: theme::DEFAULT,
             should_quit: false,
+            repository_status,
         }
     }
 
@@ -37,6 +42,10 @@ impl App {
 
     pub fn should_quit(&self) -> bool {
         self.should_quit
+    }
+
+    pub fn repository_status(&self) -> Option<&RepositoryStatus> {
+        self.repository_status.as_ref()
     }
 
     pub fn handle_event(&self, event: Event) -> Action {

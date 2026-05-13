@@ -1,4 +1,4 @@
-use crate::{app::App, state::Focus};
+use crate::{app::App, git::repository::Head, state::Focus};
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -22,17 +22,71 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
     let right = layout[2];
     let theme = app.theme();
 
-    let current_branch = "main";
-    let left_line = Line::from(vec![
-        Span::styled("marten", theme.repo_name()),
-        Span::styled("  ·  ", Style::default()),
-        Span::styled(current_branch, theme.branch_name()),
-        Span::styled("  ·  ", Style::default()),
-        Span::styled("↑", theme.success()),
-        Span::styled("3", theme.success()),
-        Span::styled(" ↓", theme.danger()),
-        Span::styled("1", theme.danger()),
-    ]);
+    let left_line = if let Some(status) = app.repository_status() {
+        let (branch_label, branch_style) = match &status.head {
+            Head::Branch(name) => (name.clone(), theme.branch_name()),
+            Head::Detached(commit) => (format!("{commit} (detached)"), theme.danger()),
+            Head::Unknown => ("unknown".to_string(), theme.muted()),
+        };
+
+        let mut spans = vec![
+            Span::styled(status.name.as_str(), theme.repo_name()),
+            Span::styled("  ·  ", Style::default()),
+            Span::styled(branch_label, branch_style),
+        ];
+
+        if status.changes.staged > 0 {
+            spans.push(Span::styled(
+                format!(" +{}", status.changes.staged),
+                theme.staged(),
+            ));
+        }
+
+        if status.changes.unstaged > 0 {
+            spans.push(Span::styled(
+                format!(" ~{}", status.changes.unstaged),
+                theme.unstaged(),
+            ));
+        }
+
+        if status.changes.untracked > 0 {
+            spans.push(Span::styled(
+                format!(" ?{}", status.changes.untracked),
+                theme.untracked(),
+            ));
+        }
+
+        if status.changes.conflicted > 0 {
+            spans.push(Span::styled(
+                format!(" !{}", status.changes.conflicted),
+                theme.conflict(),
+            ));
+        }
+
+        let ahead_style = if status.ahead > 0 {
+            theme.success()
+        } else {
+            theme.muted()
+        };
+
+        let behind_style = if status.behind > 0 {
+            theme.danger()
+        } else {
+            theme.muted()
+        };
+
+        spans.extend([
+            Span::styled("  ·  ", Style::default()),
+            Span::styled(format!("↑{}", status.ahead), ahead_style),
+            Span::styled(format!(" ↓{}", status.behind), behind_style),
+        ]);
+
+        Line::from(spans)
+    } else {
+        Line::from(vec![
+            Span::styled("no repository", theme.repo_name()),
+        ])
+    };
 
     let mode = top_bar_mode(app);
     let right_line = Line::from(Span::styled(mode, theme.text_primary()));
