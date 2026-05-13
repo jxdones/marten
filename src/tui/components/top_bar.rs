@@ -25,11 +25,12 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
     let current_branch = "main";
     let left_line = Line::from(vec![
         Span::styled("marten", theme.repo_name()),
-        Span::styled(" ", Style::default()),
+        Span::styled("  ·  ", Style::default()),
         Span::styled(current_branch, theme.branch_name()),
-        Span::styled("  ↑", theme.muted()),
+        Span::styled("  ·  ", Style::default()),
+        Span::styled("↑", theme.success()),
         Span::styled("3", theme.success()),
-        Span::styled(" ↓", theme.muted()),
+        Span::styled(" ↓", theme.danger()),
         Span::styled("1", theme.danger()),
     ]);
 
