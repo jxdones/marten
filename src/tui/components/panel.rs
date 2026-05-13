@@ -1,13 +1,12 @@
-use ratatui::{
-    style::{Color, Style},
-    widgets::{Block, Borders},
-};
+use ratatui::widgets::{Block, Borders};
 
-pub fn block(title: &'static str, is_focused: bool) -> Block<'static> {
+use crate::tui::theme::Theme;
+
+pub fn block(title: &'static str, theme: Theme, is_focused: bool) -> Block<'static> {
     let border_style = if is_focused {
-        Style::default().fg(Color::Cyan)
+        theme.focused_border()
     } else {
-        Style::default().fg(Color::DarkGray)
+        theme.panel_border()
     };
 
     Block::default()

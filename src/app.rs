@@ -3,11 +3,13 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crate::action::Action;
 use crate::event::Event;
 use crate::state::{Focus, Screen};
+use crate::tui::theme::{self, Theme};
 
 #[derive(Debug)]
 pub struct App {
     screen: Screen,
     focus: Focus,
+    theme: Theme,
     should_quit: bool,
 }
 
@@ -16,6 +18,7 @@ impl App {
         Self {
             screen: Screen::Home,
             focus: Focus::Files,
+            theme: theme::DEFAULT,
             should_quit: false,
         }
     }
@@ -26,6 +29,10 @@ impl App {
 
     pub fn focus(&self) -> Focus {
         self.focus
+    }
+
+    pub fn theme(&self) -> Theme {
+        self.theme
     }
 
     pub fn should_quit(&self) -> bool {

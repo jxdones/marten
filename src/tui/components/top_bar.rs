@@ -2,7 +2,7 @@ use crate::{app::App, state::Focus};
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::Style,
     text::{Line, Span},
     widgets::Paragraph,
 };
@@ -20,33 +20,21 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
 
     let left = layout[1];
     let right = layout[2];
+    let theme = app.theme();
 
     let current_branch = "main";
     let left_line = Line::from(vec![
-        Span::styled(
-            "marten",
-            Style::default()
-                .fg(Color::Cyan)
-                .add_modifier(Modifier::BOLD),
-        ),
+        Span::styled("marten", theme.repo_name()),
         Span::styled(" ", Style::default()),
-        Span::styled(
-            current_branch,
-            Style::default()
-                .fg(Color::White)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::styled("  ↑", Style::default().fg(Color::Gray)),
-        Span::styled("3", Style::default().fg(Color::Green)),
-        Span::styled(" ↓", Style::default().fg(Color::Gray)),
-        Span::styled("1", Style::default().fg(Color::Red)),
+        Span::styled(current_branch, theme.branch_name()),
+        Span::styled("  ↑", theme.muted()),
+        Span::styled("3", theme.success()),
+        Span::styled(" ↓", theme.muted()),
+        Span::styled("1", theme.danger()),
     ]);
 
     let mode = top_bar_mode(app);
-    let right_line = Line::from(Span::styled(
-        mode,
-        Style::default().fg(Color::Rgb(230, 180, 80)),
-    ));
+    let right_line = Line::from(Span::styled(mode, theme.text_primary()));
 
     frame.render_widget(Paragraph::new(""), area);
     frame.render_widget(Paragraph::new(left_line), left);
