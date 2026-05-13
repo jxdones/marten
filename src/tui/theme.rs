@@ -2,32 +2,70 @@ use ratatui::style::{Color, Modifier, Style};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Theme {
-    pub focus_border: Color,
-    pub panel_border: Color,
-    pub text_primary: Color,
-    pub text_muted: Color,
+    pub bg: Color,
+    pub panel: Color,
+    pub panel_focused: Color,
+    pub line: Color,
+    pub line_hi: Color,
+
+    pub fg: Color,
+    pub dim: Color,
+    pub vdim: Color,
+
     pub accent: Color,
-    pub success: Color,
-    pub danger: Color,
+    pub select: Color,
+    pub select_hi: Color,
+
+    pub add_bg: Color,
+    pub add_fg: Color,
+    pub add_gutter: Color,
+    pub del_bg: Color,
+    pub del_fg: Color,
+    pub del_gutter: Color,
+
+    pub staged: Color,
+    pub unstaged: Color,
+    pub untracked: Color,
+    pub conflict: Color,
+    pub ignored: Color,
 }
 
 pub const DEFAULT: Theme = Theme {
-    focus_border: Color::Blue,
-    panel_border: Color::DarkGray,
-    text_primary: Color::White,
-    text_muted: Color::Gray,
-    accent: Color::Rgb(230, 180, 90),
-    success: Color::Green,
-    danger: Color::Red,
+    bg:            Color::Rgb(22, 17, 13),
+    panel:         Color::Rgb(29, 23, 18),
+    panel_focused: Color::Rgb(40, 32, 26),
+    line:          Color::Rgb(85, 68, 54),
+    line_hi:       Color::Rgb(112, 89, 71),
+
+    fg:   Color::Rgb(239, 228, 210),
+    dim:  Color::Rgb(160, 141, 118),
+    vdim: Color::Rgb(94, 79, 66),
+
+    accent:    Color::Rgb(212, 163, 104),
+    select:    Color::Rgb(41, 32, 22),
+    select_hi: Color::Rgb(64, 49, 33),
+
+    add_bg:     Color::Rgb(42, 43, 29),
+    add_fg:     Color::Rgb(181, 201, 122),
+    add_gutter: Color::Rgb(138, 168, 105),
+    del_bg:     Color::Rgb(50, 27, 20),
+    del_fg:     Color::Rgb(224, 139, 111),
+    del_gutter: Color::Rgb(196, 82, 58),
+
+    staged:    Color::Rgb(181, 201, 122),
+    unstaged:  Color::Rgb(224, 139, 111),
+    untracked: Color::Rgb(212, 163, 104),
+    conflict:  Color::Rgb(212, 84, 63),
+    ignored:   Color::Rgb(74, 61, 51),
 };
 
 impl Theme {
     pub fn focused_border(self) -> Style {
-        Style::default().fg(self.focus_border)
+        Style::default().fg(self.accent)
     }
 
     pub fn panel_border(self) -> Style {
-        Style::default().fg(self.panel_border)
+        Style::default().fg(self.line)
     }
 
     pub fn repo_name(self) -> Style {
@@ -38,16 +76,16 @@ impl Theme {
 
     pub fn branch_name(self) -> Style {
         Style::default()
-            .fg(self.text_primary)
+            .fg(self.fg)
             .add_modifier(Modifier::BOLD)
     }
 
     pub fn muted(self) -> Style {
-        Style::default().fg(self.text_muted)
+        Style::default().fg(self.dim)
     }
 
     pub fn text_primary(self) -> Style {
-        Style::default().fg(self.text_primary)
+        Style::default().fg(self.fg)
     }
 
     pub fn accent(self) -> Style {
@@ -55,10 +93,38 @@ impl Theme {
     }
 
     pub fn success(self) -> Style {
-        Style::default().fg(self.success)
+        Style::default().fg(self.staged)
     }
 
     pub fn danger(self) -> Style {
-        Style::default().fg(self.danger)
+        Style::default().fg(self.conflict)
+    }
+
+    pub fn staged(self) -> Style {
+        Style::default().fg(self.staged)
+    }
+
+    pub fn unstaged(self) -> Style {
+        Style::default().fg(self.unstaged)
+    }
+
+    pub fn untracked(self) -> Style {
+        Style::default().fg(self.untracked)
+    }
+
+    pub fn conflict(self) -> Style {
+        Style::default().fg(self.conflict)
+    }
+
+    pub fn ignored(self) -> Style {
+        Style::default().fg(self.ignored)
+    }
+
+    pub fn diff_add(self) -> Style {
+        Style::default().fg(self.add_fg).bg(self.add_bg)
+    }
+
+    pub fn diff_del(self) -> Style {
+        Style::default().fg(self.del_fg).bg(self.del_bg)
     }
 }
