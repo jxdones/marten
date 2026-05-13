@@ -2,4 +2,6 @@
 pub enum Action {
     Noop,
     Quit,
+    NextFocus,
+    PreviousFocus,
 }

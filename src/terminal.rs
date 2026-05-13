@@ -3,21 +3,12 @@ use std::io;
 use crossterm::{
     event::{self, Event as CrosstermEvent, KeyEventKind},
     execute,
-    terminal::{
-        disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
-    },
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 
-use ratatui::{
-    prelude::CrosstermBackend,
-    DefaultTerminal, TerminalOptions, Viewport,
-};
+use ratatui::{DefaultTerminal, TerminalOptions, Viewport, prelude::CrosstermBackend};
 
-use crate::{
-    app::App,
-    event::Event,
-    tui,
-};
+use crate::{app::App, event::Event, tui};
 
 pub fn run(app: &mut App) -> io::Result<()> {
     let mut terminal = init_terminal()?;
@@ -33,7 +24,7 @@ fn init_terminal() -> io::Result<DefaultTerminal> {
     ratatui::Terminal::with_options(
         backend,
         TerminalOptions {
-            viewport: Viewport::Inline(30),
+            viewport: Viewport::Fullscreen,
         },
     )
 }

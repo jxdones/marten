@@ -2,15 +2,30 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::action::Action;
 use crate::event::Event;
+use crate::state::{Focus, Screen};
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct App {
+    screen: Screen,
+    focus: Focus,
     should_quit: bool,
 }
 
 impl App {
     pub fn new() -> Self {
-        Self { should_quit: false }
+        Self {
+            screen: Screen::Home,
+            focus: Focus::Files,
+            should_quit: false,
+        }
+    }
+
+    pub fn screen(&self) -> Screen {
+        self.screen
+    }
+
+    pub fn focus(&self) -> Focus {
+        self.focus
     }
 
     pub fn should_quit(&self) -> bool {
@@ -20,7 +35,7 @@ impl App {
     pub fn handle_event(&self, event: Event) -> Action {
         match event {
             Event::Key(key) => self.handle_key(key),
-            _ => Action::Noop
+            _ => Action::Noop,
         }
     }
 
@@ -30,6 +45,12 @@ impl App {
             Action::Quit => {
                 self.should_quit = true;
             }
+            Action::NextFocus => {
+                self.focus = self.focus.next();
+            }
+            Action::PreviousFocus => {
+                self.focus = self.focus.previous();
+            }
         }
     }
 
@@ -37,6 +58,8 @@ impl App {
         match key.code {
             KeyCode::Char('q') => Action::Quit,
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => Action::Quit,
+            KeyCode::Tab => Action::NextFocus,
+            KeyCode::BackTab => Action::PreviousFocus,
             _ => Action::Noop,
         }
     }
