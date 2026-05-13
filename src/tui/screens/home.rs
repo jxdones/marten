@@ -12,7 +12,7 @@ use crate::{
 pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
     let layout = layout::home(area);
 
-    top_bar::draw(frame, layout.top_bar, app, false);
+    top_bar::draw(frame, layout.top_bar, app);
     left_sidebar::draw(frame, layout.left_sidebar, app, app.focus() == Focus::Files);
 
     diff_panel::draw(frame, layout.diff, app, app.focus() == Focus::Diff);
