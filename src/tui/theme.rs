@@ -31,32 +31,32 @@ pub struct Theme {
 }
 
 pub const DEFAULT: Theme = Theme {
-    bg:            Color::Rgb(22, 17, 13),
-    panel:         Color::Rgb(29, 23, 18),
+    bg: Color::Rgb(22, 17, 13),
+    panel: Color::Rgb(29, 23, 18),
     panel_focused: Color::Rgb(40, 32, 26),
-    line:          Color::Rgb(85, 68, 54),
-    line_hi:       Color::Rgb(112, 89, 71),
+    line: Color::Rgb(85, 68, 54),
+    line_hi: Color::Rgb(112, 89, 71),
 
-    fg:   Color::Rgb(239, 228, 210),
-    dim:  Color::Rgb(160, 141, 118),
+    fg: Color::Rgb(239, 228, 210),
+    dim: Color::Rgb(160, 141, 118),
     vdim: Color::Rgb(94, 79, 66),
 
-    accent:    Color::Rgb(212, 163, 104),
-    select:    Color::Rgb(41, 32, 22),
+    accent: Color::Rgb(212, 163, 104),
+    select: Color::Rgb(41, 32, 22),
     select_hi: Color::Rgb(64, 49, 33),
 
-    add_bg:     Color::Rgb(42, 43, 29),
-    add_fg:     Color::Rgb(181, 201, 122),
+    add_bg: Color::Rgb(42, 43, 29),
+    add_fg: Color::Rgb(181, 201, 122),
     add_gutter: Color::Rgb(138, 168, 105),
-    del_bg:     Color::Rgb(50, 27, 20),
-    del_fg:     Color::Rgb(224, 139, 111),
+    del_bg: Color::Rgb(50, 27, 20),
+    del_fg: Color::Rgb(224, 139, 111),
     del_gutter: Color::Rgb(196, 82, 58),
 
-    staged:    Color::Rgb(181, 201, 122),
-    unstaged:  Color::Rgb(224, 139, 111),
+    staged: Color::Rgb(181, 201, 122),
+    unstaged: Color::Rgb(224, 139, 111),
     untracked: Color::Rgb(212, 163, 104),
-    conflict:  Color::Rgb(212, 84, 63),
-    ignored:   Color::Rgb(74, 61, 51),
+    conflict: Color::Rgb(212, 84, 63),
+    ignored: Color::Rgb(74, 61, 51),
 };
 
 impl Theme {
@@ -75,9 +75,7 @@ impl Theme {
     }
 
     pub fn branch_name(self) -> Style {
-        Style::default()
-            .fg(self.fg)
-            .add_modifier(Modifier::BOLD)
+        Style::default().fg(self.fg).add_modifier(Modifier::BOLD)
     }
 
     pub fn muted(self) -> Style {

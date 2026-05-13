@@ -83,9 +83,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
 
         Line::from(spans)
     } else {
-        Line::from(vec![
-            Span::styled("no repository", theme.repo_name()),
-        ])
+        Line::from(vec![Span::styled("no repository", theme.repo_name())])
     };
 
     let mode = top_bar_mode(app);
