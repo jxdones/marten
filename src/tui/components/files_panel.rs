@@ -35,7 +35,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
 
         let max_stats_width = matching
             .iter()
-            .map(|f| format!("+{} -{}", f.insertions, f.deletions).len())
+            .map(|f| format!("+{} -{} ", f.insertions, f.deletions).len())
             .max()
             .unwrap_or(0);
 
@@ -69,7 +69,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
 
             let stats_str = format!(
                 "{:>width$}",
-                format!("+{} -{}", file.insertions, file.deletions),
+                format!("{}{}", humanize(file.insertions), humanize(file.deletions)),
                 width = max_stats_width
             );
 
@@ -87,3 +87,32 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
 
     frame.render_stateful_widget(list, area, &mut app.files_state_mut().list);
 }
+
+fn humanize(n: usize) -> String {
+    if n >= 1000 {
+        format!("+{}K ", n / 1000)
+    } else {
+        format!("+{} ", n)
+    }
+}
+
+#[cfg(test)]
+  mod tests {
+      use super::*;
+
+      #[test]
+      fn test_humanize() {
+          let cases = [
+              (0, "+0 "),
+              (1, "+1 "),
+              (999, "+999 "),
+              (1000, "+1K "),
+              (1500, "+1K "),
+              (99999, "+99K "),
+          ];
+
+          for (input, expected) in cases {
+              assert_eq!(humanize(input), expected, "humanize({input})");
+          }
+      }
+  }
