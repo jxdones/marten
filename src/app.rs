@@ -2,29 +2,35 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::action::Action;
 use crate::event::Event;
-use crate::git::repository::{self, RepositoryStatus};
-use crate::state::{Focus, Screen};
+use crate::git::repository::{self, FileEntry, RepositoryStatus};
+use crate::state::{Files, Focus, Screen};
 use crate::tui::theme::{self, Theme};
 
 #[derive(Debug)]
 pub struct App {
     screen: Screen,
     focus: Focus,
+    files_state: Files,
+
     theme: Theme,
     should_quit: bool,
 
     repository_status: Option<RepositoryStatus>,
+    files: Option<Vec<FileEntry>>,
 }
 
 impl App {
     pub fn new() -> Self {
         let repository_status = repository::status(".").ok();
+        let files = repository::files(".").ok();
         Self {
             screen: Screen::Home,
             focus: Focus::Files,
+            files_state: Files::default(),
             theme: theme::DEFAULT,
             should_quit: false,
             repository_status,
+            files,
         }
     }
 
@@ -34,6 +40,10 @@ impl App {
 
     pub fn focus(&self) -> Focus {
         self.focus
+    }
+
+    pub fn files_state_mut(&mut self) -> &mut Files {
+        &mut self.files_state
     }
 
     pub fn theme(&self) -> Theme {
@@ -46,6 +56,10 @@ impl App {
 
     pub fn repository_status(&self) -> Option<&RepositoryStatus> {
         self.repository_status.as_ref()
+    }
+
+    pub fn files(&self) -> Option<&Vec<FileEntry>> {
+        self.files.as_ref()
     }
 
     pub fn handle_event(&self, event: Event) -> Action {

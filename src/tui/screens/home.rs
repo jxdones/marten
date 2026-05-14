@@ -9,22 +9,18 @@ use crate::{
     },
 };
 
-pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
+pub fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
     let layout = layout::home(area);
+    let focus = app.focus();
 
     top_bar::draw(frame, layout.top_bar, app);
-    left_sidebar::draw(frame, layout.left_sidebar, app, app.focus() == Focus::Files);
+    left_sidebar::draw(frame, layout.left_sidebar, app, focus == Focus::Files);
 
-    diff_panel::draw(frame, layout.diff, app, app.focus() == Focus::Diff);
+    diff_panel::draw(frame, layout.diff, app, focus == Focus::Diff);
 
-    history_panel::draw(frame, layout.history, app, app.focus() == Focus::History);
+    history_panel::draw(frame, layout.history, app, focus == Focus::History);
 
-    right_sidebar::draw(
-        frame,
-        layout.right_sidebar,
-        app,
-        app.focus() == Focus::Details,
-    );
+    right_sidebar::draw(frame, layout.right_sidebar, app, focus == Focus::Details);
 
     shortcuts::draw(frame, layout.shortcuts, app);
 }

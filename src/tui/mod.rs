@@ -7,7 +7,7 @@ use ratatui::Frame;
 
 use crate::{app::App, state::Screen};
 
-pub fn draw(frame: &mut Frame, app: &App) {
+pub fn draw(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
 
     match app.screen() {

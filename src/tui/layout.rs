@@ -10,13 +10,20 @@ pub struct Home {
     pub shortcuts: Rect,
 }
 
+#[derive(Debug, Clone)]
+pub struct LeftSidebar {
+    pub files: Rect,
+    pub branches: Rect,
+    pub stash: Rect,
+}
+
 pub fn home(area: Rect) -> Home {
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Length(1),
             Constraint::Min(0),
-            Constraint::Length(3),
+            Constraint::Length(2),
         ])
         .split(area);
 
@@ -41,5 +48,22 @@ pub fn home(area: Rect) -> Home {
         history: center_rows[1],
         right_sidebar: cols[2],
         shortcuts: rows[2],
+    }
+}
+
+pub fn left_sidebar(area: Rect) -> LeftSidebar {
+    let rows = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage(34),
+            Constraint::Percentage(33),
+            Constraint::Percentage(33),
+        ])
+        .split(area);
+
+    LeftSidebar {
+        files: rows[0],
+        branches: rows[1],
+        stash: rows[2],
     }
 }

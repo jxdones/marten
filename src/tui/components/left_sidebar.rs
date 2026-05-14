@@ -1,8 +1,13 @@
 use ratatui::{Frame, layout::Rect};
 
 use crate::app::App;
-use crate::tui::components::panel;
+use crate::tui::components::{branches_panel, files_panel, panel, stash_panel};
+use crate::tui::layout;
 
-pub fn draw(frame: &mut Frame, area: Rect, app: &App, is_focused: bool) {
-    frame.render_widget(panel::block("left sidebar", app.theme(), is_focused), area);
+pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
+    let layout = layout::left_sidebar(area);
+
+    files_panel::draw(frame, layout.files, app, is_focused);
+    branches_panel::draw(frame, layout.branches, app, false);
+    stash_panel::draw(frame, layout.stash, app, false);
 }
