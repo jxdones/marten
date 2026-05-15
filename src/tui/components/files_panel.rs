@@ -54,23 +54,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
                     FileStatus::Untracked => Span::styled("U ", theme.untracked()),
                 };
 
-                let path = if path_width == 0 {
-                    String::new()
-                } else if entry.path.len() > path_width {
-                    let segments: Vec<&str> = entry.path.split('/').collect();
-                    let short = if segments.len() >= 2 {
-                        format!(
-                            "…/{}/{}",
-                            segments[segments.len() - 2],
-                            segments[segments.len() - 1]
-                        )
-                    } else {
-                        format!("…{}", &segments[segments.len() - 1])
-                    };
-                    format!("{:<path_width$}", short, path_width = path_width)
-                } else {
-                    format!("{:<path_width$}", entry.path, path_width = path_width)
-                };
+                let path = format_path(&entry.path, path_width);
 
                 let insertions = humanize_stat('+', entry.insertions);
                 let deletions = humanize_stat('-', entry.deletions);
@@ -79,7 +63,6 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
 
                 items.push(ListItem::new(Line::from(vec![
                     status_letter,
-                    // TODO: truncate long paths to filename only
                     Span::styled(path, theme.text_primary()),
                     Span::raw(stats_padding),
                     Span::styled(insertions, theme.staged()),
@@ -103,4 +86,59 @@ fn humanize_stat(prefix: char, n: usize) -> String {
     }
 }
 
-// TODO: Add tests for stat formatting and file row rendering.
+fn format_path(path: &str, width: usize) -> String {
+    if width == 0 {
+        return String::new();
+    }
+
+    if path.len() <= width {
+        return format!("{path:<width$}");
+    }
+
+    let segments: Vec<&str> = path.split('/').collect();
+    let filename = segments.last().copied().unwrap_or(path);
+    let parent = segments
+        .len()
+        .checked_sub(2)
+        .and_then(|index| segments.get(index))
+        .copied();
+
+    let short = if let Some(parent) = parent {
+        let prefix = format!("…/{parent}/");
+        if prefix.len() < width {
+            format!(
+                "{prefix}{}",
+                truncate_middle(filename, width - prefix.len())
+            )
+        } else {
+            truncate_middle(filename, width)
+        }
+    } else {
+        truncate_middle(filename, width)
+    };
+
+    format!("{short:<width$}")
+}
+
+fn truncate_middle(value: &str, width: usize) -> String {
+    let len = value.chars().count();
+    if len <= width {
+        return value.to_string();
+    }
+
+    if width == 1 {
+        return "…".to_string();
+    }
+
+    let left_width = (width - 1) / 2;
+    let right_width = width - 1 - left_width;
+    let left: String = value.chars().take(left_width).collect();
+    let right: String = value
+        .chars()
+        .skip(len.saturating_sub(right_width))
+        .collect();
+
+    format!("{left}…{right}")
+}
+
+// TODO: Add tests for stat formatting, path truncation, and file row rendering.

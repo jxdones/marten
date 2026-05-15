@@ -87,7 +87,7 @@ pub fn files(path: impl AsRef<Path>) -> GitResult<Vec<FileEntry>> {
     let unstaged_map: HashMap<String, (usize, usize)> = diff_stats(&unstaged_diff)?;
 
     let mut opts = StatusOptions::new();
-    opts.include_untracked(true);
+    opts.include_untracked(true).recurse_untracked_dirs(true);
 
     let statuses = repo.statuses(Some(&mut opts))?;
     let mut entries = Vec::new();
@@ -218,7 +218,7 @@ fn ahead_behind(
 
 fn change_counts(repo: &Repository) -> GitResult<ChangeCounts> {
     let mut opts = StatusOptions::new();
-    opts.include_untracked(true);
+    opts.include_untracked(true).recurse_untracked_dirs(true);
 
     let statuses = repo.statuses(Some(&mut opts))?;
     let mut changes = ChangeCounts::default();

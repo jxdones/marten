@@ -2,7 +2,7 @@
 
 APP := marten
 
-.PHONY: help build run play check test fmt lint audit ci ci-full release install clean
+.PHONY: help build run run-release play dev-files clean-dev-files check test fmt lint audit ci ci-full release install clean
 
 help:
 	@printf "\n"
@@ -11,6 +11,8 @@ help:
 	@printf "  %-12s %s\n" "build" "Build the project (debug)."
 	@printf "  %-12s %s\n" "run" "Run the project (debug)."
 	@printf "  %-12s %s\n" "run-release" "Run the release binary."
+	@printf "  %-12s %s\n" "dev-files" "Create dummy untracked files for local files panel testing."
+	@printf "  %-12s %s\n" "clean-dev-files" "Remove dummy files created by dev-files."
 	@printf "  %-12s %s\n" "check" "Type-check and compile without linking."
 	@printf "  %-12s %s\n" "test" "Run tests."
 	@printf "  %-12s %s\n" "fmt" "Format Rust code."
@@ -35,6 +37,15 @@ run-release:
 		$(MAKE) release; \
 	fi
 	@./target/release/marten
+
+dev-files:
+	@mkdir -p .marten-dev/nested
+	@printf "Dummy unstaged content for marten development.\n" > .marten-dev/unstaged.txt
+	@printf "Nested dummy file for panel truncation checks.\n" > .marten-dev/nested/very-long-file-name-for-files-panel.txt
+	@printf "Created dummy untracked files under .marten-dev/.\n"
+
+clean-dev-files:
+	rm -rf .marten-dev
 
 check:
 	cargo check --all-targets
@@ -63,4 +74,3 @@ install:
 
 clean:
 	cargo clean
-
