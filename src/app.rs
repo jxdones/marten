@@ -3,7 +3,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crate::action::Action;
 use crate::event::Event;
 use crate::git::repository::{self, FileEntry, RepositoryStatus};
-use crate::state::{Files, Focus, Screen};
+use crate::state::{Files, Focus, Screen, file_panel_rows};
 use crate::tui::theme::{self, Theme};
 
 #[derive(Debug)]
@@ -23,7 +23,7 @@ impl App {
     pub fn new() -> Self {
         let repository_status = repository::status(".").ok();
         let files = repository::files(".").ok();
-        Self {
+        let mut app = Self {
             screen: Screen::Home,
             focus: Focus::Files,
             files_state: Files::default(),
@@ -31,7 +31,9 @@ impl App {
             should_quit: false,
             repository_status,
             files,
-        }
+        };
+        app.select_first_file();
+        app
     }
 
     pub fn screen(&self) -> Screen {
@@ -81,6 +83,12 @@ impl App {
             Action::PreviousFocus => {
                 self.focus = self.focus.previous();
             }
+            Action::NextFile => {
+                self.select_next_file();
+            }
+            Action::PreviousFile => {
+                self.select_previous_file();
+            }
         }
     }
 
@@ -90,7 +98,39 @@ impl App {
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => Action::Quit,
             KeyCode::Tab => Action::NextFocus,
             KeyCode::BackTab => Action::PreviousFocus,
+            KeyCode::Down | KeyCode::Char('j') if self.focus == Focus::Files => Action::NextFile,
+            KeyCode::Up | KeyCode::Char('k') if self.focus == Focus::Files => Action::PreviousFile,
             _ => Action::Noop,
         }
+    }
+
+    fn select_first_file(&mut self) {
+        let Some(files) = self.files.as_ref() else {
+            self.files_state.list.select(None);
+            return;
+        };
+
+        let rows = file_panel_rows(files);
+        self.files_state.select_first(&rows);
+    }
+
+    fn select_next_file(&mut self) {
+        let Some(files) = self.files.as_ref() else {
+            self.files_state.list.select(None);
+            return;
+        };
+
+        let rows = file_panel_rows(files);
+        self.files_state.select_next(&rows);
+    }
+
+    fn select_previous_file(&mut self) {
+        let Some(files) = self.files.as_ref() else {
+            self.files_state.list.select(None);
+            return;
+        };
+
+        let rows = file_panel_rows(files);
+        self.files_state.select_previous(&rows);
     }
 }

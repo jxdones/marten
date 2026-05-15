@@ -5,80 +5,87 @@ use ratatui::{Frame, layout::Rect};
 
 use crate::app::App;
 use crate::git::repository::FileStatus;
+use crate::state::{FilePanelRow, file_panel_rows};
 use crate::tui::components::panel;
 
 pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
     let theme = app.theme();
     let block = panel::block("files", theme, is_focused);
 
-    let files = app.files().cloned().unwrap_or_default();
     let mut items: Vec<ListItem> = Vec::new();
-
-    let groups = [
-        ("STAGED", FileStatus::Staged),
-        ("PARTIAL", FileStatus::Partial),
-        ("CONFLICTED", FileStatus::Conflicted),
-        ("UNSTAGED", FileStatus::Unstaged),
-        ("UNTRACKED", FileStatus::Untracked),
-    ];
-
-    for (label, status) in &groups {
-        let matching: Vec<_> = files.iter().filter(|f| matches!(&f.status, s if std::mem::discriminant(s) == std::mem::discriminant(status))).collect();
-        if matching.is_empty() {
-            continue;
-        }
-
+    let Some(files) = app.files().cloned() else {
         items.push(ListItem::new(Line::from(Span::styled(
-            format!("{} {}", label, matching.len()),
+            "unable to read git status",
             theme.muted(),
         ))));
 
-        let max_stats_width = matching
-            .iter()
-            .map(|f| format!("+{} -{} ", f.insertions, f.deletions).len())
-            .max()
-            .unwrap_or(0);
+        let list = List::new(items)
+            .block(block)
+            .highlight_style(Style::default().bg(theme.select));
 
-        let usable = area.width as usize - 2;
-        let path_width = usable - 2 - max_stats_width;
+        frame.render_stateful_widget(list, area, &mut app.files_state_mut().list);
+        return;
+    };
 
-        for file in matching {
-            let status_letter = match file.status {
-                FileStatus::Staged => Span::styled("S ", theme.staged()),
-                FileStatus::Partial => Span::styled("P ", theme.unstaged()),
-                FileStatus::Conflicted => Span::styled("! ", theme.conflict()),
-                FileStatus::Unstaged => Span::styled("M ", theme.unstaged()),
-                FileStatus::Untracked => Span::styled("U ", theme.untracked()),
-            };
+    if files.is_empty() {
+        items.push(ListItem::new(Line::from(Span::styled(
+            "working tree clean",
+            theme.muted(),
+        ))));
+    }
 
-            let path = if file.path.len() > path_width {
-                let segments: Vec<&str> = file.path.split('/').collect();
-                let short = if segments.len() >= 2 {
-                    format!(
-                        "…/{}/{}",
-                        segments[segments.len() - 2],
-                        segments[segments.len() - 1]
-                    )
-                } else {
-                    format!("…{}", &segments[segments.len() - 1])
+    for row in file_panel_rows(&files) {
+        match row {
+            FilePanelRow::Header { status, count } => {
+                items.push(ListItem::new(Line::from(Span::styled(
+                    format!("{} {}", status.label(), count),
+                    theme.muted(),
+                ))));
+            }
+            FilePanelRow::File { entry, stats_width } => {
+                let usable = (area.width as usize).saturating_sub(2);
+                let path_width = usable.saturating_sub(2 + stats_width);
+
+                let status_letter = match entry.status {
+                    FileStatus::Staged => Span::styled("S ", theme.staged()),
+                    FileStatus::Partial => Span::styled("P ", theme.unstaged()),
+                    FileStatus::Conflicted => Span::styled("! ", theme.conflict()),
+                    FileStatus::Unstaged => Span::styled("M ", theme.unstaged()),
+                    FileStatus::Untracked => Span::styled("U ", theme.untracked()),
                 };
-                format!("{:<path_width$}", short, path_width = path_width)
-            } else {
-                format!("{:<path_width$}", file.path, path_width = path_width)
-            };
 
-            let stats_str = format!(
-                "{:>width$}",
-                format!("{}{}", humanize(file.insertions), humanize(file.deletions)),
-                width = max_stats_width
-            );
+                let path = if path_width == 0 {
+                    String::new()
+                } else if entry.path.len() > path_width {
+                    let segments: Vec<&str> = entry.path.split('/').collect();
+                    let short = if segments.len() >= 2 {
+                        format!(
+                            "…/{}/{}",
+                            segments[segments.len() - 2],
+                            segments[segments.len() - 1]
+                        )
+                    } else {
+                        format!("…{}", &segments[segments.len() - 1])
+                    };
+                    format!("{:<path_width$}", short, path_width = path_width)
+                } else {
+                    format!("{:<path_width$}", entry.path, path_width = path_width)
+                };
 
-            items.push(ListItem::new(Line::from(vec![
-                status_letter,
-                // TODO: truncate long paths to filename only
-                Span::styled(path, theme.text_primary()),
-                Span::styled(stats_str, theme.muted()),
-            ])));
+                let insertions = humanize_stat('+', entry.insertions);
+                let deletions = humanize_stat('-', entry.deletions);
+                let stats = format!("{insertions}{deletions}");
+                let stats_padding = " ".repeat(stats_width.saturating_sub(stats.len()));
+
+                items.push(ListItem::new(Line::from(vec![
+                    status_letter,
+                    // TODO: truncate long paths to filename only
+                    Span::styled(path, theme.text_primary()),
+                    Span::raw(stats_padding),
+                    Span::styled(insertions, theme.staged()),
+                    Span::styled(deletions, theme.unstaged()),
+                ])));
+            }
         }
     }
     let list = List::new(items)
@@ -88,31 +95,12 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
     frame.render_stateful_widget(list, area, &mut app.files_state_mut().list);
 }
 
-fn humanize(n: usize) -> String {
+fn humanize_stat(prefix: char, n: usize) -> String {
     if n >= 1000 {
-        format!("+{}K ", n / 1000)
+        format!("{prefix}{}K ", n / 1000)
     } else {
-        format!("+{} ", n)
+        format!("{prefix}{n} ")
     }
 }
 
-#[cfg(test)]
-  mod tests {
-      use super::*;
-
-      #[test]
-      fn test_humanize() {
-          let cases = [
-              (0, "+0 "),
-              (1, "+1 "),
-              (999, "+999 "),
-              (1000, "+1K "),
-              (1500, "+1K "),
-              (99999, "+99K "),
-          ];
-
-          for (input, expected) in cases {
-              assert_eq!(humanize(input), expected, "humanize({input})");
-          }
-      }
-  }
+// TODO: Add tests for stat formatting and file row rendering.

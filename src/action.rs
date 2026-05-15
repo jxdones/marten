@@ -4,4 +4,6 @@ pub enum Action {
     Quit,
     NextFocus,
     PreviousFocus,
+    NextFile,
+    PreviousFile,
 }

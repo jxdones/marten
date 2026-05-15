@@ -37,13 +37,25 @@ pub struct FileEntry {
     pub deletions: usize,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileStatus {
     Staged,
     Partial,
     Unstaged,
     Untracked,
     Conflicted,
+}
+
+impl FileStatus {
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Staged => "STAGED",
+            Self::Partial => "PARTIAL",
+            Self::Conflicted => "CONFLICTED",
+            Self::Unstaged => "UNSTAGED",
+            Self::Untracked => "UNTRACKED",
+        }
+    }
 }
 
 pub fn status(path: impl AsRef<Path>) -> GitResult<RepositoryStatus> {
