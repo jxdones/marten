@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::Path};
+use std::{collections::HashMap, fs, path::Path};
 
 use crate::git::GitResult;
 use git2::{self, Diff, Patch, Reference, Repository, Status, StatusOptions};
@@ -46,6 +46,22 @@ pub enum FileStatus {
     Conflicted,
 }
 
+#[derive(Debug, Clone)]
+pub struct DiffLine {
+    pub old_lineno: Option<u32>,
+    pub new_lineno: Option<u32>,
+    pub origin: char,
+    pub content: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct DiffHunk {
+    pub header: String,
+    pub lines: Vec<DiffLine>,
+    pub insertions: usize,
+    pub deletions: usize,
+}
+
 impl FileStatus {
     pub fn label(self) -> &'static str {
         match self {
@@ -58,11 +74,10 @@ impl FileStatus {
     }
 }
 
-pub fn status(path: impl AsRef<Path>) -> GitResult<RepositoryStatus> {
-    let repo = Repository::discover(path)?;
-    let name = repository_name(&repo);
-    let (head, ahead, behind) = head_status(&repo)?;
-    let changes = change_counts(&repo)?;
+pub fn status(repo: &Repository) -> GitResult<RepositoryStatus> {
+    let name = repository_name(repo);
+    let (head, ahead, behind) = head_status(repo)?;
+    let changes = change_counts(repo)?;
 
     Ok(RepositoryStatus {
         name,
@@ -73,9 +88,7 @@ pub fn status(path: impl AsRef<Path>) -> GitResult<RepositoryStatus> {
     })
 }
 
-pub fn files(path: impl AsRef<Path>) -> GitResult<Vec<FileEntry>> {
-    let repo = Repository::discover(path)?;
-
+pub fn files(repo: &Repository) -> GitResult<Vec<FileEntry>> {
     let head = repo.head()?;
     let head_commit = head.peel_to_commit()?;
     let head_tree = head_commit.tree()?;
@@ -131,7 +144,8 @@ pub fn files(path: impl AsRef<Path>) -> GitResult<Vec<FileEntry>> {
                 let (ui, ud) = unstaged_map.get(&path).copied().unwrap_or((0, 0));
                 (si + ui, sd + ud)
             }
-            FileStatus::Untracked | FileStatus::Conflicted => (0, 0),
+            FileStatus::Untracked => (untracked_line_count(repo, &path)?, 0),
+            FileStatus::Conflicted => (0, 0),
         };
 
         entries.push(FileEntry {
@@ -143,6 +157,103 @@ pub fn files(path: impl AsRef<Path>) -> GitResult<Vec<FileEntry>> {
     }
 
     Ok(entries)
+}
+
+pub fn file_diff(repo: &Repository, path: &str, status: FileStatus) -> GitResult<Vec<DiffHunk>> {
+    if status == FileStatus::Untracked {
+        return untracked_file_diff(repo, path);
+    }
+
+    let head = repo.head()?;
+
+    let diff = match status {
+        FileStatus::Staged | FileStatus::Partial => {
+            let head_commit = head.peel_to_commit()?;
+            let head_tree = head_commit.tree()?;
+            repo.diff_tree_to_index(Some(&head_tree), None, None)?
+        }
+        FileStatus::Unstaged => repo.diff_index_to_workdir(None, None)?,
+        _ => return Ok(vec![]),
+    };
+
+    let mut patch: Option<Patch> = None;
+    for (idx, delta) in diff.deltas().enumerate() {
+        let Some(patch_from_diff) = Patch::from_diff(&diff, idx)? else {
+            continue;
+        };
+        let Some(delta_path) = delta.new_file().path() else {
+            continue;
+        };
+
+        if delta_path == std::path::Path::new(path) {
+            patch = Some(patch_from_diff);
+            break;
+        }
+    }
+
+    let Some(patch) = patch else {
+        return Ok(vec![]);
+    };
+
+    let mut hunks: Vec<DiffHunk> = Vec::new();
+    for hunk_idx in 0..patch.num_hunks() {
+        let mut diff_lines: Vec<DiffLine> = Vec::new();
+        let (hunk, num_lines) = patch.hunk(hunk_idx)?;
+        for line_idx in 0..num_lines {
+            let line = patch.line_in_hunk(hunk_idx, line_idx)?;
+            diff_lines.push(DiffLine {
+                old_lineno: line.old_lineno(),
+                new_lineno: line.new_lineno(),
+                origin: line.origin(),
+                content: String::from_utf8_lossy(line.content()).to_string(),
+            });
+        }
+        let (insertions, deletions) = diff_lines.iter().fold((0, 0), |(i, d), l| match l.origin {
+            '+' => (i + 1, d),
+            '-' => (i, d + 1),
+            _ => (i, d),
+        });
+        hunks.push(DiffHunk {
+            header: String::from_utf8_lossy(hunk.header()).to_string(),
+            lines: diff_lines,
+            insertions,
+            deletions,
+        });
+    }
+
+    Ok(hunks)
+}
+
+fn untracked_file_diff(repo: &Repository, path: &str) -> GitResult<Vec<DiffHunk>> {
+    let content = untracked_file_content(repo, path)?;
+    let lines = content
+        .lines()
+        .enumerate()
+        .map(|(idx, line)| DiffLine {
+            old_lineno: None,
+            new_lineno: Some((idx + 1) as u32),
+            origin: '+',
+            content: line.to_string(),
+        })
+        .collect::<Vec<_>>();
+
+    let insertions = lines.len();
+    Ok(vec![DiffHunk {
+        header: format!("@@ -0,0 +1,{} @@ {}", insertions, path),
+        lines,
+        insertions,
+        deletions: 0,
+    }])
+}
+
+fn untracked_line_count(repo: &Repository, path: &str) -> GitResult<usize> {
+    Ok(untracked_file_content(repo, path)?.lines().count())
+}
+
+fn untracked_file_content(repo: &Repository, path: &str) -> GitResult<String> {
+    let path = repo.workdir().unwrap_or_else(|| Path::new(".")).join(path);
+    let bytes = fs::read(path)?;
+    Ok(String::from_utf8_lossy(&bytes).to_string())
 }
 
 fn head_status(repo: &Repository) -> GitResult<(Head, usize, usize)> {

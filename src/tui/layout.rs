@@ -6,7 +6,6 @@ pub struct Home {
     pub left_sidebar: Rect,
     pub diff: Rect,
     pub history: Rect,
-    pub right_sidebar: Rect,
     pub shortcuts: Rect,
 }
 
@@ -29,11 +28,7 @@ pub fn home(area: Rect) -> Home {
 
     let cols = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Percentage(22),
-            Constraint::Percentage(56),
-            Constraint::Percentage(22),
-        ])
+        .constraints([Constraint::Percentage(25), Constraint::Percentage(75)])
         .split(rows[1]);
 
     let center_rows = Layout::default()
@@ -46,7 +41,6 @@ pub fn home(area: Rect) -> Home {
         left_sidebar: cols[0],
         diff: center_rows[0],
         history: center_rows[1],
-        right_sidebar: cols[2],
         shortcuts: rows[2],
     }
 }

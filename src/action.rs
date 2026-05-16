@@ -4,6 +4,9 @@ pub enum Action {
     Quit,
     NextFocus,
     PreviousFocus,
-    NextFile,
-    PreviousFile,
+    MoveDown,
+    MoveUp,
+    NextHunk,
+    PreviousHunk,
+    ToggleDiffLineNumbers,
 }

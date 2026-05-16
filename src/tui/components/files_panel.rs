@@ -35,7 +35,6 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
         ))));
     }
 
-
     let rows = file_panel_rows(&files);
     let selected_row = get_selected_row(&rows, app.files_state().selected);
     list_state.select(selected_row);

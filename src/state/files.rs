@@ -7,16 +7,11 @@ pub struct Files {
 
 #[derive(Debug, Clone, Copy)]
 pub enum FilePanelRow<'a> {
-    Header {
-        status: FileStatus,
-        count: usize,
-    },
-    File {
-        entry: &'a FileEntry,
-    },
+    Header { status: FileStatus, count: usize },
+    File { entry: &'a FileEntry },
 }
 
-const STATUS_ORDER: [FileStatus; 5] = [
+pub const STATUS_ORDER: [FileStatus; 5] = [
     FileStatus::Staged,
     FileStatus::Partial,
     FileStatus::Conflicted,
