@@ -1,4 +1,5 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::{execute, terminal::SetTitle};
 use git2::Repository;
 
 use crate::action::Action;
@@ -36,6 +37,9 @@ impl App {
             });
             f
         });
+
+        // set app title
+        execute!(std::io::stdout(), SetTitle("marten")).ok();
 
         let mut app = Self {
             screen: Screen::Home,
