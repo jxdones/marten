@@ -1,6 +1,6 @@
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{List, ListItem};
+use ratatui::widgets::{List, ListItem, ListState};
 use ratatui::{Frame, layout::Rect};
 
 use crate::app::App;
@@ -11,6 +11,7 @@ use crate::tui::components::panel;
 pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
     let theme = app.theme();
     let block = panel::block("files", theme, is_focused);
+    let mut list_state = ListState::default();
 
     let mut items: Vec<ListItem> = Vec::new();
     let Some(files) = app.files().cloned() else {
@@ -23,7 +24,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
             .block(block)
             .highlight_style(Style::default().bg(theme.select));
 
-        frame.render_stateful_widget(list, area, &mut app.files_state_mut().list);
+        frame.render_stateful_widget(list, area, &mut list_state);
         return;
     };
 
@@ -34,7 +35,24 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
         ))));
     }
 
-    for row in file_panel_rows(&files) {
+
+    let rows = file_panel_rows(&files);
+    let selected_row = get_selected_row(&rows, app.files_state().selected);
+    list_state.select(selected_row);
+
+    let stats_width = rows
+        .iter()
+        .filter_map(|row| match row {
+            FilePanelRow::File { entry } => Some(
+                humanize_stat('+', entry.insertions).len()
+                    + humanize_stat('-', entry.deletions).len(),
+            ),
+            _ => None,
+        })
+        .max()
+        .unwrap_or(0);
+
+    for row in rows {
         match row {
             FilePanelRow::Header { status, count } => {
                 items.push(ListItem::new(Line::from(Span::styled(
@@ -42,7 +60,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
                     theme.muted(),
                 ))));
             }
-            FilePanelRow::File { entry, stats_width } => {
+            FilePanelRow::File { entry } => {
                 let usable = (area.width as usize).saturating_sub(2);
                 let path_width = usable.saturating_sub(2 + stats_width);
 
@@ -75,7 +93,20 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
         .block(block)
         .highlight_style(Style::default().bg(theme.select));
 
-    frame.render_stateful_widget(list, area, &mut app.files_state_mut().list);
+    frame.render_stateful_widget(list, area, &mut list_state);
+}
+
+fn get_selected_row(rows: &[FilePanelRow<'_>], selected: Option<usize>) -> Option<usize> {
+    let mut file_count = 0;
+    for (row_index, row) in rows.iter().enumerate() {
+        if let FilePanelRow::File { .. } = row {
+            if Some(file_count) == selected {
+                return Some(row_index);
+            }
+            file_count += 1;
+        }
+    }
+    None
 }
 
 fn humanize_stat(prefix: char, n: usize) -> String {

@@ -3,7 +3,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crate::action::Action;
 use crate::event::Event;
 use crate::git::repository::{self, FileEntry, RepositoryStatus};
-use crate::state::{Files, Focus, Screen, file_panel_rows};
+use crate::state::{Files, Focus, Screen};
 use crate::tui::theme::{self, Theme};
 
 #[derive(Debug)]
@@ -44,8 +44,8 @@ impl App {
         self.focus
     }
 
-    pub fn files_state_mut(&mut self) -> &mut Files {
-        &mut self.files_state
+    pub fn files_state(&self) -> &Files {
+        &self.files_state
     }
 
     pub fn theme(&self) -> Theme {
@@ -105,32 +105,17 @@ impl App {
     }
 
     fn select_first_file(&mut self) {
-        let Some(files) = self.files.as_ref() else {
-            self.files_state.list.select(None);
-            return;
-        };
-
-        let rows = file_panel_rows(files);
-        self.files_state.select_first(&rows);
+        let len = self.files.as_ref().map_or(0, |f| f.len());
+        self.files_state.select_first(len);
     }
 
     fn select_next_file(&mut self) {
-        let Some(files) = self.files.as_ref() else {
-            self.files_state.list.select(None);
-            return;
-        };
-
-        let rows = file_panel_rows(files);
-        self.files_state.select_next(&rows);
+        let len = self.files.as_ref().map_or(0, |f| f.len());
+        self.files_state.select_next(len);
     }
 
     fn select_previous_file(&mut self) {
-        let Some(files) = self.files.as_ref() else {
-            self.files_state.list.select(None);
-            return;
-        };
-
-        let rows = file_panel_rows(files);
-        self.files_state.select_previous(&rows);
+        let len = self.files.as_ref().map_or(0, |f| f.len());
+        self.files_state.select_previous(len);
     }
 }
