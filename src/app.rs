@@ -25,9 +25,11 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
+        // set app title
+        execute!(std::io::stdout(), SetTitle("marten")).ok();
+
         let repo = Repository::discover(".").expect("not a git repo");
         let repository_status = repository::status(&repo).ok();
-
         let files = repository::files(&repo).ok().map(|mut f| {
             f.sort_by_key(|e| {
                 STATUS_ORDER
@@ -37,9 +39,6 @@ impl App {
             });
             f
         });
-
-        // set app title
-        execute!(std::io::stdout(), SetTitle("marten")).ok();
 
         let mut app = Self {
             screen: Screen::Home,
@@ -156,6 +155,28 @@ impl App {
             }
             Action::ToggleDiffLineNumbers => {
                 self.diff_state.toggle_line_numbers();
+            },
+            Action::Refresh => { 
+                self.repository_status = repository::status(&self.repo).ok();
+                self.files = repository::files(&self.repo).ok().map(|mut f| {
+                    f.sort_by_key(|e| {
+                        STATUS_ORDER
+                            .iter()
+                            .position(|s| *s == e.status)
+                            .unwrap_or(99)
+                    });
+                    f
+                });
+
+                let len = self.files.as_ref().map_or(0, |f| f.len());
+                if len == 0 {
+                    self.files_state.selected = None;
+                } else {
+                    self.files_state.selected = Some(
+                        self.files_state.selected.unwrap_or(0).min(len - 1)
+                    );
+                }
+                self.refresh_diff();
             }
         }
     }
@@ -171,6 +192,7 @@ impl App {
             KeyCode::Char(']') if self.focus == Focus::Diff => Action::NextHunk,
             KeyCode::Char('[') if self.focus == Focus::Diff => Action::PreviousHunk,
             KeyCode::Char('l') if self.focus == Focus::Diff => Action::ToggleDiffLineNumbers,
+            KeyCode::Char('r') => Action::Refresh,
             _ => Action::Noop,
         }
     }

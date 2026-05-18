@@ -9,4 +9,5 @@ pub enum Action {
     NextHunk,
     PreviousHunk,
     ToggleDiffLineNumbers,
+    Refresh,
 }
