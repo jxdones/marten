@@ -65,7 +65,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
 
                 let status_letter = match entry.status {
                     FileStatus::Staged => Span::styled("S ", theme.staged()),
-                    FileStatus::Partial => Span::styled("P ", theme.unstaged()),
+                    FileStatus::Partial => Span::styled("P ", theme.partial()),
                     FileStatus::Conflicted => Span::styled("! ", theme.conflict()),
                     FileStatus::Unstaged => Span::styled("M ", theme.unstaged()),
                     FileStatus::Untracked => Span::styled("U ", theme.untracked()),

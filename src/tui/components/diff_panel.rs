@@ -1,11 +1,11 @@
 use ratatui::layout::Alignment;
-use ratatui::style::{Modifier, Style};
+use ratatui::style::{Modifier, Style, Stylize};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, List, ListItem, ListState};
 use ratatui::{Frame, layout::Rect};
 
 use crate::app::App;
-use crate::git::repository::DiffLine;
+use crate::git::repository::{DiffLine, FileStatus};
 
 pub fn draw(frame: &mut Frame, area: Rect, app: &App, is_focused: bool) {
     let theme = app.theme();
@@ -118,10 +118,19 @@ fn diff_title(app: &App) -> Line<'static> {
             theme.unstaged(),
         ));
         spans.push(Span::styled(" · ", theme.muted()));
-        spans.push(Span::styled(
-            file.status.label().to_lowercase(),
-            theme.muted(),
-        ));
+
+        let status_color = match file.status {
+            FileStatus::Staged => theme.staged(),
+            FileStatus::Partial => theme.partial(),
+            FileStatus::Unstaged => theme.unstaged(),
+            FileStatus::Untracked => theme.untracked(),
+            FileStatus::Conflicted => theme.conflict(),
+        };
+
+        spans.push(
+            Span::styled(file.status.label().to_lowercase(), status_color)
+                .add_modifier(Modifier::BOLD),
+        );
     }
 
     Line::from(spans)

@@ -24,6 +24,7 @@ pub struct Theme {
     pub del_gutter: Color,
 
     pub staged: Color,
+    pub partial: Color,
     pub unstaged: Color,
     pub untracked: Color,
     pub conflict: Color,
@@ -53,6 +54,7 @@ pub const DEFAULT: Theme = Theme {
     del_gutter: Color::Rgb(196, 82, 58),
 
     staged: Color::Rgb(181, 201, 122),
+    partial: Color::Rgb(220, 190, 100),
     unstaged: Color::Rgb(224, 139, 111),
     untracked: Color::Rgb(212, 163, 104),
     conflict: Color::Rgb(212, 84, 63),
@@ -100,6 +102,10 @@ impl Theme {
 
     pub fn staged(self) -> Style {
         Style::default().fg(self.staged)
+    }
+
+    pub fn partial(self) -> Style {
+        Style::default().fg(self.partial)
     }
 
     pub fn unstaged(self) -> Style {
