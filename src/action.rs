@@ -10,4 +10,6 @@ pub enum Action {
     PreviousHunk,
     ToggleDiffLineNumbers,
     Refresh,
+    GoToFirst,
+    GoToLast,
 }

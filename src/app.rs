@@ -176,6 +176,14 @@ impl App {
                         Some(self.files_state.selected.unwrap_or(0).min(len - 1));
                 }
                 self.refresh_diff();
+            },
+            Action::GoToFirst => {
+                self.select_first_file();
+                self.refresh_diff();
+            }
+            Action::GoToLast => {
+                self.select_last_file();
+                self.refresh_diff();
             }
         }
     }
@@ -192,6 +200,8 @@ impl App {
             KeyCode::Char('[') if self.focus == Focus::Diff => Action::PreviousHunk,
             KeyCode::Char('l') if self.focus == Focus::Diff => Action::ToggleDiffLineNumbers,
             KeyCode::Char('r') => Action::Refresh,
+            KeyCode::Char('g') if self.focus == Focus::Files => Action::GoToFirst,
+            KeyCode::Char('G') if self.focus == Focus::Files => Action::GoToLast,
             _ => Action::Noop,
         }
     }
@@ -205,6 +215,11 @@ impl App {
     fn select_first_file(&mut self) {
         let len = self.files.as_ref().map_or(0, |f| f.len());
         self.files_state.select_first(len);
+    }
+
+    fn select_last_file(&mut self) {
+        let len = self.files.as_ref().map_or(0, |f| f.len());
+        self.files_state.select_last(len);
     }
 
     fn select_next_file(&mut self) {

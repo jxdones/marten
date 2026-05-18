@@ -28,7 +28,6 @@ pub struct Theme {
     pub unstaged: Color,
     pub untracked: Color,
     pub conflict: Color,
-    pub ignored: Color,
 }
 
 pub const DEFAULT: Theme = Theme {
@@ -58,7 +57,6 @@ pub const DEFAULT: Theme = Theme {
     unstaged: Color::Rgb(224, 139, 111),
     untracked: Color::Rgb(212, 163, 104),
     conflict: Color::Rgb(212, 84, 63),
-    ignored: Color::Rgb(74, 61, 51),
 };
 
 impl Theme {
@@ -118,10 +116,6 @@ impl Theme {
 
     pub fn conflict(self) -> Style {
         Style::default().fg(self.conflict)
-    }
-
-    pub fn ignored(self) -> Style {
-        Style::default().fg(self.ignored)
     }
 
     pub fn diff_add(self) -> Style {

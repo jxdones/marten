@@ -40,7 +40,7 @@ fn shortcuts(app: &App) -> Vec<(&'static str, &'static str)> {
 
     match app.focus() {
         Focus::Files => {
-            shortcuts.extend([("j/k", "navigate")]);
+            shortcuts.extend([("j/k", "navigate"), ("g", "first"), ("G", "last")]);
         }
         Focus::Diff => {
             let line_number_label = if app.diff_state().show_line_numbers {
