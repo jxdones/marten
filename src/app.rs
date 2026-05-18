@@ -155,8 +155,8 @@ impl App {
             }
             Action::ToggleDiffLineNumbers => {
                 self.diff_state.toggle_line_numbers();
-            },
-            Action::Refresh => { 
+            }
+            Action::Refresh => {
                 self.repository_status = repository::status(&self.repo).ok();
                 self.files = repository::files(&self.repo).ok().map(|mut f| {
                     f.sort_by_key(|e| {
@@ -172,9 +172,8 @@ impl App {
                 if len == 0 {
                     self.files_state.selected = None;
                 } else {
-                    self.files_state.selected = Some(
-                        self.files_state.selected.unwrap_or(0).min(len - 1)
-                    );
+                    self.files_state.selected =
+                        Some(self.files_state.selected.unwrap_or(0).min(len - 1));
                 }
                 self.refresh_diff();
             }

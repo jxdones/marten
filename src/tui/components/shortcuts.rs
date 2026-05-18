@@ -36,7 +36,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
 }
 
 fn shortcuts(app: &App) -> Vec<(&'static str, &'static str)> {
-    let mut shortcuts = vec![("tab", "next"), ("shift+tab", "previous")];
+    let mut shortcuts = vec![("tab", "next"), ("shift+tab", "previous"), ("r", "reload")];
 
     match app.focus() {
         Focus::Files => {
