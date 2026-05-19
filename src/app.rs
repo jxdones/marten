@@ -10,17 +10,26 @@ use crate::tui::theme::{self, Theme};
 
 const SCROLL_STEP: usize = 3;
 
+pub struct FilesPanel {
+    state: Files,
+    entries: Option<Vec<FileEntry>>,
+}
+
+pub struct DiffPanel {
+    state: Diff,
+    hunks: Option<Vec<DiffHunk>>,
+}
+
 pub struct App {
     screen: Screen,
     focus: Focus,
-    files_state: Files,
-    diff_state: Diff,
     theme: Theme,
     repo: Repository,
     repository_status: Option<RepositoryStatus>,
-    files: Option<Vec<FileEntry>>,
-    diff_hunks: Option<Vec<DiffHunk>>,
     should_quit: bool,
+
+    files: FilesPanel,
+    diff: DiffPanel,
 }
 
 impl App {
@@ -43,14 +52,12 @@ impl App {
         let mut app = Self {
             screen: Screen::Home,
             focus: Focus::Files,
-            files_state: Files::default(),
-            diff_state: Diff::default(),
-            diff_hunks: None,
+            files: FilesPanel { state: Files::default(), entries: files },
+            diff: DiffPanel { state: Diff::default(), hunks: None },
             theme: theme::DEFAULT,
             repo,
             should_quit: false,
             repository_status,
-            files,
         };
 
         app.select_first_file();
@@ -67,7 +74,7 @@ impl App {
     }
 
     pub fn files_state(&self) -> &Files {
-        &self.files_state
+        &self.files.state
     }
 
     pub fn theme(&self) -> Theme {
@@ -83,28 +90,28 @@ impl App {
     }
 
     pub fn files(&self) -> Option<&Vec<FileEntry>> {
-        self.files.as_ref()
+        self.files.entries.as_ref()
     }
 
     pub fn diff_state(&self) -> &Diff {
-        &self.diff_state
+        &self.diff.state
     }
 
     pub fn diff_hunks(&self) -> Option<&Vec<DiffHunk>> {
-        self.diff_hunks.as_ref()
+        self.diff.hunks.as_ref()
     }
 
     pub fn set_diff_viewport_height(&mut self, height: usize) {
         let clamped = height.max(1);
-        if clamped == self.diff_state.viewport_height {
+        if clamped == self.diff.state.viewport_height {
             return;
         }
-        self.diff_state.set_viewport_height(height);
+        self.diff.state.set_viewport_height(height);
         let offset = self
-            .diff_state
+            .diff.state
             .scroll_offset
             .min(self.max_diff_scroll_offset());
-        self.diff_state.set_scroll_offset(offset);
+        self.diff.state.set_scroll_offset(offset);
         self.sync_diff_selection_to_scroll();
     }
 
@@ -154,11 +161,11 @@ impl App {
                 self.select_previous_hunk();
             }
             Action::ToggleDiffLineNumbers => {
-                self.diff_state.toggle_line_numbers();
+                self.diff.state.toggle_line_numbers();
             }
             Action::Refresh => {
                 self.repository_status = repository::status(&self.repo).ok();
-                self.files = repository::files(&self.repo).ok().map(|mut f| {
+                self.files.entries = repository::files(&self.repo).ok().map(|mut f| {
                     f.sort_by_key(|e| {
                         STATUS_ORDER
                             .iter()
@@ -168,12 +175,12 @@ impl App {
                     f
                 });
 
-                let len = self.files.as_ref().map_or(0, |f| f.len());
+                let len = self.files.entries.as_ref().map_or(0, |f| f.len());
                 if len == 0 {
-                    self.files_state.selected = None;
+                    self.files.state.selected = None;
                 } else {
-                    self.files_state.selected =
-                        Some(self.files_state.selected.unwrap_or(0).min(len - 1));
+                    self.files.state.selected =
+                        Some(self.files.state.selected.unwrap_or(0).min(len - 1));
                 }
                 self.refresh_diff();
             },
@@ -207,86 +214,86 @@ impl App {
     }
 
     pub fn selected_file(&self) -> Option<&FileEntry> {
-        let files = self.files.as_ref()?;
-        let idx = self.files_state.selected?;
+        let files = self.files.entries.as_ref()?;
+        let idx = self.files.state.selected?;
         files.get(idx)
     }
 
     fn select_first_file(&mut self) {
-        let len = self.files.as_ref().map_or(0, |f| f.len());
-        self.files_state.select_first(len);
+        let len = self.files.entries.as_ref().map_or(0, |f| f.len());
+        self.files.state.select_first(len);
     }
 
     fn select_last_file(&mut self) {
-        let len = self.files.as_ref().map_or(0, |f| f.len());
-        self.files_state.select_last(len);
+        let len = self.files.entries.as_ref().map_or(0, |f| f.len());
+        self.files.state.select_last(len);
     }
 
     fn select_next_file(&mut self) {
-        let len = self.files.as_ref().map_or(0, |f| f.len());
-        self.files_state.select_next(len);
+        let len = self.files.entries.as_ref().map_or(0, |f| f.len());
+        self.files.state.select_next(len);
     }
 
     fn select_previous_file(&mut self) {
-        let len = self.files.as_ref().map_or(0, |f| f.len());
-        self.files_state.select_previous(len);
+        let len = self.files.entries.as_ref().map_or(0, |f| f.len());
+        self.files.state.select_previous(len);
     }
 
     fn refresh_diff(&mut self) {
         let Some(file) = self.selected_file() else {
-            self.diff_hunks = None;
+            self.diff.hunks = None;
             return;
         };
         let path = file.path.clone();
         let status = file.status;
-        self.diff_hunks = repository::file_diff(&self.repo, &path, status).ok();
-        self.diff_state
-            .select_first_hunk(self.diff_hunks.as_ref().map_or(0, |hunk| hunk.len()));
+        self.diff.hunks = repository::file_diff(&self.repo, &path, status).ok();
+        self.diff.state
+            .select_first_hunk(self.diff.hunks.as_ref().map_or(0, |hunk| hunk.len()));
         self.sync_diff_scroll_to_hunk();
     }
 
     fn select_next_hunk(&mut self) {
-        let len = self.diff_hunks.as_ref().map_or(0, |h| h.len());
-        self.diff_state.select_next_hunk(len);
+        let len = self.diff.hunks.as_ref().map_or(0, |h| h.len());
+        self.diff.state.select_next_hunk(len);
         self.sync_diff_scroll_to_hunk();
     }
 
     fn select_previous_hunk(&mut self) {
-        let len = self.diff_hunks.as_ref().map_or(0, |h| h.len());
-        self.diff_state.select_previous_hunk(len);
+        let len = self.diff.hunks.as_ref().map_or(0, |h| h.len());
+        self.diff.state.select_previous_hunk(len);
         self.sync_diff_scroll_to_hunk();
     }
 
     fn scroll_diff_down(&mut self) {
         let max_offset = self.max_diff_scroll_offset();
-        let offset = (self.diff_state.scroll_offset + SCROLL_STEP).min(max_offset);
-        self.diff_state.set_scroll_offset(offset);
+        let offset = (self.diff.state.scroll_offset + SCROLL_STEP).min(max_offset);
+        self.diff.state.set_scroll_offset(offset);
         self.sync_diff_selection_to_scroll();
     }
 
     fn scroll_diff_up(&mut self) {
-        let offset = self.diff_state.scroll_offset.saturating_sub(SCROLL_STEP);
-        self.diff_state.set_scroll_offset(offset);
+        let offset = self.diff.state.scroll_offset.saturating_sub(SCROLL_STEP);
+        self.diff.state.set_scroll_offset(offset);
         self.sync_diff_selection_to_scroll();
     }
 
     fn diff_row_count(&self) -> usize {
-        self.diff_hunks.as_ref().map_or(0, |hunks| {
+        self.diff.hunks.as_ref().map_or(0, |hunks| {
             hunks.iter().map(|hunk| 1 + hunk.lines.len()).sum()
         })
     }
 
     fn max_diff_scroll_offset(&self) -> usize {
         self.diff_row_count()
-            .saturating_sub(self.diff_state.viewport_height)
+            .saturating_sub(self.diff.state.viewport_height)
     }
 
     fn sync_diff_scroll_to_hunk(&mut self) {
         let offset = self
-            .diff_state
+            .diff.state
             .selected_hunk
             .and_then(|selected| {
-                self.diff_hunks.as_ref().map(|hunks| {
+                self.diff.hunks.as_ref().map(|hunks| {
                     hunks
                         .iter()
                         .take(selected)
@@ -296,33 +303,33 @@ impl App {
             })
             .unwrap_or(0);
 
-        self.diff_state
+        self.diff.state
             .set_scroll_offset(offset.min(self.max_diff_scroll_offset()));
     }
 
     fn sync_diff_selection_to_scroll(&mut self) {
-        let Some(hunks) = self.diff_hunks.as_ref() else {
-            self.diff_state.select_first_hunk(0);
+        let Some(hunks) = self.diff.hunks.as_ref() else {
+            self.diff.state.select_first_hunk(0);
             return;
         };
 
         let mut row_start = 0;
         for (hunk_idx, hunk) in hunks.iter().enumerate() {
             let row_end = row_start + 1 + hunk.lines.len();
-            if self.diff_state.scroll_offset < row_end {
+            if self.diff.state.scroll_offset < row_end {
                 let line_idx = self
-                    .diff_state
+                    .diff.state
                     .scroll_offset
                     .saturating_sub(row_start + 1)
                     .min(hunk.lines.len().saturating_sub(1));
-                self.diff_state.select_hunk_line(hunk_idx, line_idx);
+                self.diff.state.select_hunk_line(hunk_idx, line_idx);
                 return;
             }
             row_start = row_end;
         }
 
         if let Some((hunk_idx, hunk)) = hunks.iter().enumerate().next_back() {
-            self.diff_state
+            self.diff.state
                 .select_hunk_line(hunk_idx, hunk.lines.len().saturating_sub(1));
         }
     }

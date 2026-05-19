@@ -30,7 +30,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App, is_focused: bool) {
     let mut items: Vec<ListItem> = Vec::new();
     let Some(hunks) = app.diff_hunks() else {
         items.push(ListItem::new(Line::from(Span::styled(
-            "unable to read diff",
+            "no available diffs",
             theme.muted(),
         ))));
 
