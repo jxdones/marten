@@ -2,7 +2,7 @@
 
 APP := marten
 
-.PHONY: help build run run-release play dev-files clean-dev-files check test fmt lint audit ci ci-full release install clean
+.PHONY: help build run run-release play dev-files clean-dev-files check test fmt lint lint-strict audit ci ci-full release install clean
 
 help:
 	@printf "\n"
@@ -17,6 +17,7 @@ help:
 	@printf "  %-12s %s\n" "test" "Run tests."
 	@printf "  %-12s %s\n" "fmt" "Format Rust code."
 	@printf "  %-12s %s\n" "lint" "Run clippy and fail on warnings."
+	@printf "  %-12s %s\n" "lint-strict" "Run clippy with additional pedantic lints before committing."
 	@printf "  %-12s %s\n" "audit" "Run cargo audit."
 	@printf "  %-12s %s\n" "ci" "Run fmt + lint + test checks."
 	@printf "  %-12s %s\n" "ci-full" "Run fmt + lint + test + audit checks."
@@ -58,6 +59,13 @@ fmt:
 
 lint:
 	cargo clippy --all-targets -- -D warnings
+
+lint-strict:
+	cargo clippy --all-targets --all-features -- \
+		-D warnings \
+		-W clippy::pedantic \
+		-W clippy::nursery \
+		-A clippy::missing_errors_doc
 
 audit:
 	cargo audit
