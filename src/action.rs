@@ -1,3 +1,5 @@
+use crate::state::Focus;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
     Noop,
@@ -12,4 +14,5 @@ pub enum Action {
     Refresh,
     GoToFirst,
     GoToLast,
+    FocusPanel(Focus),
 }

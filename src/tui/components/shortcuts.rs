@@ -53,6 +53,9 @@ fn shortcuts(app: &App) -> Vec<(&'static str, &'static str)> {
         Focus::History | Focus::Details => {
             shortcuts.extend([("j/k", "navigate")]);
         }
+        Focus::Branches | Focus::Stash => {
+            shortcuts.extend([("j/k", "navigate"), ("g", "first"), ("G", "last")]);
+        }
     }
 
     shortcuts

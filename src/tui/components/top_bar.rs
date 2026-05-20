@@ -100,6 +100,8 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
 fn top_bar_mode(app: &App) -> &'static str {
     match app.focus() {
         Focus::Files => "files",
+        Focus::Branches => "branches",
+        Focus::Stash => "stash",
         Focus::Diff => "diff",
         Focus::History => "history",
         Focus::Details => "details",

@@ -10,7 +10,7 @@ use crate::tui::components::panel;
 
 pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
     let theme = app.theme();
-    let block = panel::block("files", theme, is_focused);
+    let block = panel::block("[1] files", theme, is_focused);
 
     let Some(files) = app.files().cloned() else {
         let list_state = app.files_list_state();

@@ -59,7 +59,10 @@ impl App {
                 entries: files,
                 list_state: ListState::default(),
             },
-            diff: DiffPanel { state: Diff::default(), hunks: None },
+            diff: DiffPanel {
+                state: Diff::default(),
+                hunks: None,
+            },
             theme: theme::DEFAULT,
             repo,
             should_quit: false,
@@ -118,7 +121,8 @@ impl App {
         }
         self.diff.state.set_viewport_height(height);
         let offset = self
-            .diff.state
+            .diff
+            .state
             .scroll_offset
             .min(self.max_diff_scroll_offset());
         self.diff.state.set_scroll_offset(offset);
@@ -143,6 +147,9 @@ impl App {
             }
             Action::PreviousFocus => {
                 self.focus = self.focus.previous();
+            }
+            Action::FocusPanel(focus) => {
+                self.focus = focus;
             }
             Action::MoveDown => match self.focus {
                 Focus::Files => {
@@ -193,7 +200,7 @@ impl App {
                         Some(self.files.state.selected.unwrap_or(0).min(len - 1));
                 }
                 self.refresh_diff();
-            },
+            }
             Action::GoToFirst => {
                 self.select_first_file();
                 self.refresh_diff();
@@ -211,6 +218,11 @@ impl App {
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => Action::Quit,
             KeyCode::Tab => Action::NextFocus,
             KeyCode::BackTab => Action::PreviousFocus,
+            KeyCode::Char('0') => Action::FocusPanel(Focus::Diff),
+            KeyCode::Char('1') => Action::FocusPanel(Focus::Files),
+            KeyCode::Char('2') => Action::FocusPanel(Focus::Branches),
+            KeyCode::Char('3') => Action::FocusPanel(Focus::Stash),
+            KeyCode::Char('4') => Action::FocusPanel(Focus::History),
             KeyCode::Down | KeyCode::Char('j') => Action::MoveDown,
             KeyCode::Up | KeyCode::Char('k') => Action::MoveUp,
             KeyCode::Char(']') if self.focus == Focus::Diff => Action::NextHunk,
@@ -257,7 +269,8 @@ impl App {
         let path = file.path.clone();
         let status = file.status;
         self.diff.hunks = repository::file_diff(&self.repo, &path, status).ok();
-        self.diff.state
+        self.diff
+            .state
             .select_first_hunk(self.diff.hunks.as_ref().map_or(0, |hunk| hunk.len()));
         self.sync_diff_scroll_to_hunk();
     }
@@ -300,7 +313,8 @@ impl App {
 
     fn sync_diff_scroll_to_hunk(&mut self) {
         let offset = self
-            .diff.state
+            .diff
+            .state
             .selected_hunk
             .and_then(|selected| {
                 self.diff.hunks.as_ref().map(|hunks| {
@@ -313,7 +327,8 @@ impl App {
             })
             .unwrap_or(0);
 
-        self.diff.state
+        self.diff
+            .state
             .set_scroll_offset(offset.min(self.max_diff_scroll_offset()));
     }
 
@@ -328,7 +343,8 @@ impl App {
             let row_end = row_start + 1 + hunk.lines.len();
             if self.diff.state.scroll_offset < row_end {
                 let line_idx = self
-                    .diff.state
+                    .diff
+                    .state
                     .scroll_offset
                     .saturating_sub(row_start + 1)
                     .min(hunk.lines.len().saturating_sub(1));
@@ -339,7 +355,8 @@ impl App {
         }
 
         if let Some((hunk_idx, hunk)) = hunks.iter().enumerate().next_back() {
-            self.diff.state
+            self.diff
+                .state
                 .select_hunk_line(hunk_idx, hunk.lines.len().saturating_sub(1));
         }
     }

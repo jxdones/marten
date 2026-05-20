@@ -32,7 +32,7 @@ impl Files {
 
         match self.selected {
             None => self.selected = Some(0),
-            Some(_) => self.selected = Some(len - 1)
+            Some(_) => self.selected = Some(len - 1),
         }
     }
 

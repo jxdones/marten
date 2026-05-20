@@ -16,7 +16,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App, is_focused: bool) {
     };
     let block = Block::default()
         .title(Line::from(vec![Span::styled(
-            "diff",
+            "[0] diff",
             Style::default()
                 .fg(theme.accent)
                 .add_modifier(Modifier::BOLD),

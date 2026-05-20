@@ -14,7 +14,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
     let focus = app.focus();
 
     top_bar::draw(frame, layout.top_bar, app);
-    left_sidebar::draw(frame, layout.left_sidebar, app, focus == Focus::Files);
+    left_sidebar::draw(frame, layout.left_sidebar, app, focus);
 
     app.set_diff_viewport_height(layout.diff.height.saturating_sub(2) as usize);
     diff_panel::draw(frame, layout.diff, app, focus == Focus::Diff);

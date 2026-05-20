@@ -1,8 +1,25 @@
+use ratatui::style::{Modifier, Style};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{Block, Borders};
 use ratatui::{Frame, layout::Rect};
 
 use crate::app::App;
-use crate::tui::components::panel;
 
 pub fn draw(frame: &mut Frame, area: Rect, app: &App, is_focused: bool) {
-    frame.render_widget(panel::block("branches", app.theme(), is_focused), area);
+    let theme = app.theme();
+    let border_style = if is_focused {
+        theme.focused_border()
+    } else {
+        theme.panel_border()
+    };
+    let block = Block::default()
+        .title(Line::from(vec![Span::styled(
+            "[2] branches",
+            Style::default()
+                .fg(theme.accent)
+                .add_modifier(Modifier::BOLD),
+        )]))
+        .borders(Borders::ALL)
+        .border_style(border_style);
+    frame.render_widget(block, area);
 }
