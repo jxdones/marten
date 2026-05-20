@@ -1,6 +1,7 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crossterm::{execute, terminal::SetTitle};
 use git2::Repository;
+use ratatui::widgets::ListState;
 
 use crate::action::Action;
 use crate::event::Event;
@@ -13,6 +14,7 @@ const SCROLL_STEP: usize = 3;
 pub struct FilesPanel {
     state: Files,
     entries: Option<Vec<FileEntry>>,
+    pub(crate) list_state: ListState,
 }
 
 pub struct DiffPanel {
@@ -52,7 +54,11 @@ impl App {
         let mut app = Self {
             screen: Screen::Home,
             focus: Focus::Files,
-            files: FilesPanel { state: Files::default(), entries: files },
+            files: FilesPanel {
+                state: Files::default(),
+                entries: files,
+                list_state: ListState::default(),
+            },
             diff: DiffPanel { state: Diff::default(), hunks: None },
             theme: theme::DEFAULT,
             repo,
@@ -91,6 +97,10 @@ impl App {
 
     pub fn files(&self) -> Option<&Vec<FileEntry>> {
         self.files.entries.as_ref()
+    }
+
+    pub fn files_list_state(&mut self) -> &mut ListState {
+        &mut self.files.list_state
     }
 
     pub fn diff_state(&self) -> &Diff {
