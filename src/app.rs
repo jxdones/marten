@@ -74,43 +74,43 @@ impl App {
         app
     }
 
-    pub fn screen(&self) -> Screen {
+    pub const fn screen(&self) -> Screen {
         self.screen
     }
 
-    pub fn focus(&self) -> Focus {
+    pub const fn focus(&self) -> Focus {
         self.focus
     }
 
-    pub fn files_state(&self) -> &Files {
+    pub const fn files_state(&self) -> &Files {
         &self.files.state
     }
 
-    pub fn theme(&self) -> Theme {
+    pub const fn theme(&self) -> Theme {
         self.theme
     }
 
-    pub fn should_quit(&self) -> bool {
+    pub const fn should_quit(&self) -> bool {
         self.should_quit
     }
 
-    pub fn repository_status(&self) -> Option<&RepositoryStatus> {
+    pub const fn repository_status(&self) -> Option<&RepositoryStatus> {
         self.repository_status.as_ref()
     }
 
-    pub fn files(&self) -> Option<&Vec<FileEntry>> {
+    pub const fn files(&self) -> Option<&Vec<FileEntry>> {
         self.files.entries.as_ref()
     }
 
-    pub fn files_list_state(&mut self) -> &mut ListState {
+    pub const fn files_list_state(&mut self) -> &mut ListState {
         &mut self.files.list_state
     }
 
-    pub fn diff_state(&self) -> &Diff {
+    pub const fn diff_state(&self) -> &Diff {
         &self.diff.state
     }
 
-    pub fn diff_hunks(&self) -> Option<&Vec<DiffHunk>> {
+    pub const fn diff_hunks(&self) -> Option<&Vec<DiffHunk>> {
         self.diff.hunks.as_ref()
     }
 
@@ -132,7 +132,7 @@ impl App {
     pub fn handle_event(&self, event: Event) -> Action {
         match event {
             Event::Key(key) => self.handle_key(key),
-            _ => Action::Noop,
+            Event::Resize(..) => Action::Noop,
         }
     }
 
@@ -192,7 +192,7 @@ impl App {
                     f
                 });
 
-                let len = self.files.entries.as_ref().map_or(0, |f| f.len());
+                let len = self.files.entries.as_ref().map_or(0, Vec::len);
                 if len == 0 {
                     self.files.state.selected = None;
                 } else {
@@ -242,22 +242,22 @@ impl App {
     }
 
     fn select_first_file(&mut self) {
-        let len = self.files.entries.as_ref().map_or(0, |f| f.len());
+        let len = self.files.entries.as_ref().map_or(0, Vec::len);
         self.files.state.select_first(len);
     }
 
     fn select_last_file(&mut self) {
-        let len = self.files.entries.as_ref().map_or(0, |f| f.len());
+        let len = self.files.entries.as_ref().map_or(0, Vec::len);
         self.files.state.select_last(len);
     }
 
     fn select_next_file(&mut self) {
-        let len = self.files.entries.as_ref().map_or(0, |f| f.len());
+        let len = self.files.entries.as_ref().map_or(0, Vec::len);
         self.files.state.select_next(len);
     }
 
     fn select_previous_file(&mut self) {
-        let len = self.files.entries.as_ref().map_or(0, |f| f.len());
+        let len = self.files.entries.as_ref().map_or(0, Vec::len);
         self.files.state.select_previous(len);
     }
 
@@ -271,18 +271,18 @@ impl App {
         self.diff.hunks = repository::file_diff(&self.repo, &path, status).ok();
         self.diff
             .state
-            .select_first_hunk(self.diff.hunks.as_ref().map_or(0, |hunk| hunk.len()));
+            .select_first_hunk(self.diff.hunks.as_ref().map_or(0, Vec::len));
         self.sync_diff_scroll_to_hunk();
     }
 
     fn select_next_hunk(&mut self) {
-        let len = self.diff.hunks.as_ref().map_or(0, |h| h.len());
+        let len = self.diff.hunks.as_ref().map_or(0, Vec::len);
         self.diff.state.select_next_hunk(len);
         self.sync_diff_scroll_to_hunk();
     }
 
     fn select_previous_hunk(&mut self) {
-        let len = self.diff.hunks.as_ref().map_or(0, |h| h.len());
+        let len = self.diff.hunks.as_ref().map_or(0, Vec::len);
         self.diff.state.select_previous_hunk(len);
         self.sync_diff_scroll_to_hunk();
     }

@@ -24,7 +24,7 @@ impl Files {
         self.selected = (len > 0).then_some(0);
     }
 
-    pub fn select_last(&mut self, len: usize) {
+    pub const fn select_last(&mut self, len: usize) {
         if len == 0 {
             self.selected = None;
             return;
@@ -36,7 +36,7 @@ impl Files {
         }
     }
 
-    pub fn select_next(&mut self, len: usize) {
+    pub const fn select_next(&mut self, len: usize) {
         if len == 0 {
             self.selected = None;
             return;
@@ -47,7 +47,7 @@ impl Files {
         }
     }
 
-    pub fn select_previous(&mut self, len: usize) {
+    pub const fn select_previous(&mut self, len: usize) {
         if len == 0 {
             self.selected = None;
             return;

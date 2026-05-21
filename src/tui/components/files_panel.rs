@@ -14,11 +14,10 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
 
     let Some(files) = app.files().cloned() else {
         let list_state = app.files_list_state();
-        let mut items = Vec::new();
-        items.push(ListItem::new(Line::from(Span::styled(
+        let items = vec![ListItem::new(Line::from(Span::styled(
             "unable to read git status",
             theme.muted(),
-        ))));
+        )))];
 
         let list = List::new(items)
             .block(block)
@@ -50,7 +49,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
                 humanize_stat('+', entry.insertions).len()
                     + humanize_stat('-', entry.deletions).len(),
             ),
-            _ => None,
+            FilePanelRow::Header { .. } => None,
         })
         .max()
         .unwrap_or(0);
@@ -137,8 +136,8 @@ fn format_path(path: &str, width: usize) -> String {
         .and_then(|index| segments.get(index))
         .copied();
 
-    let short = if let Some(parent) = parent {
-        let prefix = format!("…/{parent}/");
+    let short = parent.map_or_else(|| truncate_middle(filename, width), |parent| {
+        let prefix = format!("../{parent}/");
         if prefix.len() < width {
             format!(
                 "{prefix}{}",
@@ -147,9 +146,7 @@ fn format_path(path: &str, width: usize) -> String {
         } else {
             truncate_middle(filename, width)
         }
-    } else {
-        truncate_middle(filename, width)
-    };
+    });
 
     format!("{short:<width$}")
 }

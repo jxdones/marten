@@ -4,6 +4,7 @@ use crate::git::GitResult;
 use git2::{self, Diff, Patch, Reference, Repository, Status, StatusOptions};
 
 const DEFAULT_HEAD: &str = "HEAD";
+const SHORT_COMMIT_LEN: usize = 7;
 
 #[derive(Debug, Clone)]
 pub struct RepositoryStatus {
@@ -63,7 +64,7 @@ pub struct DiffHunk {
 }
 
 impl FileStatus {
-    pub fn label(self) -> &'static str {
+    pub const fn label(self) -> &'static str {
         match self {
             Self::Staged => "STAGED",
             Self::Partial => "PARTIAL",
@@ -176,7 +177,7 @@ pub fn file_diff(repo: &Repository, path: &str, status: FileStatus) -> GitResult
         _ => return Ok(vec![]),
     };
 
-    let mut patch: Option<Patch> = None;
+    let mut diff_patch: Option<Patch> = None;
     for (idx, delta) in diff.deltas().enumerate() {
         let Some(patch_from_diff) = Patch::from_diff(&diff, idx)? else {
             continue;
@@ -186,21 +187,21 @@ pub fn file_diff(repo: &Repository, path: &str, status: FileStatus) -> GitResult
         };
 
         if delta_path == std::path::Path::new(path) {
-            patch = Some(patch_from_diff);
+            diff_patch = Some(patch_from_diff);
             break;
         }
     }
 
-    let Some(patch) = patch else {
+    let Some(diff_patch) = diff_patch else {
         return Ok(vec![]);
     };
 
     let mut hunks: Vec<DiffHunk> = Vec::new();
-    for hunk_idx in 0..patch.num_hunks() {
+    for hunk_idx in 0..diff_patch.num_hunks() {
         let mut diff_lines: Vec<DiffLine> = Vec::new();
-        let (hunk, num_lines) = patch.hunk(hunk_idx)?;
+        let (hunk, num_lines) = diff_patch.hunk(hunk_idx)?;
         for line_idx in 0..num_lines {
-            let line = patch.line_in_hunk(hunk_idx, line_idx)?;
+            let line = diff_patch.line_in_hunk(hunk_idx, line_idx)?;
             diff_lines.push(DiffLine {
                 old_lineno: line.old_lineno(),
                 new_lineno: line.new_lineno(),
@@ -231,7 +232,7 @@ fn untracked_file_diff(repo: &Repository, path: &str) -> GitResult<Vec<DiffHunk>
         .enumerate()
         .map(|(idx, line)| DiffLine {
             old_lineno: None,
-            new_lineno: Some((idx + 1) as u32),
+            new_lineno: Some(u32::try_from(idx + 1).expect("line count exceeded u32::MAX")),
             origin: '+',
             content: line.to_string(),
         })
@@ -239,7 +240,7 @@ fn untracked_file_diff(repo: &Repository, path: &str) -> GitResult<Vec<DiffHunk>
 
     let insertions = lines.len();
     Ok(vec![DiffHunk {
-        header: format!("@@ -0,0 +1,{} @@ {}", insertions, path),
+        header: format!("@@ -0,0 +1,{insertions} @@ {path}"),
         lines,
         insertions,
         deletions: 0,
@@ -285,10 +286,10 @@ fn is_unknown_head_error(error: &git2::Error) -> bool {
 }
 
 fn detached_head(head: &Reference) -> Head {
-    let commit_id = head
-        .target()
-        .map(|oid| oid.to_string().chars().take(7).collect())
-        .unwrap_or_else(|| DEFAULT_HEAD.to_string());
+    let commit_id = head.target().map_or_else(
+        || DEFAULT_HEAD.to_string(),
+        |oid| oid.to_string().chars().take(SHORT_COMMIT_LEN).collect(),
+    );
 
     Head::Detached(commit_id)
 }
@@ -372,11 +373,11 @@ fn diff_stats(diff: &Diff<'_>) -> Result<HashMap<String, (usize, usize)>, git2::
     let mut stats = HashMap::new();
 
     for (idx, delta) in diff.deltas().enumerate() {
-        let Some(patch) = Patch::from_diff(diff, idx)? else {
+        let Some(delta_patch) = Patch::from_diff(diff, idx)? else {
             continue;
         };
 
-        let (_, insertions, deletions) = patch.line_stats()?;
+        let (_, insertions, deletions) = delta_patch.line_stats()?;
         let Some(path) = delta
             .new_file()
             .path()

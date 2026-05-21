@@ -28,7 +28,7 @@ impl Diff {
         }
     }
 
-    pub fn select_next_hunk(&mut self, len: usize) {
+    pub const fn select_next_hunk(&mut self, len: usize) {
         if len == 0 {
             self.selected_hunk = None;
             self.selected_line = 0;
@@ -41,7 +41,7 @@ impl Diff {
         self.selected_line = 0;
     }
 
-    pub fn select_previous_hunk(&mut self, len: usize) {
+    pub const fn select_previous_hunk(&mut self, len: usize) {
         if len == 0 {
             self.selected_hunk = None;
             self.selected_line = 0;
@@ -55,16 +55,16 @@ impl Diff {
         self.selected_line = 0;
     }
 
-    pub fn select_hunk_line(&mut self, hunk: usize, line: usize) {
+    pub const fn select_hunk_line(&mut self, hunk: usize, line: usize) {
         self.selected_hunk = Some(hunk);
         self.selected_line = line;
     }
 
-    pub fn toggle_line_numbers(&mut self) {
+    pub const fn toggle_line_numbers(&mut self) {
         self.show_line_numbers = !self.show_line_numbers;
     }
 
-    pub fn set_scroll_offset(&mut self, offset: usize) {
+    pub const fn set_scroll_offset(&mut self, offset: usize) {
         self.scroll_offset = offset;
     }
 

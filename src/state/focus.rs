@@ -9,7 +9,7 @@ pub enum Focus {
 }
 
 impl Focus {
-    pub fn next(self) -> Self {
+    pub const fn next(self) -> Self {
         match self {
             Self::Files => Self::Branches,
             Self::Branches => Self::Stash,
@@ -20,7 +20,7 @@ impl Focus {
         }
     }
 
-    pub fn previous(self) -> Self {
+    pub const fn previous(self) -> Self {
         match self {
             Self::Files => Self::Details,
             Self::Branches => Self::Files,

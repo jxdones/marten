@@ -23,4 +23,3 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App, is_focused: bool) {
         .border_style(border_style);
     frame.render_widget(block, area);
 }
-

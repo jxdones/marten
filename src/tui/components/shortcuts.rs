@@ -22,7 +22,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
 
     let left = shortcut_spans(shortcuts(app), app);
     let right = quit_spans(app);
-    let right_width = spans_width(&right) as u16;
+    let right_width = u16::try_from(spans_width(&right)).expect("terminal width exceeded u16::MAX");
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
@@ -39,7 +39,7 @@ fn shortcuts(app: &App) -> Vec<(&'static str, &'static str)> {
     let mut shortcuts = vec![("tab", "next"), ("shift+tab", "previous"), ("r", "reload")];
 
     match app.focus() {
-        Focus::Files => {
+        Focus::Files | Focus::Branches | Focus::Stash => {
             shortcuts.extend([("j/k", "navigate"), ("g", "first"), ("G", "last")]);
         }
         Focus::Diff => {
@@ -52,9 +52,6 @@ fn shortcuts(app: &App) -> Vec<(&'static str, &'static str)> {
         }
         Focus::History | Focus::Details => {
             shortcuts.extend([("j/k", "navigate")]);
-        }
-        Focus::Branches | Focus::Stash => {
-            shortcuts.extend([("j/k", "navigate"), ("g", "first"), ("G", "last")]);
         }
     }
 
