@@ -1,14 +1,8 @@
-use crate::git::repository::{FileEntry, FileStatus};
+use crate::git::repository::FileStatus;
 
 #[derive(Debug, Default)]
 pub struct Files {
     pub selected: Option<usize>,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum FilePanelRow<'a> {
-    Header { status: FileStatus, count: usize },
-    File { entry: &'a FileEntry },
 }
 
 pub const STATUS_ORDER: [FileStatus; 5] = [
@@ -60,24 +54,3 @@ impl Files {
     }
 }
 
-pub fn file_panel_rows(files: &[FileEntry]) -> Vec<FilePanelRow<'_>> {
-    let mut rows = Vec::new();
-
-    for status in STATUS_ORDER {
-        let matching: Vec<_> = files.iter().filter(|file| file.status == status).collect();
-        if matching.is_empty() {
-            continue;
-        }
-
-        rows.push(FilePanelRow::Header {
-            status,
-            count: matching.len(),
-        });
-
-        for entry in matching {
-            rows.push(FilePanelRow::File { entry });
-        }
-    }
-
-    rows
-}

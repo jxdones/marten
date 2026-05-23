@@ -3,9 +3,12 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{List, ListItem};
 use ratatui::{Frame, layout::Rect};
 
+const BORDER_WIDTH: usize = 2;
+const STATUS_LETTER_WIDTH: usize = 2;
+
 use crate::app::App;
 use crate::git::repository::FileStatus;
-use crate::state::{FilePanelRow, file_panel_rows};
+use crate::state::{TreeRow, tree_rows};
 use crate::tui::components::panel;
 
 pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
@@ -38,34 +41,21 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
         ))));
     }
 
-    let rows = file_panel_rows(&files);
+    let rows = tree_rows(&files);
     let selected_row = get_selected_row(&rows, selected_index);
     list_state.select(selected_row);
 
-    let stats_width = rows
-        .iter()
-        .filter_map(|row| match row {
-            FilePanelRow::File { entry } => Some(
-                humanize_stat('+', entry.insertions).len()
-                    + humanize_stat('-', entry.deletions).len(),
-            ),
-            FilePanelRow::Header { .. } => None,
-        })
-        .max()
-        .unwrap_or(0);
 
     for row in rows {
         match row {
-            FilePanelRow::Header { status, count } => {
-                items.push(ListItem::new(Line::from(Span::styled(
-                    format!("{} {}", status.label(), count),
-                    theme.muted(),
-                ))));
+            TreeRow::Dir(dir_name, depth) => {
+                let path_depth = "  ".repeat(depth);
+                items.push(ListItem::new(Line::from(vec![
+                    Span::raw(path_depth),
+                    Span::styled(dir_name, theme.text_primary()),
+                ])));
             }
-            FilePanelRow::File { entry } => {
-                let usable = (area.width as usize).saturating_sub(2);
-                let path_width = usable.saturating_sub(2 + stats_width);
-
+            TreeRow::File(entry, depth) => {
                 let status_letter = match entry.status {
                     FileStatus::Staged => Span::styled("S ", theme.staged()),
                     FileStatus::Partial => Span::styled("P ", theme.partial()),
@@ -74,14 +64,17 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
                     FileStatus::Untracked => Span::styled("U ", theme.untracked()),
                 };
 
-                let path = format_path(&entry.path, path_width);
+                let path = entry.path.split('/').next_back().unwrap_or(&entry.path);
+                let path_depth = "  ".repeat(depth);
 
                 let insertions = humanize_stat('+', entry.insertions);
                 let deletions = humanize_stat('-', entry.deletions);
                 let stats = format!("{insertions}{deletions}");
-                let stats_padding = " ".repeat(stats_width.saturating_sub(stats.len()));
+                let padding_width = area.width as usize - path_depth.len() - BORDER_WIDTH - path.len() - STATUS_LETTER_WIDTH - stats.len();
+                let stats_padding = " ".repeat(padding_width);
 
                 items.push(ListItem::new(Line::from(vec![
+                    Span::raw(path_depth),
                     status_letter,
                     Span::styled(path, theme.text_primary()),
                     Span::raw(stats_padding),
@@ -98,10 +91,10 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
     frame.render_stateful_widget(list, area, list_state);
 }
 
-fn get_selected_row(rows: &[FilePanelRow<'_>], selected: Option<usize>) -> Option<usize> {
+fn get_selected_row(rows: &[TreeRow<'_>], selected: Option<usize>) -> Option<usize> {
     let mut file_count = 0;
     for (row_index, row) in rows.iter().enumerate() {
-        if let FilePanelRow::File { .. } = row {
+        if let TreeRow::File(..) = row {
             if Some(file_count) == selected {
                 return Some(row_index);
             }
@@ -119,60 +112,3 @@ fn humanize_stat(prefix: char, n: usize) -> String {
     }
 }
 
-fn format_path(path: &str, width: usize) -> String {
-    if width == 0 {
-        return String::new();
-    }
-
-    if path.len() <= width {
-        return format!("{path:<width$}");
-    }
-
-    let segments: Vec<&str> = path.split('/').collect();
-    let filename = segments.last().copied().unwrap_or(path);
-    let parent = segments
-        .len()
-        .checked_sub(2)
-        .and_then(|index| segments.get(index))
-        .copied();
-
-    let short = parent.map_or_else(
-        || truncate_middle(filename, width),
-        |parent| {
-            let prefix = format!("../{parent}/");
-            if prefix.len() < width {
-                format!(
-                    "{prefix}{}",
-                    truncate_middle(filename, width - prefix.len())
-                )
-            } else {
-                truncate_middle(filename, width)
-            }
-        },
-    );
-
-    format!("{short:<width$}")
-}
-
-fn truncate_middle(value: &str, width: usize) -> String {
-    let len = value.chars().count();
-    if len <= width {
-        return value.to_string();
-    }
-
-    if width == 1 {
-        return "…".to_string();
-    }
-
-    let left_width = (width - 1) / 2;
-    let right_width = width - 1 - left_width;
-    let left: String = value.chars().take(left_width).collect();
-    let right: String = value
-        .chars()
-        .skip(len.saturating_sub(right_width))
-        .collect();
-
-    format!("{left}…{right}")
-}
-
-// TODO: Add tests for stat formatting, path truncation, and file row rendering.
