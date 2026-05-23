@@ -71,12 +71,12 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
                 let insertions = humanize_stat('+', entry.insertions);
                 let deletions = humanize_stat('-', entry.deletions);
                 let stats = format!("{insertions}{deletions}");
-                let padding_width = area.width as usize
-                    - path_depth.len()
-                    - BORDER_WIDTH
-                    - path.len()
-                    - STATUS_LETTER_WIDTH
-                    - stats.len();
+                let padding_width = (area.width as usize)
+                    .saturating_sub(path_depth.len())
+                    .saturating_sub(BORDER_WIDTH)
+                    .saturating_sub(path.len())
+                    .saturating_sub(STATUS_LETTER_WIDTH)
+                    .saturating_sub(stats.len());
                 let stats_padding = " ".repeat(padding_width);
 
                 items.push(ListItem::new(Line::from(vec![
