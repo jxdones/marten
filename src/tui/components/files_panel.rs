@@ -30,6 +30,9 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
         return;
     };
 
+    let rows = tree_rows(&files);
+    app.set_tree_row_count(rows.len());
+
     let selected_index = app.files_state().selected;
     let list_state = app.files_list_state();
 
@@ -41,10 +44,8 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
         ))));
     }
 
-    let rows = tree_rows(&files);
     let selected_row = get_selected_row(&rows, selected_index);
     list_state.select(selected_row);
-
 
     for row in rows {
         match row {
@@ -70,7 +71,12 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
                 let insertions = humanize_stat('+', entry.insertions);
                 let deletions = humanize_stat('-', entry.deletions);
                 let stats = format!("{insertions}{deletions}");
-                let padding_width = area.width as usize - path_depth.len() - BORDER_WIDTH - path.len() - STATUS_LETTER_WIDTH - stats.len();
+                let padding_width = area.width as usize
+                    - path_depth.len()
+                    - BORDER_WIDTH
+                    - path.len()
+                    - STATUS_LETTER_WIDTH
+                    - stats.len();
                 let stats_padding = " ".repeat(padding_width);
 
                 items.push(ListItem::new(Line::from(vec![
@@ -91,17 +97,8 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
     frame.render_stateful_widget(list, area, list_state);
 }
 
-fn get_selected_row(rows: &[TreeRow<'_>], selected: Option<usize>) -> Option<usize> {
-    let mut file_count = 0;
-    for (row_index, row) in rows.iter().enumerate() {
-        if let TreeRow::File(..) = row {
-            if Some(file_count) == selected {
-                return Some(row_index);
-            }
-            file_count += 1;
-        }
-    }
-    None
+fn get_selected_row(_rows: &[TreeRow<'_>], selected: Option<usize>) -> Option<usize> {
+    selected
 }
 
 fn humanize_stat(prefix: char, n: usize) -> String {
@@ -111,4 +108,3 @@ fn humanize_stat(prefix: char, n: usize) -> String {
         format!("{prefix}{n} ")
     }
 }
-

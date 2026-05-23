@@ -6,7 +6,11 @@ use ratatui::widgets::ListState;
 use crate::action::Action;
 use crate::event::Event;
 use crate::git::repository::{self, DiffHunk, FileEntry, RepositoryStatus};
-use crate::state::{Diff, Files, Focus, Screen, files::STATUS_ORDER};
+use crate::state::{
+    Diff, Files, Focus, Screen,
+    files::STATUS_ORDER,
+    tree::{TreeRow, tree_rows},
+};
 use crate::tui::theme::{self, Theme};
 
 const SCROLL_STEP: usize = 3;
@@ -50,7 +54,6 @@ impl App {
             });
             f
         });
-
         let mut app = Self {
             screen: Screen::Home,
             focus: Focus::Files,
@@ -233,27 +236,31 @@ impl App {
     pub fn selected_file(&self) -> Option<&FileEntry> {
         let files = self.files.entries.as_ref()?;
         let idx = self.files.state.selected?;
-        files.get(idx)
+        let rows = tree_rows(files);
+        for (i, row) in rows.iter().enumerate() {
+            if i >= idx
+                && let TreeRow::File(entry, _) = row
+            {
+                return Some(entry);
+            }
+        }
+        None
     }
 
     fn select_first_file(&mut self) {
-        let len = self.files.entries.as_ref().map_or(0, Vec::len);
-        self.files.state.select_first(len);
+        self.files.state.select_first();
     }
 
     fn select_last_file(&mut self) {
-        let len = self.files.entries.as_ref().map_or(0, Vec::len);
-        self.files.state.select_last(len);
+        self.files.state.select_last();
     }
 
     fn select_next_file(&mut self) {
-        let len = self.files.entries.as_ref().map_or(0, Vec::len);
-        self.files.state.select_next(len);
+        self.files.state.select_next();
     }
 
     fn select_previous_file(&mut self) {
-        let len = self.files.entries.as_ref().map_or(0, Vec::len);
-        self.files.state.select_previous(len);
+        self.files.state.select_previous();
     }
 
     fn refresh_diff(&mut self) {
@@ -354,6 +361,10 @@ impl App {
                 .state
                 .select_hunk_line(hunk_idx, hunk.lines.len().saturating_sub(1));
         }
+    }
+
+    pub fn set_tree_row_count(&mut self, len: usize) {
+        self.files.state.tree_row_count = len;
     }
 }
 
