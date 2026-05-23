@@ -90,11 +90,15 @@ pub fn status(repo: &Repository) -> GitResult<RepositoryStatus> {
 }
 
 pub fn files(repo: &Repository) -> GitResult<Vec<FileEntry>> {
-    let head = repo.head()?;
-    let head_commit = head.peel_to_commit()?;
-    let head_tree = head_commit.tree()?;
+    let staged_diff = if let Ok(head) = repo.head() {
+        // repo has at least one commit
+        let tree = head.peel_to_commit()?.tree()?;
+        repo.diff_tree_to_index(Some(&tree), None, None)?
+    } else {
+        // no commits yet, diff against empty tree
+        repo.diff_tree_to_index(None, None, None)?
+    };
 
-    let staged_diff = repo.diff_tree_to_index(Some(&head_tree), None, None)?;
     let unstaged_diff = repo.diff_index_to_workdir(None, None)?;
 
     let staged_map: HashMap<String, (usize, usize)> = diff_stats(&staged_diff)?;
