@@ -185,16 +185,13 @@ fn diff_line(
         _ => theme.muted(),
     };
     let style = if is_selected { selected } else { base };
+    let content = line.content.trim_end().replace('\t', "    ");
     let text = if show_line_numbers {
         let old_lineno = line_number(line.old_lineno);
         let new_lineno = line_number(line.new_lineno);
-        format!(
-            "{old_lineno} {new_lineno} {} {}",
-            line.origin,
-            line.content.trim_end()
-        )
+        format!("{old_lineno} {new_lineno} {} {}", line.origin, content)
     } else {
-        format!("{} {}", line.origin, line.content.trim_end())
+        format!("{} {}", line.origin, content)
     };
 
     bordered_line(width, text, style, border_style(line, is_selected, theme))
