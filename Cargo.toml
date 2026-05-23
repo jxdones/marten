@@ -2,7 +2,7 @@
 name = "marten"
 version = "0.1.0"
 authors = ["Jones Dias"]
-description = "A small Rust Git TUI for reviewing work and understanding history."
+description = "A small Rust Git TUI for reviewing work without leaving the terminal."
 keywords = ["tui", "terminal", "git"]
 edition = "2024"
 

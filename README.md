@@ -2,7 +2,7 @@
   <p>
     <h2>marten</h2>
   </p>
-  <p>A small Rust Git TUI for reviewing local changes without leaving the terminal.</p>
+  <p>A small Rust Git TUI for reviewing work without leaving the terminal.</p>
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)
@@ -19,7 +19,7 @@ marten opens inside a Git repository and gives you a focused view of your workin
 - diff hunks for the selected file
 - repository, branch, ahead/behind, and change counts in the top bar
 
-Branch, stash, and history panels are present in the layout, but still early.
+marten currently starts with working-tree review and file diffs. More Git views are planned.
 
 ## Install
 
@@ -44,9 +44,6 @@ Run `marten` from inside a Git repository.
 | `tab` / `shift+tab` | Move focus between panels |
 | `0` | Focus diff |
 | `1` | Focus files |
-| `2` | Focus branches |
-| `3` | Focus stash |
-| `4` | Focus history |
 | `j` / `k` | Navigate files or scroll the diff |
 | `g` / `G` | Jump to first or last file |
 | `[` / `]` | Move between diff hunks |
@@ -65,6 +62,7 @@ make test
 make lint
 make fmt
 make ci
+make ci-full
 ```
 
 For UI testing with local untracked files:
