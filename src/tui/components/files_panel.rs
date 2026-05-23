@@ -110,7 +110,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
     frame.render_stateful_widget(list, area, &mut list_state);
 }
 
-fn get_selected_row(_rows: &[TreeRow], selected: Option<usize>) -> Option<usize> {
+const fn get_selected_row(_rows: &[TreeRow], selected: Option<usize>) -> Option<usize> {
     selected
 }
 

@@ -256,7 +256,7 @@ impl App {
         None
     }
 
-    pub fn set_tree_row_count(&mut self, len: usize) {
+    pub const fn set_tree_row_count(&mut self, len: usize) {
         self.files.state.tree_row_count = len;
     }
 
@@ -291,19 +291,19 @@ impl App {
         &self.files.cached_rows
     }
 
-    fn select_first_file(&mut self) {
+    const fn select_first_file(&mut self) {
         self.files.state.select_first();
     }
 
-    fn select_last_file(&mut self) {
+    const fn select_last_file(&mut self) {
         self.files.state.select_last();
     }
 
-    fn select_next_file(&mut self) {
+    const fn select_next_file(&mut self) {
         self.files.state.select_next();
     }
 
-    fn select_previous_file(&mut self) {
+    const fn select_previous_file(&mut self) {
         self.files.state.select_previous();
     }
 

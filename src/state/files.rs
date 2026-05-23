@@ -15,7 +15,7 @@ pub const STATUS_ORDER: [FileStatus; 5] = [
 ];
 
 impl Files {
-    pub fn select_first(&mut self) {
+    pub const fn select_first(&mut self) {
         self.selected = Some(0);
     }
 
