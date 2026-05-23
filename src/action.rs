@@ -15,4 +15,5 @@ pub enum Action {
     GoToFirst,
     GoToLast,
     FocusPanel(Focus),
+    ToggleCollapsed,
 }

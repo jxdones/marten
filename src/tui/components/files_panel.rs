@@ -1,6 +1,6 @@
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{List, ListItem};
+use ratatui::widgets::{List, ListItem, ListState};
 use ratatui::{Frame, layout::Rect};
 
 const BORDER_WIDTH: usize = 2;
@@ -8,7 +8,7 @@ const STATUS_LETTER_WIDTH: usize = 2;
 
 use crate::app::App;
 use crate::git::repository::FileStatus;
-use crate::state::{TreeRow, tree_rows};
+use crate::state::TreeRow;
 use crate::tui::components::panel;
 
 pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
@@ -16,7 +16,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
     let block = panel::block("[1] files", theme, is_focused);
 
     let Some(files) = app.files().cloned() else {
-        let list_state = app.files_list_state();
+        let mut list_state = ListState::default();
         let items = vec![ListItem::new(Line::from(Span::styled(
             "unable to read git status",
             theme.muted(),
@@ -26,78 +26,91 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
             .block(block)
             .highlight_style(Style::default().bg(theme.select));
 
-        frame.render_stateful_widget(list, area, list_state);
+        frame.render_stateful_widget(list, area, &mut list_state);
         return;
     };
 
-    let rows = tree_rows(&files);
-    app.set_tree_row_count(rows.len());
-
+    app.ensure_rows();
     let selected_index = app.files_state().selected;
-    let list_state = app.files_list_state();
+    app.set_tree_row_count(app.cached_rows().len());
 
+    let collapsed = app.collapsed_files().clone();
+    let selected_row;
     let mut items: Vec<ListItem> = Vec::new();
-    if files.is_empty() {
-        items.push(ListItem::new(Line::from(Span::styled(
-            "working tree clean",
-            theme.muted(),
-        ))));
-    }
+    {
+        let rows = app.cached_rows();
+        selected_row = get_selected_row(rows, selected_index);
 
-    let selected_row = get_selected_row(&rows, selected_index);
-    list_state.select(selected_row);
+        if files.is_empty() {
+            items.push(ListItem::new(Line::from(Span::styled(
+                "working tree clean",
+                theme.muted(),
+            ))));
+        }
 
-    for row in rows {
-        match row {
-            TreeRow::Dir(dir_name, depth) => {
-                let path_depth = "  ".repeat(depth);
-                items.push(ListItem::new(Line::from(vec![
-                    Span::raw(path_depth),
-                    Span::styled(dir_name, theme.text_primary()),
-                ])));
-            }
-            TreeRow::File(entry, depth) => {
-                let status_letter = match entry.status {
-                    FileStatus::Staged => Span::styled("S ", theme.staged()),
-                    FileStatus::Partial => Span::styled("P ", theme.partial()),
-                    FileStatus::Conflicted => Span::styled("! ", theme.conflict()),
-                    FileStatus::Unstaged => Span::styled("M ", theme.unstaged()),
-                    FileStatus::Untracked => Span::styled("U ", theme.untracked()),
-                };
+        for row in rows {
+            match row {
+                TreeRow::Dir(dir_name, depth) => {
+                    let path_depth = "  ".repeat(*depth);
+                    let symbol = if collapsed.contains(dir_name) {
+                        "› "
+                    } else {
+                        "⌄ "
+                    };
+                    items.push(ListItem::new(Line::from(vec![
+                        Span::raw(path_depth),
+                        Span::styled(symbol, theme.muted()),
+                        Span::styled(dir_name, theme.muted()),
+                    ])));
+                }
+                TreeRow::File(idx, depth) => {
+                    let entry = &files[*idx];
+                    let status_letter = match entry.status {
+                        FileStatus::Staged => Span::styled("S ", theme.staged()),
+                        FileStatus::Partial => Span::styled("P ", theme.partial()),
+                        FileStatus::Conflicted => Span::styled("! ", theme.conflict()),
+                        FileStatus::Unstaged => Span::styled("M ", theme.unstaged()),
+                        FileStatus::Untracked => Span::styled("U ", theme.untracked()),
+                    };
 
-                let path = entry.path.split('/').next_back().unwrap_or(&entry.path);
-                let path_depth = "  ".repeat(depth);
+                    let path = entry.path.split('/').next_back().unwrap_or(&entry.path);
+                    let path_depth = "  ".repeat(*depth);
 
-                let insertions = humanize_stat('+', entry.insertions);
-                let deletions = humanize_stat('-', entry.deletions);
-                let stats = format!("{insertions}{deletions}");
-                let padding_width = (area.width as usize)
-                    .saturating_sub(path_depth.len())
-                    .saturating_sub(BORDER_WIDTH)
-                    .saturating_sub(path.len())
-                    .saturating_sub(STATUS_LETTER_WIDTH)
-                    .saturating_sub(stats.len());
-                let stats_padding = " ".repeat(padding_width);
+                    let insertions = humanize_stat('+', entry.insertions);
+                    let deletions = humanize_stat('-', entry.deletions);
+                    let stats = format!("{insertions}{deletions}");
+                    let padding_width = (area.width as usize)
+                        .saturating_sub(path_depth.len())
+                        .saturating_sub(BORDER_WIDTH)
+                        .saturating_sub(path.len())
+                        .saturating_sub(STATUS_LETTER_WIDTH)
+                        .saturating_sub(stats.len());
+                    let stats_padding = " ".repeat(padding_width);
 
-                items.push(ListItem::new(Line::from(vec![
-                    Span::raw(path_depth),
-                    status_letter,
-                    Span::styled(path, theme.text_primary()),
-                    Span::raw(stats_padding),
-                    Span::styled(insertions, theme.staged()),
-                    Span::styled(deletions, theme.unstaged()),
-                ])));
+                    items.push(ListItem::new(Line::from(vec![
+                        Span::raw(path_depth),
+                        status_letter,
+                        Span::styled(path, theme.text_primary()),
+                        Span::raw(stats_padding),
+                        Span::styled(insertions, theme.staged()),
+                        Span::styled(deletions, theme.unstaged()),
+                    ])));
+                }
             }
         }
     }
+
+    let mut list_state = ListState::default();
+    list_state.select(selected_row);
+
     let list = List::new(items)
         .block(block)
         .highlight_style(Style::default().bg(theme.select));
 
-    frame.render_stateful_widget(list, area, list_state);
+    frame.render_stateful_widget(list, area, &mut list_state);
 }
 
-fn get_selected_row(_rows: &[TreeRow<'_>], selected: Option<usize>) -> Option<usize> {
+fn get_selected_row(_rows: &[TreeRow], selected: Option<usize>) -> Option<usize> {
     selected
 }
 

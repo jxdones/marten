@@ -8,4 +8,4 @@ pub use diff::Diff;
 pub use files::Files;
 pub use focus::Focus;
 pub use screen::Screen;
-pub use tree::{TreeRow, tree_rows};
+pub use tree::TreeRow;

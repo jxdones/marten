@@ -1,7 +1,8 @@
+use std::collections::HashSet;
+
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crossterm::{execute, terminal::SetTitle};
 use git2::Repository;
-use ratatui::widgets::ListState;
 
 use crate::action::Action;
 use crate::event::Event;
@@ -18,7 +19,9 @@ const SCROLL_STEP: usize = 3;
 pub struct FilesPanel {
     state: Files,
     entries: Option<Vec<FileEntry>>,
-    pub(crate) list_state: ListState,
+    cached_rows: Vec<TreeRow>,
+    collapsed: HashSet<String>,
+    dirty: bool,
 }
 
 pub struct DiffPanel {
@@ -60,7 +63,9 @@ impl App {
             files: FilesPanel {
                 state: Files::default(),
                 entries: files,
-                list_state: ListState::default(),
+                cached_rows: Vec::new(),
+                collapsed: HashSet::new(),
+                dirty: true,
             },
             diff: DiffPanel {
                 state: Diff::default(),
@@ -105,16 +110,16 @@ impl App {
         self.files.entries.as_ref()
     }
 
-    pub const fn files_list_state(&mut self) -> &mut ListState {
-        &mut self.files.list_state
-    }
-
     pub const fn diff_state(&self) -> &Diff {
         &self.diff.state
     }
 
     pub const fn diff_hunks(&self) -> Option<&Vec<DiffHunk>> {
         self.diff.hunks.as_ref()
+    }
+
+    pub const fn collapsed_files(&self) -> &HashSet<String> {
+        &self.files.collapsed
     }
 
     pub fn set_diff_viewport_height(&mut self, height: usize) {
@@ -192,8 +197,9 @@ impl App {
                     });
                     f
                 });
-
-                let len = self.files.entries.as_ref().map_or(0, Vec::len);
+                self.files.dirty = true;
+                self.ensure_rows();
+                let len = self.files.cached_rows.len();
                 if len == 0 {
                     self.files.state.selected = None;
                 } else {
@@ -209,6 +215,11 @@ impl App {
             Action::GoToLast => {
                 self.select_last_file();
                 self.refresh_diff();
+            }
+            Action::ToggleCollapsed => {
+                if let Some(path) = self.selected_dir() {
+                    self.toggle_collapsed(path);
+                }
             }
         }
     }
@@ -229,22 +240,55 @@ impl App {
             KeyCode::Char('r') => Action::Refresh,
             KeyCode::Char('g') if self.focus == Focus::Files => Action::GoToFirst,
             KeyCode::Char('G') if self.focus == Focus::Files => Action::GoToLast,
+            KeyCode::Enter | KeyCode::Char(' ') if self.focus == Focus::Files => {
+                Action::ToggleCollapsed
+            }
             _ => Action::Noop,
         }
     }
 
     pub fn selected_file(&self) -> Option<&FileEntry> {
-        let files = self.files.entries.as_ref()?;
         let idx = self.files.state.selected?;
-        let rows = tree_rows(files);
-        for (i, row) in rows.iter().enumerate() {
-            if i >= idx
-                && let TreeRow::File(entry, _) = row
-            {
-                return Some(entry);
-            }
+        let row = self.files.cached_rows.get(idx)?;
+        if let TreeRow::File(entry_idx, _) = row {
+            return self.files.entries.as_ref()?.get(*entry_idx);
         }
         None
+    }
+
+    pub fn set_tree_row_count(&mut self, len: usize) {
+        self.files.state.tree_row_count = len;
+    }
+
+    pub fn toggle_collapsed(&mut self, path: String) {
+        if !self.files.collapsed.remove(&path) {
+            self.files.collapsed.insert(path);
+        }
+        self.files.dirty = true;
+        self.ensure_rows();
+        let len = self.files.cached_rows.len();
+        if len == 0 {
+            self.files.state.selected = None;
+        } else if let Some(sel) = self.files.state.selected {
+            self.files.state.selected = Some(sel.min(len - 1));
+        }
+    }
+
+    pub fn ensure_rows(&mut self) {
+        if !self.files.dirty {
+            return;
+        }
+        if let Some(entries) = &self.files.entries {
+            self.files.cached_rows = tree_rows(entries, &self.files.collapsed);
+        } else {
+            self.files.cached_rows.clear();
+        }
+        self.files.state.tree_row_count = self.files.cached_rows.len();
+        self.files.dirty = false;
+    }
+
+    pub fn cached_rows(&self) -> &[TreeRow] {
+        &self.files.cached_rows
     }
 
     fn select_first_file(&mut self) {
@@ -264,6 +308,7 @@ impl App {
     }
 
     fn refresh_diff(&mut self) {
+        self.ensure_rows();
         let Some(file) = self.selected_file() else {
             self.diff.hunks = None;
             return;
@@ -363,8 +408,15 @@ impl App {
         }
     }
 
-    pub fn set_tree_row_count(&mut self, len: usize) {
-        self.files.state.tree_row_count = len;
+    fn selected_dir(&self) -> Option<String> {
+        let idx = self.files.state.selected?;
+        self.files.entries.as_ref()?;
+
+        let rows = &self.files.cached_rows;
+        if let Some(TreeRow::Dir(path, _)) = rows.get(idx) {
+            return Some(path.clone());
+        }
+        None
     }
 }
 

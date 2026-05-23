@@ -2,15 +2,10 @@ use ratatui::style::{Color, Modifier, Style};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Theme {
-    pub bg: Color,
-    pub panel: Color,
-    pub panel_focused: Color,
     pub line: Color,
-    pub line_hi: Color,
 
     pub fg: Color,
     pub dim: Color,
-    pub vdim: Color,
 
     pub accent: Color,
     pub select: Color,
@@ -31,15 +26,10 @@ pub struct Theme {
 }
 
 pub const DEFAULT: Theme = Theme {
-    bg: Color::Rgb(22, 17, 13),
-    panel: Color::Rgb(29, 23, 18),
-    panel_focused: Color::Rgb(40, 32, 26),
     line: Color::Rgb(85, 68, 54),
-    line_hi: Color::Rgb(112, 89, 71),
 
     fg: Color::Rgb(239, 228, 210),
     dim: Color::Rgb(160, 141, 118),
-    vdim: Color::Rgb(94, 79, 66),
 
     accent: Color::Rgb(212, 163, 104),
     select: Color::Rgb(41, 32, 22),
