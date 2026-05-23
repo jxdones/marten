@@ -13,13 +13,14 @@
 
 marten opens inside a Git repository and gives you a focused view of your working tree:
 
-- changed files grouped by status
+- changed files grouped by status in a collapsible tree
 - insertion/deletion counts per file
 - staged, unstaged, partial, untracked, and conflicted file states
 - diff hunks for the selected file
+- hunk navigation, diff scrolling, and optional diff line numbers
 - repository, branch, ahead/behind, and change counts in the top bar
 
-marten currently starts with working-tree review and file diffs. More Git views are planned.
+marten currently focuses on working-tree review and file diffs. More Git views and file operations are planned.
 
 ## Install
 
@@ -46,6 +47,7 @@ Run `marten` from inside a Git repository.
 | `1` | Focus files |
 | `j` / `k` | Navigate files or scroll the diff |
 | `g` / `G` | Jump to first or last file |
+| `enter` / `space` | Collapse or expand the selected directory |
 | `[` / `]` | Move between diff hunks |
 | `l` | Toggle diff line numbers |
 | `r` | Refresh repository state |
@@ -57,6 +59,7 @@ To see all the available options, run `make help`.
 
 ```bash
 make build
+make run-release
 make check
 make test
 make lint
