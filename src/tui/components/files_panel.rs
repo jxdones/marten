@@ -136,17 +136,20 @@ fn format_path(path: &str, width: usize) -> String {
         .and_then(|index| segments.get(index))
         .copied();
 
-    let short = parent.map_or_else(|| truncate_middle(filename, width), |parent| {
-        let prefix = format!("../{parent}/");
-        if prefix.len() < width {
-            format!(
-                "{prefix}{}",
-                truncate_middle(filename, width - prefix.len())
-            )
-        } else {
-            truncate_middle(filename, width)
-        }
-    });
+    let short = parent.map_or_else(
+        || truncate_middle(filename, width),
+        |parent| {
+            let prefix = format!("../{parent}/");
+            if prefix.len() < width {
+                format!(
+                    "{prefix}{}",
+                    truncate_middle(filename, width - prefix.len())
+                )
+            } else {
+                truncate_middle(filename, width)
+            }
+        },
+    );
 
     format!("{short:<width$}")
 }

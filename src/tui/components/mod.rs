@@ -1,9 +1,6 @@
-pub mod branches_panel;
 pub mod diff_panel;
 pub mod files_panel;
-pub mod history_panel;
 pub mod left_sidebar;
 pub mod panel;
 pub mod shortcuts;
-pub mod stash_panel;
 pub mod top_bar;

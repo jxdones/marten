@@ -39,7 +39,7 @@ fn shortcuts(app: &App) -> Vec<(&'static str, &'static str)> {
     let mut shortcuts = vec![("tab", "next"), ("shift+tab", "previous"), ("r", "reload")];
 
     match app.focus() {
-        Focus::Files | Focus::Branches | Focus::Stash => {
+        Focus::Files => {
             shortcuts.extend([("j/k", "navigate"), ("g", "first"), ("G", "last")]);
         }
         Focus::Diff => {
@@ -49,9 +49,6 @@ fn shortcuts(app: &App) -> Vec<(&'static str, &'static str)> {
                 "show lines"
             };
             shortcuts.extend([("j/k", "scroll"), ("[/]", "hunk"), ("l", line_number_label)]);
-        }
-        Focus::History | Focus::Details => {
-            shortcuts.extend([("j/k", "navigate")]);
         }
     }
 

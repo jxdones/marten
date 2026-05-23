@@ -159,7 +159,6 @@ impl App {
                 Focus::Diff => {
                     self.scroll_diff_down();
                 }
-                _ => {}
             },
             Action::MoveUp => match self.focus {
                 Focus::Files => {
@@ -169,7 +168,6 @@ impl App {
                 Focus::Diff => {
                     self.scroll_diff_up();
                 }
-                _ => {}
             },
             Action::NextHunk => {
                 self.select_next_hunk();
@@ -220,9 +218,6 @@ impl App {
             KeyCode::BackTab => Action::PreviousFocus,
             KeyCode::Char('0') => Action::FocusPanel(Focus::Diff),
             KeyCode::Char('1') => Action::FocusPanel(Focus::Files),
-            KeyCode::Char('2') => Action::FocusPanel(Focus::Branches),
-            KeyCode::Char('3') => Action::FocusPanel(Focus::Stash),
-            KeyCode::Char('4') => Action::FocusPanel(Focus::History),
             KeyCode::Down | KeyCode::Char('j') => Action::MoveDown,
             KeyCode::Up | KeyCode::Char('k') => Action::MoveUp,
             KeyCode::Char(']') if self.focus == Focus::Diff => Action::NextHunk,
