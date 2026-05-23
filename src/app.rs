@@ -7,6 +7,7 @@ use git2::Repository;
 use crate::action::Action;
 use crate::event::Event;
 use crate::git::repository::{self, DiffHunk, FileEntry, RepositoryStatus};
+use crate::state::LineIndex;
 use crate::state::{
     Diff, Files, Focus, Screen,
     files::STATUS_ORDER,
@@ -316,6 +317,7 @@ impl App {
         let path = file.path.clone();
         let status = file.status;
         self.diff.hunks = repository::file_diff(&self.repo, &path, status).ok();
+        self.diff.state.line_index = LineIndex::new(self.diff.hunks.as_deref().unwrap_or(&[]));
         self.diff
             .state
             .select_first_hunk(self.diff.hunks.as_ref().map_or(0, Vec::len));
@@ -344,13 +346,12 @@ impl App {
     fn scroll_diff_up(&mut self) {
         let offset = self.diff.state.scroll_offset.saturating_sub(SCROLL_STEP);
         self.diff.state.set_scroll_offset(offset);
+        self.clamp_scroll();
         self.sync_diff_selection_to_scroll();
     }
 
     fn diff_row_count(&self) -> usize {
-        self.diff.hunks.as_ref().map_or(0, |hunks| {
-            hunks.iter().map(|hunk| 1 + hunk.lines.len()).sum()
-        })
+        self.diff.state.line_index.total_rows
     }
 
     fn max_diff_scroll_offset(&self) -> usize {
@@ -363,49 +364,37 @@ impl App {
             .diff
             .state
             .selected_hunk
-            .and_then(|selected| {
-                self.diff.hunks.as_ref().map(|hunks| {
-                    hunks
-                        .iter()
-                        .take(selected)
-                        .map(|hunk| 1 + hunk.lines.len())
-                        .sum()
-                })
+            .and_then(|hunk_idx| {
+                self.diff
+                    .state
+                    .line_index
+                    .hunk_starts
+                    .get(hunk_idx)
+                    .copied()
             })
             .unwrap_or(0);
 
-        self.diff
-            .state
-            .set_scroll_offset(offset.min(self.max_diff_scroll_offset()));
+        self.clamp_scroll();
+        self.diff.state.set_scroll_offset(offset);
     }
 
     fn sync_diff_selection_to_scroll(&mut self) {
-        let Some(hunks) = self.diff.hunks.as_ref() else {
+        let Some((hunk_idx, line_in_hunk)) = self
+            .diff
+            .state
+            .line_index
+            .lookup(self.diff.state.scroll_offset)
+        else {
             self.diff.state.select_first_hunk(0);
             return;
         };
 
-        let mut row_start = 0;
-        for (hunk_idx, hunk) in hunks.iter().enumerate() {
-            let row_end = row_start + 1 + hunk.lines.len();
-            if self.diff.state.scroll_offset < row_end {
-                let line_idx = self
-                    .diff
-                    .state
-                    .scroll_offset
-                    .saturating_sub(row_start + 1)
-                    .min(hunk.lines.len().saturating_sub(1));
-                self.diff.state.select_hunk_line(hunk_idx, line_idx);
-                return;
-            }
-            row_start = row_end;
-        }
-
-        if let Some((hunk_idx, hunk)) = hunks.iter().enumerate().next_back() {
-            self.diff
-                .state
-                .select_hunk_line(hunk_idx, hunk.lines.len().saturating_sub(1));
-        }
+        let line_idx = if line_in_hunk == 0 {
+            0
+        } else {
+            line_in_hunk - 1
+        };
+        self.diff.state.select_hunk_line(hunk_idx, line_idx);
     }
 
     fn selected_dir(&self) -> Option<String> {
@@ -417,6 +406,13 @@ impl App {
             return Some(path.clone());
         }
         None
+    }
+
+    fn clamp_scroll(&mut self) {
+        let max = self
+            .diff_row_count()
+            .saturating_sub(self.diff.state.viewport_height);
+        self.diff.state.scroll_offset = self.diff.state.scroll_offset.min(max);
     }
 }
 

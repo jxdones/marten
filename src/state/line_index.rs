@@ -2,6 +2,7 @@ use crate::git::repository::DiffHunk;
 
 const HUNK_HEADER_ROWS: usize = 1;
 
+#[derive(Debug)]
 pub struct LineIndex {
     pub hunk_starts: Vec<usize>,
     pub total_rows: usize,
@@ -60,9 +61,20 @@ mod tests {
     #[test]
     fn empty_hunks() {
         let index = LineIndex::new(&[]);
-        assert_eq!(index.total_rows, 0, "empty diff should have zero total rows");
-        assert_eq!(index.lookup(0), None, "lookup on empty diff should return None");
-        assert_eq!(index.lookup(999), None, "out-of-bounds on empty diff should return None");
+        assert_eq!(
+            index.total_rows, 0,
+            "empty diff should have zero total rows"
+        );
+        assert_eq!(
+            index.lookup(0),
+            None,
+            "lookup on empty diff should return None"
+        );
+        assert_eq!(
+            index.lookup(999),
+            None,
+            "out-of-bounds on empty diff should return None"
+        );
     }
 
     #[test]
@@ -78,9 +90,20 @@ mod tests {
         }];
         let index = LineIndex::new(&hunks);
 
-        assert_eq!(index.total_rows, HEADER_COUNT, "header-only hunk should have {HEADER_COUNT} total row");
-        assert_eq!(index.lookup(0), Some(HUNK_HEADER), "row 0 should be the hunk header");
-        assert_eq!(index.lookup(1), None, "row 1 should be out of bounds for header-only hunk");
+        assert_eq!(
+            index.total_rows, HEADER_COUNT,
+            "header-only hunk should have {HEADER_COUNT} total row"
+        );
+        assert_eq!(
+            index.lookup(0),
+            Some(HUNK_HEADER),
+            "row 0 should be the hunk header"
+        );
+        assert_eq!(
+            index.lookup(1),
+            None,
+            "row 1 should be out of bounds for header-only hunk"
+        );
     }
 
     #[test]
@@ -94,11 +117,30 @@ mod tests {
         let hunks = vec![hunk_with_lines(3)];
         let index = LineIndex::new(&hunks);
 
-        assert_eq!(index.total_rows, HEADER_WITH_LINES, "header + 3 lines should have {HEADER_WITH_LINES} total rows");
-        assert_eq!(index.lookup(0), Some(HUNK_HEADER), "row 0 should be the hunk header");
-        assert_eq!(index.lookup(1), Some(HUNK_0_LINE_0), "row 1 should be hunk 0, line 0");
-        assert_eq!(index.lookup(2), Some(HUNK_0_LINE_1), "row 2 should be hunk 0, line 1");
-        assert_eq!(index.lookup(3), Some(HUNK_0_LINE_2), "row 3 should be hunk 0, line 2");
+        assert_eq!(
+            index.total_rows, HEADER_WITH_LINES,
+            "header + 3 lines should have {HEADER_WITH_LINES} total rows"
+        );
+        assert_eq!(
+            index.lookup(0),
+            Some(HUNK_HEADER),
+            "row 0 should be the hunk header"
+        );
+        assert_eq!(
+            index.lookup(1),
+            Some(HUNK_0_LINE_0),
+            "row 1 should be hunk 0, line 0"
+        );
+        assert_eq!(
+            index.lookup(2),
+            Some(HUNK_0_LINE_1),
+            "row 2 should be hunk 0, line 1"
+        );
+        assert_eq!(
+            index.lookup(3),
+            Some(HUNK_0_LINE_2),
+            "row 3 should be hunk 0, line 2"
+        );
         assert_eq!(index.lookup(4), None, "row 4 should be out of bounds");
     }
 
@@ -114,10 +156,25 @@ mod tests {
         let hunks = vec![hunk_with_lines(2), hunk_with_lines(3)];
         let index = LineIndex::new(&hunks);
 
-        assert_eq!(index.total_rows, TOTAL_ROWS, "two hunks with 2 and 3 lines should have {TOTAL_ROWS} total rows");
-        assert_eq!(index.lookup(2), Some(HUNK_0_LAST_ROW), "row 2 should be the last line of hunk 0");
-        assert_eq!(index.lookup(3), Some(HUNK_1_HEADER), "row 3 should be the header of hunk 1");
-        assert_eq!(index.lookup(5), Some(HUNK_1_MIDDLE), "row 5 should be a middle line of hunk 1");
+        assert_eq!(
+            index.total_rows, TOTAL_ROWS,
+            "two hunks with 2 and 3 lines should have {TOTAL_ROWS} total rows"
+        );
+        assert_eq!(
+            index.lookup(2),
+            Some(HUNK_0_LAST_ROW),
+            "row 2 should be the last line of hunk 0"
+        );
+        assert_eq!(
+            index.lookup(3),
+            Some(HUNK_1_HEADER),
+            "row 3 should be the header of hunk 1"
+        );
+        assert_eq!(
+            index.lookup(5),
+            Some(HUNK_1_MIDDLE),
+            "row 5 should be a middle line of hunk 1"
+        );
     }
 
     #[test]
@@ -129,7 +186,15 @@ mod tests {
         let hunks = vec![hunk_with_lines(1)];
         let index = LineIndex::new(&hunks);
 
-        assert_eq!(index.lookup(PAST_THE_END), None, "row just past the end should return None");
-        assert_eq!(index.lookup(FAR_PAST_THE_END), None, "row far past the end should return None");
+        assert_eq!(
+            index.lookup(PAST_THE_END),
+            None,
+            "row just past the end should return None"
+        );
+        assert_eq!(
+            index.lookup(FAR_PAST_THE_END),
+            None,
+            "row far past the end should return None"
+        );
     }
 }

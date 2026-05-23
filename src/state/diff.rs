@@ -1,3 +1,5 @@
+use crate::state::LineIndex;
+
 #[derive(Debug)]
 pub struct Diff {
     pub selected_hunk: Option<usize>,
@@ -5,6 +7,7 @@ pub struct Diff {
     pub scroll_offset: usize,
     pub viewport_height: usize,
     pub show_line_numbers: bool,
+    pub line_index: LineIndex,
 }
 
 impl Default for Diff {
@@ -15,6 +18,7 @@ impl Default for Diff {
             scroll_offset: 0,
             viewport_height: 1,
             show_line_numbers: true,
+            line_index: LineIndex::new(&[]),
         }
     }
 }
