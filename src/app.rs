@@ -27,7 +27,7 @@ pub struct FilesPanel {
 
 pub struct DiffPanel {
     state: Diff,
-    hunks: Option<Vec<DiffHunk>>,
+    current_key: Option<(String, FileStatus)>,
 }
 
 pub struct App {
@@ -71,7 +71,7 @@ impl App {
             },
             diff: DiffPanel {
                 state: Diff::default(),
-                hunks: None,
+                current_key: None,
             },
             theme: theme::DEFAULT,
             repo,
@@ -117,8 +117,9 @@ impl App {
         &self.diff.state
     }
 
-    pub const fn diff_hunks(&self) -> Option<&Vec<DiffHunk>> {
-        self.diff.hunks.as_ref()
+    pub fn diff_hunks(&self) -> Option<&Vec<DiffHunk>> {
+        let key = self.diff.current_key.as_ref()?;
+        self.diff_cache.get(key)
     }
 
     pub const fn collapsed_files(&self) -> &HashSet<String> {
@@ -314,38 +315,34 @@ impl App {
     fn refresh_diff(&mut self) {
         self.ensure_rows();
         let Some(file) = self.selected_file() else {
-            self.diff.hunks = None;
+            self.diff.current_key = None;
             return;
         };
         let path = file.path.clone();
         let status = file.status;
 
         let cache_key = (path.clone(), status);
-        if let Some(cached) = self.diff_cache.get(&cache_key) {
-            self.diff.hunks = Some(cached.clone());
-        } else {
-            let hunks = repository::file_diff(&self.repo, &path, status).ok();
-            if let Some(ref h) = hunks {
-                self.diff_cache.insert(cache_key, h.clone());
-            }
-            self.diff.hunks = hunks;
+        if !self.diff_cache.contains_key(&cache_key)
+            && let Ok(hunks) = repository::file_diff(&self.repo, &path, status)
+        {
+            self.diff_cache.insert(cache_key.clone(), hunks);
         }
 
-        self.diff.state.line_index = LineIndex::new(self.diff.hunks.as_deref().unwrap_or(&[]));
-        self.diff
-            .state
-            .select_first_hunk(self.diff.hunks.as_ref().map_or(0, Vec::len));
+        let hunks: &[DiffHunk] = self.diff_cache.get(&cache_key).map_or(&[], |v| v);
+        self.diff.state.line_index = LineIndex::new(hunks);
+        self.diff.state.select_first_hunk(hunks.len());
+        self.diff.current_key = Some(cache_key);
         self.sync_diff_scroll_to_hunk();
     }
 
     fn select_next_hunk(&mut self) {
-        let len = self.diff.hunks.as_ref().map_or(0, Vec::len);
+        let len = self.diff_hunks().map_or(0, std::vec::Vec::len);
         self.diff.state.select_next_hunk(len);
         self.sync_diff_scroll_to_hunk();
     }
 
     fn select_previous_hunk(&mut self) {
-        let len = self.diff.hunks.as_ref().map_or(0, Vec::len);
+        let len = self.diff_hunks().map_or(0, std::vec::Vec::len);
         self.diff.state.select_previous_hunk(len);
         self.sync_diff_scroll_to_hunk();
     }
@@ -364,11 +361,11 @@ impl App {
         self.sync_diff_selection_to_scroll();
     }
 
-    fn diff_row_count(&self) -> usize {
+    const fn diff_row_count(&self) -> usize {
         self.diff.state.line_index.total_rows
     }
 
-    fn max_diff_scroll_offset(&self) -> usize {
+    const fn max_diff_scroll_offset(&self) -> usize {
         self.diff_row_count()
             .saturating_sub(self.diff.state.viewport_height)
     }
