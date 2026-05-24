@@ -15,7 +15,7 @@ use crate::state::{
 };
 use crate::tui::theme::{self, Theme};
 
-const SCROLL_STEP: usize = 3;
+const SCROLL_STEP: usize = 1;
 
 pub struct FilesPanel {
     state: Files,

@@ -1,11 +1,13 @@
 use ratatui::layout::Alignment;
 use ratatui::style::{Modifier, Style, Stylize};
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, List, ListItem, ListState};
+use ratatui::text::{Line, Span, Text};
+use ratatui::widgets::{Block, Borders, Paragraph};
 use ratatui::{Frame, layout::Rect};
 
 use crate::app::App;
-use crate::git::repository::{DiffLine, FileStatus};
+use crate::git::repository::{DiffHunk, DiffLine, FileStatus};
+use crate::state::LineIndex;
+use crate::tui::theme::Theme;
 
 pub fn draw(frame: &mut Frame, area: Rect, app: &App, is_focused: bool) {
     let theme = app.theme();
@@ -24,58 +26,34 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App, is_focused: bool) {
         .title(diff_title(app).alignment(Alignment::Right))
         .borders(Borders::ALL)
         .border_style(border_style);
-    let mut list_state = ListState::default();
-    let row_width = area.width.saturating_sub(2) as usize;
 
-    let mut items: Vec<ListItem> = Vec::new();
-    let Some(hunks) = app.diff_hunks() else {
-        items.push(ListItem::new(Line::from(Span::styled(
+    let diff_state = app.diff_state();
+    let hunks = app.diff_hunks();
+
+    let lines = if let Some(hunks) = hunks {
+        if hunks.is_empty() {
+            vec![Line::from(Span::styled("no changes", theme.muted()))]
+        } else {
+            render_diff_lines(
+                diff_state.scroll_offset,
+                area.height.saturating_sub(2) as usize,
+                hunks,
+                &diff_state.line_index,
+                diff_state.selected_hunk,
+                diff_state.show_line_numbers,
+                theme,
+                area.width as usize,
+            )
+        }
+    } else {
+        vec![Line::from(Span::styled(
             "no available diffs",
             theme.muted(),
-        ))));
-
-        let list = List::new(items).block(block);
-        frame.render_stateful_widget(list, area, &mut list_state);
-        return;
+        ))]
     };
 
-    if hunks.is_empty() {
-        items.push(ListItem::new(Line::from(Span::styled(
-            "no changes",
-            theme.muted(),
-        ))));
-    }
-
-    let selected_hunk = app.diff_state().selected_hunk;
-
-    for (i, row) in hunks.iter().enumerate() {
-        let is_selected = Some(i) == selected_hunk;
-
-        items.push(ListItem::new(hunk_header_line(
-            row_width,
-            i,
-            hunks.len(),
-            row.header.trim_end(),
-            (row.insertions, row.deletions),
-            is_selected,
-            theme,
-        )));
-
-        for line in &row.lines {
-            items.push(ListItem::new(diff_line(
-                row_width,
-                line,
-                is_selected,
-                app.diff_state().show_line_numbers,
-                theme,
-            )));
-        }
-    }
-
-    let list = List::new(items).block(block);
-    *list_state.offset_mut() = app.diff_state().scroll_offset;
-
-    frame.render_stateful_widget(list, area, &mut list_state);
+    let paragraph = Paragraph::new(Text::from(lines)).block(block);
+    frame.render_widget(paragraph, area);
 }
 
 fn diff_title(app: &App) -> Line<'static> {
@@ -165,6 +143,48 @@ fn hunk_header_line(
         Span::styled(" ", style),
         Span::styled(format!("-{deletions}"), Style::default().fg(theme.del_fg)),
     ])
+}
+
+fn render_diff_lines(
+    scroll_offset: usize,
+    viewport_height: usize,
+    hunks: &[DiffHunk],
+    line_index: &LineIndex,
+    selected_hunk: Option<usize>,
+    show_line_numbers: bool,
+    theme: Theme,
+    panel_width: usize,
+) -> Vec<Line<'static>> {
+    let row_width = panel_width.saturating_sub(2);
+    let visible_rows = scroll_offset..scroll_offset + viewport_height;
+
+    visible_rows
+        .filter_map(|global_row| {
+            let (hunk_idx, line_in_hunk) = line_index.lookup(global_row)?;
+            let hunk = &hunks[hunk_idx];
+            let is_selected = Some(hunk_idx) == selected_hunk;
+
+            if line_in_hunk == 0 {
+                Some(hunk_header_line(
+                    row_width,
+                    hunk_idx,
+                    hunks.len(),
+                    hunk.header.trim_end(),
+                    (hunk.insertions, hunk.deletions),
+                    is_selected,
+                    theme,
+                ))
+            } else {
+                Some(diff_line(
+                    row_width,
+                    &hunk.lines[line_in_hunk - 1],
+                    is_selected,
+                    show_line_numbers,
+                    theme,
+                ))
+            }
+        })
+        .collect()
 }
 
 fn diff_line(
