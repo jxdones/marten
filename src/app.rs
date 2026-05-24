@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crossterm::{execute, terminal::SetTitle};
@@ -6,7 +6,7 @@ use git2::Repository;
 
 use crate::action::Action;
 use crate::event::Event;
-use crate::git::repository::{self, DiffHunk, FileEntry, RepositoryStatus};
+use crate::git::repository::{self, DiffHunk, FileEntry, FileStatus, RepositoryStatus};
 use crate::state::LineIndex;
 use crate::state::{
     Diff, Files, Focus, Screen,
@@ -37,6 +37,7 @@ pub struct App {
     repo: Repository,
     repository_status: Option<RepositoryStatus>,
     should_quit: bool,
+    diff_cache: HashMap<(String, FileStatus), Vec<DiffHunk>>,
 
     files: FilesPanel,
     diff: DiffPanel,
@@ -75,6 +76,7 @@ impl App {
             theme: theme::DEFAULT,
             repo,
             should_quit: false,
+            diff_cache: HashMap::new(),
             repository_status,
         };
 
@@ -207,6 +209,7 @@ impl App {
                     self.files.state.selected =
                         Some(self.files.state.selected.unwrap_or(0).min(len - 1));
                 }
+                self.diff_cache.clear();
                 self.refresh_diff();
             }
             Action::GoToFirst => {
@@ -316,7 +319,18 @@ impl App {
         };
         let path = file.path.clone();
         let status = file.status;
-        self.diff.hunks = repository::file_diff(&self.repo, &path, status).ok();
+
+        let cache_key = (path.clone(), status);
+        if let Some(cached) = self.diff_cache.get(&cache_key) {
+            self.diff.hunks = Some(cached.clone());
+        } else {
+            let hunks = repository::file_diff(&self.repo, &path, status).ok();
+            if let Some(ref h) = hunks {
+                self.diff_cache.insert(cache_key, h.clone());
+            }
+            self.diff.hunks = hunks;
+        }
+
         self.diff.state.line_index = LineIndex::new(self.diff.hunks.as_deref().unwrap_or(&[]));
         self.diff
             .state

@@ -145,6 +145,7 @@ fn hunk_header_line(
     ])
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_diff_lines(
     scroll_offset: usize,
     viewport_height: usize,
