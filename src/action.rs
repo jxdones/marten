@@ -16,4 +16,5 @@ pub enum Action {
     GoToLast,
     FocusPanel(Focus),
     ToggleCollapsed,
+    ForceLoadDiff,
 }

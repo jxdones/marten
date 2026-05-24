@@ -8,6 +8,7 @@ pub struct Diff {
     pub viewport_height: usize,
     pub show_line_numbers: bool,
     pub line_index: LineIndex,
+    pub too_large: Option<usize>,
 }
 
 impl Default for Diff {
@@ -19,6 +20,7 @@ impl Default for Diff {
             viewport_height: 1,
             show_line_numbers: true,
             line_index: LineIndex::new(&[]),
+            too_large: None,
         }
     }
 }

@@ -5,7 +5,7 @@ use ratatui::widgets::{Block, Borders, Paragraph};
 use ratatui::{Frame, layout::Rect};
 
 use crate::app::App;
-use crate::git::repository::{DiffHunk, DiffLine, FileStatus};
+use crate::git::repository::{DIFF_LINE_THRESHOLD, DiffHunk, DiffLine, FileStatus};
 use crate::state::LineIndex;
 use crate::tui::theme::Theme;
 
@@ -30,7 +30,19 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App, is_focused: bool) {
     let diff_state = app.diff_state();
     let hunks = app.diff_hunks();
 
-    let lines = if let Some(hunks) = hunks {
+    let lines = if let Some(line_count) = diff_state.too_large {
+        vec![
+            Line::from(Span::styled(
+                "File too large to render automatically.",
+                theme.muted(),
+            )),
+            Line::from(Span::styled(
+                format!("{line_count} lines (threshold: {DIFF_LINE_THRESHOLD})"),
+                theme.muted(),
+            )),
+            Line::from(Span::styled("Press Enter to view.", theme.muted())),
+        ]
+    } else if let Some(hunks) = hunks {
         if hunks.is_empty() {
             vec![Line::from(Span::styled("no changes", theme.muted()))]
         } else {

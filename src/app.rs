@@ -81,7 +81,6 @@ impl App {
         };
 
         app.select_first_file();
-        app.refresh_diff();
         app
     }
 
@@ -226,6 +225,9 @@ impl App {
                     self.toggle_collapsed(path);
                 }
             }
+            Action::ForceLoadDiff => {
+                self.force_refresh_diff();
+            }
         }
     }
 
@@ -245,6 +247,9 @@ impl App {
             KeyCode::Char('r') => Action::Refresh,
             KeyCode::Char('g') if self.focus == Focus::Files => Action::GoToFirst,
             KeyCode::Char('G') if self.focus == Focus::Files => Action::GoToLast,
+            KeyCode::Enter if self.focus == Focus::Diff && self.diff.state.too_large.is_some() => {
+                Action::ForceLoadDiff
+            }
             KeyCode::Enter | KeyCode::Char(' ') if self.focus == Focus::Files => {
                 Action::ToggleCollapsed
             }
@@ -312,7 +317,16 @@ impl App {
         self.files.state.select_previous();
     }
 
-    fn refresh_diff(&mut self) {
+    pub fn refresh_diff(&mut self) {
+        self.refresh_diff_internal(false);
+    }
+
+    pub fn force_refresh_diff(&mut self) {
+        self.diff.state.too_large = None;
+        self.refresh_diff_internal(true);
+    }
+
+    fn refresh_diff_internal(&mut self, force: bool) {
         self.ensure_rows();
         let Some(file) = self.selected_file() else {
             self.diff.current_key = None;
@@ -322,6 +336,19 @@ impl App {
         let status = file.status;
 
         let cache_key = (path.clone(), status);
+
+        if !force
+            && let Ok(n) = repository::file_diff_line_count(&self.repo, &path, status)
+            && n > repository::DIFF_LINE_THRESHOLD
+        {
+            self.diff.state.too_large = Some(n);
+            self.diff.state.line_index = LineIndex::new(&[]);
+            self.diff.current_key = Some(cache_key);
+            return;
+        }
+
+        self.diff.state.too_large = None;
+
         if !self.diff_cache.contains_key(&cache_key)
             && let Ok(hunks) = repository::file_diff(&self.repo, &path, status)
         {

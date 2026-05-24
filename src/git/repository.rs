@@ -1,10 +1,11 @@
 use std::{collections::HashMap, fs, path::Path};
 
 use crate::git::GitResult;
-use git2::{self, Diff, Patch, Reference, Repository, Status, StatusOptions};
+use git2::{self, Diff, DiffOptions, Patch, Reference, Repository, Status, StatusOptions};
 
 const DEFAULT_HEAD: &str = "HEAD";
 const SHORT_COMMIT_LEN: usize = 7;
+pub const DIFF_LINE_THRESHOLD: usize = 15_000;
 
 #[derive(Debug, Clone)]
 pub struct RepositoryStatus {
@@ -164,6 +165,41 @@ pub fn files(repo: &Repository) -> GitResult<Vec<FileEntry>> {
     Ok(entries)
 }
 
+pub fn file_diff_line_count(repo: &Repository, path: &str, status: FileStatus) -> GitResult<usize> {
+    if status == FileStatus::Untracked {
+        return Ok(untracked_file_content(repo, path)?.lines().count());
+    }
+
+    let head = repo.head()?;
+    let mut opts = DiffOptions::new();
+    opts.pathspec(path);
+
+    let diff = match status {
+        FileStatus::Staged | FileStatus::Partial => {
+            let head_commit = head.peel_to_commit()?;
+            let head_tree = head_commit.tree()?;
+            repo.diff_tree_to_index(Some(&head_tree), None, Some(&mut opts))?
+        }
+        FileStatus::Unstaged => repo.diff_index_to_workdir(None, Some(&mut opts))?,
+        _ => return Ok(0),
+    };
+
+    let mut count = 0;
+    diff.foreach(
+        &mut |_delta, _progress| true,
+        None,
+        None,
+        Some(&mut |_delta, _hunk, line| {
+            if [' ', '+', '-'].contains(&line.origin()) {
+                count += 1;
+            }
+            true
+        }),
+    )?;
+
+    Ok(count)
+}
+
 pub fn file_diff(repo: &Repository, path: &str, status: FileStatus) -> GitResult<Vec<DiffHunk>> {
     if status == FileStatus::Untracked {
         return untracked_file_diff(repo, path);
@@ -171,32 +207,20 @@ pub fn file_diff(repo: &Repository, path: &str, status: FileStatus) -> GitResult
 
     let head = repo.head()?;
 
+    let mut opts = DiffOptions::new();
+    opts.pathspec(path);
+
     let diff = match status {
         FileStatus::Staged | FileStatus::Partial => {
             let head_commit = head.peel_to_commit()?;
             let head_tree = head_commit.tree()?;
-            repo.diff_tree_to_index(Some(&head_tree), None, None)?
+            repo.diff_tree_to_index(Some(&head_tree), None, Some(&mut opts))?
         }
-        FileStatus::Unstaged => repo.diff_index_to_workdir(None, None)?,
+        FileStatus::Unstaged => repo.diff_index_to_workdir(None, Some(&mut opts))?,
         _ => return Ok(vec![]),
     };
 
-    let mut diff_patch: Option<Patch> = None;
-    for (idx, delta) in diff.deltas().enumerate() {
-        let Some(patch_from_diff) = Patch::from_diff(&diff, idx)? else {
-            continue;
-        };
-        let Some(delta_path) = delta.new_file().path() else {
-            continue;
-        };
-
-        if delta_path == std::path::Path::new(path) {
-            diff_patch = Some(patch_from_diff);
-            break;
-        }
-    }
-
-    let Some(diff_patch) = diff_patch else {
+    let Some(diff_patch) = Patch::from_diff(&diff, 0)? else {
         return Ok(vec![]);
     };
 
@@ -374,25 +398,29 @@ fn change_counts(repo: &Repository) -> GitResult<ChangeCounts> {
 }
 
 fn diff_stats(diff: &Diff<'_>) -> Result<HashMap<String, (usize, usize)>, git2::Error> {
-    let mut stats = HashMap::new();
+    let mut stats: HashMap<String, (usize, usize)> = HashMap::new();
 
-    for (idx, delta) in diff.deltas().enumerate() {
-        let Some(delta_patch) = Patch::from_diff(diff, idx)? else {
-            continue;
-        };
+    diff.foreach(
+        &mut |_delta, _progress| true,
+        None,
+        None,
+        Some(&mut |delta, _hunk, line| {
+            let path = delta
+                .new_file()
+                .path()
+                .or_else(|| delta.old_file().path())
+                .and_then(|p| p.to_str())
+                .unwrap_or_default();
 
-        let (_, insertions, deletions) = delta_patch.line_stats()?;
-        let Some(path) = delta
-            .new_file()
-            .path()
-            .or_else(|| delta.old_file().path()) // in case the file is deleted
-            .and_then(|p| p.to_str())
-        else {
-            continue;
-        };
-
-        stats.insert(path.to_string(), (insertions, deletions));
-    }
+            let entry = stats.entry(path.to_string()).or_insert((0, 0));
+            match line.origin() {
+                '+' => entry.0 += 1,
+                '-' => entry.1 += 1,
+                _ => {}
+            }
+            true
+        }),
+    )?;
 
     Ok(stats)
 }
