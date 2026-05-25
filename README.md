@@ -2,25 +2,38 @@
   <p>
     <h2>marten</h2>
   </p>
-  <p>A small Rust Git TUI for reviewing work without leaving the terminal.</p>
+  <p>A fast terminal workspace for reviewing local Git changes before they become a PR/MR.</p>
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)
 ![Status](https://img.shields.io/badge/status-early%20development-yellow.svg)
 </div>
 
+## What is marten?
+
+marten is a Rust Git TUI for reviewing your own work without leaving the terminal.
+
+It opens inside a Git repository and gives you a focused view of your working tree, changed files, and diffs so you can inspect your changes before committing, pushing, or opening a pull/merge request.
+
+marten is currently focused on local working-tree review. Remote PR/MR review, additional Git views, and review-oriented workflows are planned.
+
 ## What it does
 
-marten opens inside a Git repository and gives you a focused view of your working tree:
+marten currently supports:
 
 - changed files grouped by status in a collapsible tree
 - insertion/deletion counts per file
 - staged, unstaged, partial, untracked, and conflicted file states
 - diff hunks for the selected file
-- hunk navigation, diff scrolling, and optional diff line numbers
+- hunk navigation and diff scrolling
+- optional diff line numbers
 - repository, branch, ahead/behind, and change counts in the top bar
+- repository refresh without leaving the TUI
 
-marten currently focuses on working-tree review and file diffs. More Git views and file operations are planned.
+## Why?
+
+Code review often starts before a PR or MR exists. marten is meant for that moment when you want to quickly
+inspect your own changes, move through files and hunks, and catch obvious mistakes while staying in your terminal.
 
 ## Install
 
@@ -37,6 +50,10 @@ make run
 ```
 
 Run `marten` from inside a Git repository.
+
+```bash
+marten
+```
 
 ## Keybindings
 
