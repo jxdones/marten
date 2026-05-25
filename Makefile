@@ -11,7 +11,7 @@ help:
 	@printf "  %-12s %s\n" "build" "Build the project (debug)."
 	@printf "  %-12s %s\n" "run" "Run the project (debug)."
 	@printf "  %-12s %s\n" "run-release" "Run the release binary."
-	@printf "  %-12s %s\n" "dev-files" "Create dummy untracked files for local files panel testing."
+	@printf "  %-12s %s\n" "dev-files" "Create untracked files under .marten-dev/ for UI testing (tree, scroll, threshold)."
 	@printf "  %-12s %s\n" "clean-dev-files" "Remove dummy files created by dev-files."
 	@printf "  %-12s %s\n" "check" "Type-check and compile without linking."
 	@printf "  %-12s %s\n" "test" "Run tests."
@@ -40,10 +40,20 @@ run-release:
 	@./target/release/marten
 
 dev-files:
-	@mkdir -p .marten-dev/nested
-	@printf "Dummy unstaged content for marten development.\n" > .marten-dev/unstaged.txt
-	@printf "Nested dummy file for panel truncation checks.\n" > .marten-dev/nested/very-long-file-name-for-files-panel.txt
-	@printf "Created dummy untracked files under .marten-dev/.\n"
+	@mkdir -p .marten-dev/src/utils .marten-dev/tests/fixtures .marten-dev/generated .marten-dev/docs
+	@printf "# readme\n\nThis is a placeholder file.\n\nUsed for marten dev testing.\n" \
+		> .marten-dev/readme.md
+	@seq 1 30  | awk '{print "# line " $$1}' > .marten-dev/config.toml
+	@seq 1 150 | awk '{print "// line " $$1}' > .marten-dev/src/main.rs
+	@seq 1 40  | awk '{print "// line " $$1}' > .marten-dev/src/lib.rs
+	@seq 1 100 | awk '{print "// line " $$1}' > .marten-dev/src/utils/helpers.rs
+	@seq 1 25  | awk '{print "// line " $$1}' > .marten-dev/src/utils/validators.rs
+	@seq 1 300 | awk '{print "// line " $$1}' > .marten-dev/tests/integration.rs
+	@seq 1 80  | awk '{print "line " $$1}'    > .marten-dev/tests/fixtures/sample_output.txt
+	@seq 1 16000 | awk '{print "// line " $$1}' > .marten-dev/generated/bindings.rs
+	@printf "# long filename\n\nPlaceholder.\n" \
+		> ".marten-dev/docs/this-is-a-very-long-filename-to-test-sidebar-truncation-behavior.md"
+	@printf "Created dev files under .marten-dev/.\n"
 
 clean-dev-files:
 	rm -rf .marten-dev
