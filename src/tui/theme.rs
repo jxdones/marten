@@ -2,6 +2,8 @@ use ratatui::style::{Color, Modifier, Style};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Theme {
+    pub bg: Color,
+    pub sidebar_bg: Color,
     pub line: Color,
 
     pub fg: Color,
@@ -26,6 +28,8 @@ pub struct Theme {
 }
 
 pub const DEFAULT: Theme = Theme {
+    bg: Color::Rgb(22, 17, 13),
+    sidebar_bg: Color::Rgb(22, 17, 13),
     line: Color::Rgb(85, 68, 54),
 
     fg: Color::Rgb(239, 228, 210),

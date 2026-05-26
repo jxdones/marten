@@ -1,6 +1,6 @@
-use ratatui::style::Style;
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{List, ListItem, ListState};
+use ratatui::widgets::{Borders, List, ListItem, ListState};
 use ratatui::{Frame, layout::Rect};
 
 const BORDER_WIDTH: usize = 2;
@@ -13,7 +13,18 @@ use crate::tui::components::panel;
 
 pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
     let theme = app.theme();
-    let block = panel::block("[1] files", theme, is_focused);
+    let block = panel::block(
+        Line::from(vec![Span::styled(
+            " files",
+            Style::default()
+                .fg(theme.accent)
+                .add_modifier(Modifier::BOLD),
+        )]),
+        theme,
+        Borders::NONE,
+        theme.sidebar_bg,
+        is_focused,
+    );
 
     let Some(files) = app.files().cloned() else {
         let mut list_state = ListState::default();
@@ -79,10 +90,33 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
                     let insertions = humanize_stat('+', entry.insertions);
                     let deletions = humanize_stat('-', entry.deletions);
                     let stats = format!("{insertions}{deletions}");
+
+                    let fixed_width = path_depth.len()
+                        + BORDER_WIDTH
+                        + STATUS_LETTER_WIDTH
+                        + stats.len();
+                    let max_path_width = (area.width as usize).saturating_sub(fixed_width);
+
+                    let display_path = if path.chars().count() > max_path_width {
+                        let mut truncated = String::new();
+                        let mut count = 0;
+                        for ch in path.chars() {
+                            if count + 1 >= max_path_width {
+                                break;
+                            }
+                            truncated.push(ch);
+                            count += 1;
+                        }
+                        truncated.push('…');
+                        truncated
+                    } else {
+                        path.to_string()
+                    };
+
                     let padding_width = (area.width as usize)
                         .saturating_sub(path_depth.len())
                         .saturating_sub(BORDER_WIDTH)
-                        .saturating_sub(path.len())
+                        .saturating_sub(display_path.chars().count())
                         .saturating_sub(STATUS_LETTER_WIDTH)
                         .saturating_sub(stats.len());
                     let stats_padding = " ".repeat(padding_width);
@@ -90,7 +124,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
                     items.push(ListItem::new(Line::from(vec![
                         Span::raw(path_depth),
                         status_letter,
-                        Span::styled(path, theme.text_primary()),
+                        Span::styled(display_path, theme.text_primary()),
                         Span::raw(stats_padding),
                         Span::styled(insertions, theme.staged()),
                         Span::styled(deletions, theme.unstaged()),

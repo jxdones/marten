@@ -90,10 +90,12 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
     let mode = top_bar_mode(app);
     let right_line = Line::from(Span::styled(mode, theme.text_primary()));
 
-    frame.render_widget(Paragraph::new(""), area);
-    frame.render_widget(Paragraph::new(left_line), left);
+    let bg_style = Style::default().bg(theme.bg);
+
+    frame.render_widget(Paragraph::new("").style(bg_style), area);
+    frame.render_widget(Paragraph::new(left_line).style(bg_style), left);
     frame.render_widget(
-        Paragraph::new(right_line).alignment(Alignment::Right),
+        Paragraph::new(right_line).style(bg_style).alignment(Alignment::Right),
         right,
     );
 }

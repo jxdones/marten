@@ -1,6 +1,7 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
+    style::Style,
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
 };
@@ -10,9 +11,11 @@ use crate::state::Focus;
 
 pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
     let theme = app.theme();
+    let bg_style = Style::default().bg(theme.bg);
     let block = Block::default()
         .borders(Borders::TOP)
-        .border_style(theme.panel_border());
+        .border_style(theme.panel_border())
+        .style(bg_style);
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
@@ -31,8 +34,8 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
         ])
         .split(inner);
 
-    frame.render_widget(Paragraph::new(Line::from(left)), chunks[0]);
-    frame.render_widget(Paragraph::new(Line::from(right)), chunks[1]);
+    frame.render_widget(Paragraph::new(Line::from(left)).style(bg_style), chunks[0]);
+    frame.render_widget(Paragraph::new(Line::from(right)).style(bg_style), chunks[1]);
 }
 
 fn shortcuts(app: &App) -> Vec<(&'static str, &'static str)> {

@@ -20,7 +20,7 @@ pub fn home(area: Rect) -> Home {
 
     let cols = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(25), Constraint::Percentage(75)])
+        .constraints([Constraint::Percentage(20), Constraint::Percentage(80)])
         .split(rows[1]);
 
     Home {

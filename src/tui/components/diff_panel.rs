@@ -18,14 +18,15 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App, is_focused: bool) {
     };
     let block = Block::default()
         .title(Line::from(vec![Span::styled(
-            "[0] diff",
+            " diff",
             Style::default()
                 .fg(theme.accent)
                 .add_modifier(Modifier::BOLD),
         )]))
         .title(diff_title(app).alignment(Alignment::Right))
         .borders(Borders::ALL)
-        .border_style(border_style);
+        .border_style(border_style)
+        .style(Style::default().bg(theme.bg));
 
     let diff_state = app.diff_state();
     let hunks = app.diff_hunks();
