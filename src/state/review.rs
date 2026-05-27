@@ -93,6 +93,13 @@ pub enum RenderedRow {
     },
 }
 
+#[derive(Debug)]
+pub struct WorkerResult {
+    pub generation: u64,
+    pub file_idx: usize,
+    pub result: Result<(Vec<DiffHunk>, LineIndex), String>,
+}
+
 impl ReviewIndex {
     pub fn file_at_row(&self, global_row: usize) -> Option<(usize, usize)> {
         if self.file_starts.is_empty() {

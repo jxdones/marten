@@ -1,4 +1,4 @@
-use std::io;
+use std::{io, time::Duration};
 
 use crossterm::{
     event::{self, Event as CrosstermEvent, KeyEventKind},
@@ -34,13 +34,14 @@ fn run_loop(terminal: &mut DefaultTerminal, app: &mut App) -> io::Result<()> {
         if app.diff_hunks().is_none() && app.selected_file().is_some() {
             app.refresh_diff();
         }
-
+        app.poll_workers();
         terminal.draw(|frame| tui::draw(frame, app))?;
 
-        let event = read_event()?;
-        let action = app.handle_event(event);
-
-        app.update(action);
+        if event::poll(Duration::from_millis(50))? {
+            let event = read_event()?;
+            let action = app.handle_event(event);
+            app.update(action);
+        }
     }
 
     Ok(())

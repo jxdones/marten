@@ -14,7 +14,7 @@ use crate::state::{
 };
 use crate::state::{
     DiffLoadState, FileKey, FileSlot, LineIndex, LoadingProgress, ReviewDoc, ReviewIndex,
-    ReviewState,
+    ReviewState, WorkerResult,
 };
 use crate::tui::theme::{self, Theme};
 
@@ -45,6 +45,8 @@ pub struct App {
     diff: DiffPanel,
     review: ReviewState,
     review_doc: ReviewDoc,
+
+    worker_rx: std::sync::mpsc::Receiver<WorkerResult>,
 }
 
 impl App {
@@ -102,6 +104,8 @@ impl App {
             }
         };
 
+        let (tx, rx) = std::sync::mpsc::channel::<WorkerResult>();
+
         let mut app = Self {
             screen: Screen::Home,
             focus: Focus::Files,
@@ -119,11 +123,31 @@ impl App {
             },
             review_doc,
             review: ReviewState::default(),
+            worker_rx: rx,
             theme: theme::DEFAULT,
             repo,
             should_quit: false,
             repository_status,
         };
+
+        let generation = app.review_doc.generation;
+        for (file_idx, file) in app.review_doc.files.iter().enumerate() {
+            let tx_clone = tx.clone();
+            let path = file.entry.path.clone();
+            let status = file.entry.status;
+            std::thread::spawn(move || {
+                let repo = Repository::discover(".").unwrap();
+                let result = repository::file_diff(&repo, &path, status)
+                    .map(|hunks| {
+                        let index = LineIndex::new(&hunks);
+                        (hunks, index)
+                    })
+                    .map_err(|e| e.to_string());
+
+                tx_clone.send(WorkerResult { generation, file_idx, result }).ok();
+                
+            });
+        }
 
         app.review_doc.rebuild_index();
         app.select_first_file();
@@ -390,6 +414,26 @@ impl App {
     pub fn force_refresh_diff(&mut self) {
         self.diff.state.too_large = None;
         self.refresh_diff_internal(true);
+    }
+
+    pub fn poll_workers(&mut self) {
+        while let Ok(msg) = self.worker_rx.try_recv() {
+            if msg.generation != self.review_doc.generation {
+                continue;
+            }
+
+            let slot = &mut self.review_doc.files[msg.file_idx];
+            slot.load = match msg.result {
+                Ok((hunks, index)) => DiffLoadState::Loaded { hunks, index },
+                Err(e) => DiffLoadState::Error(e),
+            };
+            self.review_doc.index_dirty = true;
+        }
+
+        if self.review_doc.index_dirty {
+            self.review_doc.rebuild_index();
+            self.review_doc.index_dirty = false;
+        }
     }
 
     fn refresh_diff_internal(&mut self, force: bool) {
