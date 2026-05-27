@@ -13,8 +13,7 @@ use crate::state::{
     tree::{TreeRow, tree_rows},
 };
 use crate::state::{
-    DiffLoadState, FileKey, FileSlot, LineIndex, LoadingProgress, ReviewDoc, ReviewIndex,
-    ReviewState, WorkerResult,
+    DiffLoadState, FileKey, FileSlot, LineIndex, LoadingProgress, ReviewDoc, ReviewIndex, ReviewState, ViewMode, WorkerResult
 };
 use crate::tui::theme::{self, Theme};
 
@@ -244,8 +243,9 @@ impl App {
                     self.select_next_file();
                     self.refresh_diff();
                 }
-                Focus::Diff => {
-                    self.scroll_diff_down();
+                Focus::Diff => match self.review.mode {
+                    ViewMode::Continuous => self.scroll_continuous_diff_down(),
+                    ViewMode::SingleFile => self.scroll_diff_down()
                 }
             },
             Action::MoveUp => match self.focus {
@@ -253,8 +253,9 @@ impl App {
                     self.select_previous_file();
                     self.refresh_diff();
                 }
-                Focus::Diff => {
-                    self.scroll_diff_up();
+                Focus::Diff => match self.review.mode {
+                    ViewMode::Continuous => self.scroll_continuous_diff_up(),
+                    ViewMode::SingleFile => self.scroll_diff_up()
                 }
             },
             Action::NextHunk => {
@@ -346,6 +347,17 @@ impl App {
             return self.files.entries.as_ref()?.get(*entry_idx);
         }
         None
+    }
+
+    pub fn match_selected_file(&mut self) {
+        let Some((file_idx, _)) = self.review_doc.index.file_at_row(self.review.continuous_scroll) else {
+            return;
+        };
+        self.files.state.selected = self.files.cached_rows
+            .iter()
+            .enumerate()
+            .find(|(_, row)| matches!(row, TreeRow::File(entry_idx, _) if *entry_idx == file_idx))
+            .map(|(pos, _)| pos);
     }
 
     pub const fn set_tree_row_count(&mut self, len: usize) {
@@ -517,6 +529,24 @@ impl App {
         self.diff.state.set_scroll_offset(offset);
         self.clamp_scroll();
         self.sync_diff_selection_to_scroll();
+    }
+
+    fn max_continuous_diff_scroll_offset(&self) -> usize {
+        self.review_doc.index.total_rows
+        .saturating_sub(self.diff.state.viewport_height)
+    }
+
+    fn scroll_continuous_diff_down(&mut self) {
+        let max_offset = self.max_continuous_diff_scroll_offset();
+        let offset = (self.review.continuous_scroll + SCROLL_STEP).min(max_offset);
+        self.review.continuous_scroll = offset;
+        self.match_selected_file();
+    }
+
+    fn scroll_continuous_diff_up(&mut self) {
+        let offset = self.review.continuous_scroll.saturating_sub(SCROLL_STEP);
+        self.review.continuous_scroll = offset;
+        self.match_selected_file();
     }
 
     const fn diff_row_count(&self) -> usize {
