@@ -31,9 +31,6 @@ fn init_terminal() -> io::Result<DefaultTerminal> {
 
 fn run_loop(terminal: &mut DefaultTerminal, app: &mut App) -> io::Result<()> {
     while !app.should_quit() {
-        if app.diff_hunks().is_none() && app.selected_file().is_some() {
-            app.refresh_diff();
-        }
         app.poll_workers();
         terminal.draw(|frame| tui::draw(frame, app))?;
 
