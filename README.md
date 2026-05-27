@@ -24,6 +24,8 @@ marten currently supports:
 - changed files grouped by status in a collapsible tree
 - insertion/deletion counts per file
 - staged, unstaged, partial, untracked, and conflicted file states
+- continuous review mode where all files flow as one scrollable document, sidebar selection follows scroll position
+- single-file mode where sidebar selection controls which file is shown
 - diff hunks for the selected file
 - hunk navigation and diff scrolling
 - optional diff line numbers
@@ -67,6 +69,7 @@ marten
 | `enter` / `space` | Collapse or expand the selected directory |
 | `[` / `]` | Move between diff hunks |
 | `l` | Toggle diff line numbers |
+| `v` | Toggle between continuous and single-file review mode |
 | `r` | Refresh repository state |
 | `q` / `ctrl+c` | Quit |
 
