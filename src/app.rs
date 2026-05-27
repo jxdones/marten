@@ -303,6 +303,12 @@ impl App {
                     self.toggle_collapsed(path);
                 }
             }
+            Action::ToggleViewMode => {
+                match self.review.mode {
+                    ViewMode::Continuous => self.review.mode = ViewMode::SingleFile,
+                    ViewMode::SingleFile => self.review.mode = ViewMode::Continuous,
+                }
+            }
             Action::ForceLoadDiff => {
                 self.force_refresh_diff();
             }
@@ -327,6 +333,7 @@ impl App {
             KeyCode::Char(']') if self.focus == Focus::Diff => Action::NextHunk,
             KeyCode::Char('[') if self.focus == Focus::Diff => Action::PreviousHunk,
             KeyCode::Char('l') if self.focus == Focus::Diff => Action::ToggleDiffLineNumbers,
+            KeyCode::Char('v') => Action::ToggleViewMode,
             KeyCode::Char('r') => Action::Refresh,
             KeyCode::Char('g') if self.focus == Focus::Files => Action::GoToFirst,
             KeyCode::Char('G') if self.focus == Focus::Files => Action::GoToLast,
