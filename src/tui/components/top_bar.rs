@@ -95,7 +95,9 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
     frame.render_widget(Paragraph::new("").style(bg_style), area);
     frame.render_widget(Paragraph::new(left_line).style(bg_style), left);
     frame.render_widget(
-        Paragraph::new(right_line).style(bg_style).alignment(Alignment::Right),
+        Paragraph::new(right_line)
+            .style(bg_style)
+            .alignment(Alignment::Right),
         right,
     );
 }

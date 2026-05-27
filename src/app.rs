@@ -6,12 +6,15 @@ use git2::Repository;
 
 use crate::action::Action;
 use crate::event::Event;
-use crate::git::repository::{self, DiffHunk, FileEntry, FileStatus, RepositoryStatus};
-use crate::state::LineIndex;
+use crate::git::repository::{self, DiffHunk, FileEntry, RepositoryStatus};
 use crate::state::{
     Diff, Files, Focus, Screen,
     files::STATUS_ORDER,
     tree::{TreeRow, tree_rows},
+};
+use crate::state::{
+    DiffLoadState, FileKey, FileSlot, LineIndex, LoadingProgress, ReviewDoc, ReviewIndex,
+    ReviewState,
 };
 use crate::tui::theme::{self, Theme};
 
@@ -27,7 +30,7 @@ pub struct FilesPanel {
 
 pub struct DiffPanel {
     state: Diff,
-    current_key: Option<(String, FileStatus)>,
+    current_key: Option<FileKey>,
 }
 
 pub struct App {
@@ -37,10 +40,11 @@ pub struct App {
     repo: Repository,
     repository_status: Option<RepositoryStatus>,
     should_quit: bool,
-    diff_cache: HashMap<(String, FileStatus), Vec<DiffHunk>>,
 
     files: FilesPanel,
     diff: DiffPanel,
+    review: ReviewState,
+    review_doc: ReviewDoc,
 }
 
 impl App {
@@ -59,11 +63,51 @@ impl App {
             });
             f
         });
+
+        let review_doc = match &files {
+            None => ReviewDoc {
+                files: vec![],
+                by_key: HashMap::new(),
+                index: ReviewIndex::default(),
+                index_dirty: false,
+                generation: 0,
+                loading: LoadingProgress::default(),
+            },
+            Some(entries) => {
+                let mut file_slots = Vec::new();
+                let mut by_key = HashMap::new();
+
+                for (idx, entry) in entries.iter().enumerate() {
+                    let file_key = FileKey {
+                        path: entry.path.clone(),
+                        status: entry.status,
+                    };
+
+                    let file_slot = FileSlot {
+                        entry: entry.clone(),
+                        load: crate::state::DiffLoadState::NotLoaded,
+                    };
+
+                    by_key.insert(file_key, idx);
+                    file_slots.push(file_slot);
+                }
+                ReviewDoc {
+                    files: file_slots,
+                    by_key,
+                    index: ReviewIndex::default(),
+                    index_dirty: false,
+                    generation: 0,
+                    loading: LoadingProgress::default(),
+                }
+            }
+        };
+
         let mut app = Self {
             screen: Screen::Home,
             focus: Focus::Files,
             files: FilesPanel {
                 state: Files::default(),
+                // TODO: FilesPanel.entries should read from ReviewDoc
                 entries: files,
                 cached_rows: Vec::new(),
                 collapsed: HashSet::new(),
@@ -73,10 +117,11 @@ impl App {
                 state: Diff::default(),
                 current_key: None,
             },
+            review_doc,
+            review: ReviewState::default(),
             theme: theme::DEFAULT,
             repo,
             should_quit: false,
-            diff_cache: HashMap::new(),
             repository_status,
         };
 
@@ -118,7 +163,12 @@ impl App {
 
     pub fn diff_hunks(&self) -> Option<&Vec<DiffHunk>> {
         let key = self.diff.current_key.as_ref()?;
-        self.diff_cache.get(key)
+        let slot_idx = self.review_doc.by_key.get(key)?;
+        let slot = self.review_doc.files.get(*slot_idx)?;
+        match &slot.load {
+            DiffLoadState::Loaded { hunks, .. } => Some(hunks),
+            _ => None,
+        }
     }
 
     pub const fn collapsed_files(&self) -> &HashSet<String> {
@@ -209,7 +259,7 @@ impl App {
                     self.files.state.selected =
                         Some(self.files.state.selected.unwrap_or(0).min(len - 1));
                 }
-                self.diff_cache.clear();
+                self.review_doc.by_key.clear();
                 self.refresh_diff();
             }
             Action::GoToFirst => {
@@ -335,7 +385,10 @@ impl App {
         let path = file.path.clone();
         let status = file.status;
 
-        let cache_key = (path.clone(), status);
+        let cache_key = FileKey {
+            path: path.clone(),
+            status,
+        };
 
         if !force
             && let Ok(n) = repository::file_diff_line_count(&self.repo, &path, status)
@@ -343,21 +396,38 @@ impl App {
         {
             self.diff.state.too_large = Some(n);
             self.diff.state.line_index = LineIndex::new(&[]);
-            self.diff.current_key = Some(cache_key);
+            self.diff.current_key = Some(cache_key.clone());
+
+            if let Some(&slot_idx) = self.review_doc.by_key.get(&cache_key) {
+                self.review_doc.files[slot_idx].load = DiffLoadState::TooLarge {
+                    lines: n,
+                    forced: false,
+                };
+            }
             return;
         }
 
         self.diff.state.too_large = None;
 
-        if !self.diff_cache.contains_key(&cache_key)
-            && let Ok(hunks) = repository::file_diff(&self.repo, &path, status)
-        {
-            self.diff_cache.insert(cache_key.clone(), hunks);
+        if let Some(&slot_idx) = self.review_doc.by_key.get(&cache_key) {
+            if matches!(
+                self.review_doc.files[slot_idx].load,
+                DiffLoadState::NotLoaded
+            ) && let Ok(hunks) = repository::file_diff(&self.repo, &path, status)
+            {
+                let index = LineIndex::new(&hunks);
+                self.review_doc.files[slot_idx].load = DiffLoadState::Loaded { hunks, index };
+            }
+
+            let hunks: &[DiffHunk] = match &self.review_doc.files[slot_idx].load {
+                DiffLoadState::Loaded { hunks, .. } => hunks,
+                _ => &[],
+            };
+
+            self.diff.state.line_index = LineIndex::new(hunks);
+            self.diff.state.select_first_hunk(hunks.len());
         }
 
-        let hunks: &[DiffHunk] = self.diff_cache.get(&cache_key).map_or(&[], |v| v);
-        self.diff.state.line_index = LineIndex::new(hunks);
-        self.diff.state.select_first_hunk(hunks.len());
         self.diff.current_key = Some(cache_key);
         self.sync_diff_scroll_to_hunk();
     }
