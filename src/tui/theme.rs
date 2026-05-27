@@ -13,6 +13,9 @@ pub struct Theme {
     pub select: Color,
     pub select_hi: Color,
 
+    pub file_header_bg: Color,
+    pub hunk_header_bg: Color,
+
     pub add_bg: Color,
     pub add_fg: Color,
     pub add_gutter: Color,
@@ -38,6 +41,9 @@ pub const DEFAULT: Theme = Theme {
     accent: Color::Rgb(212, 163, 104),
     select: Color::Rgb(41, 32, 22),
     select_hi: Color::Rgb(64, 49, 33),
+
+    file_header_bg: Color::Rgb(29, 23, 18),
+    hunk_header_bg: Color::Rgb(40, 32, 26),
 
     add_bg: Color::Rgb(42, 43, 29),
     add_fg: Color::Rgb(181, 201, 122),
@@ -118,5 +124,9 @@ impl Theme {
 
     pub fn diff_del(self) -> Style {
         Style::default().fg(self.del_fg).bg(self.del_bg)
+    }
+
+    pub fn hunk_header(self) -> Style {
+        Style::default().fg(self.dim).bg(self.hunk_header_bg)
     }
 }

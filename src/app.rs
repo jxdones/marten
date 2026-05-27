@@ -6,12 +6,13 @@ use git2::Repository;
 
 use crate::action::Action;
 use crate::event::Event;
-use crate::git::repository::{self, DiffHunk, FileEntry, FileStatus, RepositoryStatus};
-use crate::state::LineIndex;
+use crate::git::repository::{self, DiffHunk, FileEntry, RepositoryStatus};
 use crate::state::{
     Diff, Files, Focus, Screen,
-    files::STATUS_ORDER,
     tree::{TreeRow, tree_rows},
+};
+use crate::state::{
+    DiffLoadState, FileKey, FileSlot, LineIndex, LoadingProgress, ReviewDoc, ReviewIndex, ReviewState, ViewMode, WorkerResult
 };
 use crate::tui::theme::{self, Theme};
 
@@ -27,7 +28,7 @@ pub struct FilesPanel {
 
 pub struct DiffPanel {
     state: Diff,
-    current_key: Option<(String, FileStatus)>,
+    current_key: Option<FileKey>,
 }
 
 pub struct App {
@@ -37,10 +38,13 @@ pub struct App {
     repo: Repository,
     repository_status: Option<RepositoryStatus>,
     should_quit: bool,
-    diff_cache: HashMap<(String, FileStatus), Vec<DiffHunk>>,
 
     files: FilesPanel,
     diff: DiffPanel,
+    review: ReviewState,
+    review_doc: ReviewDoc,
+
+    worker_rx: std::sync::mpsc::Receiver<WorkerResult>,
 }
 
 impl App {
@@ -51,19 +55,60 @@ impl App {
         let repo = Repository::discover(".").expect("not a git repo");
         let repository_status = repository::status(&repo).ok();
         let files = repository::files(&repo).ok().map(|mut f| {
-            f.sort_by_key(|e| {
-                STATUS_ORDER
-                    .iter()
-                    .position(|s| *s == e.status)
-                    .unwrap_or(99)
+            f.sort_by(|a, b| {
+                let a_key = (a.path.contains('/'), a.path.to_lowercase());
+                let b_key = (b.path.contains('/'), b.path.to_lowercase());
+                a_key.cmp(&b_key)
             });
             f
         });
+
+        let review_doc = match &files {
+            None => ReviewDoc {
+                files: vec![],
+                by_key: HashMap::new(),
+                index: ReviewIndex::default(),
+                index_dirty: false,
+                generation: 0,
+                loading: LoadingProgress::default(),
+            },
+            Some(entries) => {
+                let mut file_slots = Vec::new();
+                let mut by_key = HashMap::new();
+
+                for (idx, entry) in entries.iter().enumerate() {
+                    let file_key = FileKey {
+                        path: entry.path.clone(),
+                        status: entry.status,
+                    };
+
+                    let file_slot = FileSlot {
+                        entry: entry.clone(),
+                        load: crate::state::DiffLoadState::NotLoaded,
+                    };
+
+                    by_key.insert(file_key, idx);
+                    file_slots.push(file_slot);
+                }
+                ReviewDoc {
+                    files: file_slots,
+                    by_key,
+                    index: ReviewIndex::default(),
+                    index_dirty: false,
+                    generation: 0,
+                    loading: LoadingProgress::default(),
+                }
+            }
+        };
+
+        let (tx, rx) = std::sync::mpsc::channel::<WorkerResult>();
+
         let mut app = Self {
             screen: Screen::Home,
             focus: Focus::Files,
             files: FilesPanel {
                 state: Files::default(),
+                // TODO: FilesPanel.entries should read from ReviewDoc
                 entries: files,
                 cached_rows: Vec::new(),
                 collapsed: HashSet::new(),
@@ -73,14 +118,38 @@ impl App {
                 state: Diff::default(),
                 current_key: None,
             },
+            review_doc,
+            review: ReviewState::default(),
+            worker_rx: rx,
             theme: theme::DEFAULT,
             repo,
             should_quit: false,
-            diff_cache: HashMap::new(),
             repository_status,
         };
 
+        let generation = app.review_doc.generation;
+        for (file_idx, file) in app.review_doc.files.iter().enumerate() {
+            let tx_clone = tx.clone();
+            let path = file.entry.path.clone();
+            let status = file.entry.status;
+            std::thread::spawn(move || {
+                let repo = Repository::discover(".").unwrap();
+                let result = repository::file_diff(&repo, &path, status)
+                    .map(|hunks| {
+                        let index = LineIndex::new(&hunks);
+                        (hunks, index)
+                    })
+                    .map_err(|e| e.to_string());
+
+                tx_clone.send(WorkerResult { generation, file_idx, result }).ok();
+                
+            });
+        }
+
+        app.review_doc.rebuild_index();
         app.select_first_file();
+        app.ensure_rows();
+        app.refresh_diff();
         app
     }
 
@@ -118,7 +187,12 @@ impl App {
 
     pub fn diff_hunks(&self) -> Option<&Vec<DiffHunk>> {
         let key = self.diff.current_key.as_ref()?;
-        self.diff_cache.get(key)
+        let slot_idx = self.review_doc.by_key.get(key)?;
+        let slot = self.review_doc.files.get(*slot_idx)?;
+        match &slot.load {
+            DiffLoadState::Loaded { hunks, .. } => Some(hunks),
+            _ => None,
+        }
     }
 
     pub const fn collapsed_files(&self) -> &HashSet<String> {
@@ -163,21 +237,37 @@ impl App {
                 self.focus = focus;
             }
             Action::MoveDown => match self.focus {
-                Focus::Files => {
-                    self.select_next_file();
-                    self.refresh_diff();
+                Focus::Files => match self.review.mode {
+                    ViewMode::SingleFile => {
+                        self.select_next_file();
+                        self.refresh_diff();
+                    }
+                    ViewMode::Continuous => {
+                        self.select_next_file();
+                        self.refresh_diff();
+                        self.jump_to_selected_file();
+                    }
                 }
-                Focus::Diff => {
-                    self.scroll_diff_down();
+                Focus::Diff => match self.review.mode {
+                    ViewMode::Continuous => self.scroll_continuous_diff_down(),
+                    ViewMode::SingleFile => self.scroll_diff_down()
                 }
             },
             Action::MoveUp => match self.focus {
-                Focus::Files => {
-                    self.select_previous_file();
-                    self.refresh_diff();
+                Focus::Files => match self.review.mode {
+                    ViewMode::SingleFile => {
+                        self.select_previous_file();
+                        self.refresh_diff();
+                    }
+                    ViewMode::Continuous => {
+                        self.select_previous_file();
+                        self.refresh_diff();
+                        self.jump_to_selected_file();
+                    }
                 }
-                Focus::Diff => {
-                    self.scroll_diff_up();
+                Focus::Diff => match self.review.mode {
+                    ViewMode::Continuous => self.scroll_continuous_diff_up(),
+                    ViewMode::SingleFile => self.scroll_diff_up()
                 }
             },
             Action::NextHunk => {
@@ -192,11 +282,10 @@ impl App {
             Action::Refresh => {
                 self.repository_status = repository::status(&self.repo).ok();
                 self.files.entries = repository::files(&self.repo).ok().map(|mut f| {
-                    f.sort_by_key(|e| {
-                        STATUS_ORDER
-                            .iter()
-                            .position(|s| *s == e.status)
-                            .unwrap_or(99)
+                    f.sort_by(|a, b| {
+                        let a_key = (a.path.contains('/'), a.path.as_str());
+                        let b_key = (b.path.contains('/'), b.path.as_str());
+                        a_key.cmp(&b_key)
                     });
                     f
                 });
@@ -209,7 +298,7 @@ impl App {
                     self.files.state.selected =
                         Some(self.files.state.selected.unwrap_or(0).min(len - 1));
                 }
-                self.diff_cache.clear();
+                self.review_doc.by_key.clear();
                 self.refresh_diff();
             }
             Action::GoToFirst => {
@@ -225,9 +314,20 @@ impl App {
                     self.toggle_collapsed(path);
                 }
             }
+            Action::ToggleViewMode => {
+                match self.review.mode {
+                    ViewMode::Continuous => self.review.mode = ViewMode::SingleFile,
+                    ViewMode::SingleFile => self.review.mode = ViewMode::Continuous,
+                }
+            }
             Action::ForceLoadDiff => {
                 self.force_refresh_diff();
             }
+        }
+
+        if self.review_doc.index_dirty {
+            self.review_doc.rebuild_index();
+            self.review_doc.index_dirty = false;
         }
     }
 
@@ -244,6 +344,7 @@ impl App {
             KeyCode::Char(']') if self.focus == Focus::Diff => Action::NextHunk,
             KeyCode::Char('[') if self.focus == Focus::Diff => Action::PreviousHunk,
             KeyCode::Char('l') if self.focus == Focus::Diff => Action::ToggleDiffLineNumbers,
+            KeyCode::Char('v') => Action::ToggleViewMode,
             KeyCode::Char('r') => Action::Refresh,
             KeyCode::Char('g') if self.focus == Focus::Files => Action::GoToFirst,
             KeyCode::Char('G') if self.focus == Focus::Files => Action::GoToLast,
@@ -264,6 +365,28 @@ impl App {
             return self.files.entries.as_ref()?.get(*entry_idx);
         }
         None
+    }
+
+    pub fn match_selected_file(&mut self) {
+        let Some((file_idx, _)) = self.review_doc.index.file_at_row(self.review.continuous_scroll) else {
+            return;
+        };
+        self.files.state.selected = self.files.cached_rows
+            .iter()
+            .enumerate()
+            .find(|(_, row)| matches!(row, TreeRow::File(entry_idx, _) if *entry_idx == file_idx))
+            .map(|(pos, _)| pos);
+    }
+
+    pub fn jump_to_selected_file(&mut self) {
+        let Some(file) = self.selected_file() else {
+            return;
+        };
+        let key = FileKey { path: file.path.clone(), status: file.status };
+        let Some(&file_idx) = self.review_doc.by_key.get(&key) else {
+            return;
+        };
+        self.review.continuous_scroll = self.review_doc.index.file_starts[file_idx];
     }
 
     pub const fn set_tree_row_count(&mut self, len: usize) {
@@ -301,6 +424,14 @@ impl App {
         &self.files.cached_rows
     }
 
+    pub fn review_doc(&self) -> &ReviewDoc {
+        &self.review_doc
+    }
+
+    pub fn review_state(&self) -> &ReviewState {
+        &self.review
+    }
+
     const fn select_first_file(&mut self) {
         self.files.state.select_first();
     }
@@ -326,6 +457,26 @@ impl App {
         self.refresh_diff_internal(true);
     }
 
+    pub fn poll_workers(&mut self) {
+        while let Ok(msg) = self.worker_rx.try_recv() {
+            if msg.generation != self.review_doc.generation {
+                continue;
+            }
+
+            let slot = &mut self.review_doc.files[msg.file_idx];
+            slot.load = match msg.result {
+                Ok((hunks, index)) => DiffLoadState::Loaded { hunks, index },
+                Err(e) => DiffLoadState::Error(e),
+            };
+            self.review_doc.index_dirty = true;
+        }
+
+        if self.review_doc.index_dirty {
+            self.review_doc.rebuild_index();
+            self.review_doc.index_dirty = false;
+        }
+    }
+
     fn refresh_diff_internal(&mut self, force: bool) {
         self.ensure_rows();
         let Some(file) = self.selected_file() else {
@@ -335,7 +486,10 @@ impl App {
         let path = file.path.clone();
         let status = file.status;
 
-        let cache_key = (path.clone(), status);
+        let cache_key = FileKey {
+            path: path.clone(),
+            status,
+        };
 
         if !force
             && let Ok(n) = repository::file_diff_line_count(&self.repo, &path, status)
@@ -343,35 +497,95 @@ impl App {
         {
             self.diff.state.too_large = Some(n);
             self.diff.state.line_index = LineIndex::new(&[]);
-            self.diff.current_key = Some(cache_key);
+            self.diff.current_key = Some(cache_key.clone());
+
+            if let Some(&slot_idx) = self.review_doc.by_key.get(&cache_key) {
+                if !matches!(self.review_doc.files[slot_idx].load, DiffLoadState::Loaded { .. }) {
+                    self.review_doc.files[slot_idx].load = DiffLoadState::TooLarge {
+                        lines: n,
+                        forced: false,
+                    };
+                    self.review_doc.index_dirty = true;
+                }
+            }
             return;
         }
 
         self.diff.state.too_large = None;
 
-        if !self.diff_cache.contains_key(&cache_key)
-            && let Ok(hunks) = repository::file_diff(&self.repo, &path, status)
-        {
-            self.diff_cache.insert(cache_key.clone(), hunks);
+        if let Some(&slot_idx) = self.review_doc.by_key.get(&cache_key) {
+            if matches!(
+                self.review_doc.files[slot_idx].load,
+                DiffLoadState::NotLoaded
+            ) && let Ok(hunks) = repository::file_diff(&self.repo, &path, status)
+            {
+                let index = LineIndex::new(&hunks);
+                self.review_doc.files[slot_idx].load = DiffLoadState::Loaded { hunks, index };
+            }
+
+            let hunks: &[DiffHunk] = match &self.review_doc.files[slot_idx].load {
+                DiffLoadState::Loaded { hunks, .. } => hunks,
+                _ => &[],
+            };
+
+            self.diff.state.line_index = LineIndex::new(hunks);
+            self.diff.state.select_first_hunk(hunks.len());
+            self.review_doc.index_dirty = true;
         }
 
-        let hunks: &[DiffHunk] = self.diff_cache.get(&cache_key).map_or(&[], |v| v);
-        self.diff.state.line_index = LineIndex::new(hunks);
-        self.diff.state.select_first_hunk(hunks.len());
         self.diff.current_key = Some(cache_key);
         self.sync_diff_scroll_to_hunk();
     }
 
     fn select_next_hunk(&mut self) {
-        let len = self.diff_hunks().map_or(0, std::vec::Vec::len);
-        self.diff.state.select_next_hunk(len);
-        self.sync_diff_scroll_to_hunk();
+        match self.review.mode {
+            ViewMode::Continuous => self.select_next_continuous_hunk(),
+            ViewMode::SingleFile => {
+                let len = self.diff_hunks().map_or(0, std::vec::Vec::len);
+                self.diff.state.select_next_hunk(len);
+                self.sync_diff_scroll_to_hunk();
+            }
+        }
     }
 
     fn select_previous_hunk(&mut self) {
-        let len = self.diff_hunks().map_or(0, std::vec::Vec::len);
-        self.diff.state.select_previous_hunk(len);
-        self.sync_diff_scroll_to_hunk();
+        match self.review.mode {
+            ViewMode::Continuous => self.select_prev_continuous_hunk(),
+            ViewMode::SingleFile => {
+                let len = self.diff_hunks().map_or(0, std::vec::Vec::len);
+                self.diff.state.select_previous_hunk(len);
+                self.sync_diff_scroll_to_hunk();
+            }
+        }
+    }
+
+    fn continuous_hunk_rows(&self) -> Vec<usize> {
+        self.review_doc.files.iter().enumerate().flat_map(|(file_idx, slot)| {
+            let file_start = self.review_doc.index.file_starts.get(file_idx).copied().unwrap_or(0);
+            if let DiffLoadState::Loaded { index, .. } = &slot.load {
+                index.hunk_starts.iter().map(move |&h| file_start + 1 + h).collect::<Vec<_>>()
+            } else {
+                vec![]
+            }
+        }).collect()
+    }
+
+    fn select_next_continuous_hunk(&mut self) {
+        let current = self.review.continuous_scroll;
+        let rows = self.continuous_hunk_rows();
+        if let Some(&row) = rows.iter().find(|&&r| r > current) {
+            self.review.continuous_scroll = row;
+            self.match_selected_file();
+        }
+    }
+
+    fn select_prev_continuous_hunk(&mut self) {
+        let current = self.review.continuous_scroll;
+        let rows = self.continuous_hunk_rows();
+        if let Some(&row) = rows.iter().filter(|&&r| r < current).last() {
+            self.review.continuous_scroll = row;
+            self.match_selected_file();
+        }
     }
 
     fn scroll_diff_down(&mut self) {
@@ -386,6 +600,24 @@ impl App {
         self.diff.state.set_scroll_offset(offset);
         self.clamp_scroll();
         self.sync_diff_selection_to_scroll();
+    }
+
+    fn max_continuous_diff_scroll_offset(&self) -> usize {
+        self.review_doc.index.total_rows
+        .saturating_sub(self.diff.state.viewport_height)
+    }
+
+    fn scroll_continuous_diff_down(&mut self) {
+        let max_offset = self.max_continuous_diff_scroll_offset();
+        let offset = (self.review.continuous_scroll + SCROLL_STEP).min(max_offset);
+        self.review.continuous_scroll = offset;
+        self.match_selected_file();
+    }
+
+    fn scroll_continuous_diff_up(&mut self) {
+        let offset = self.review.continuous_scroll.saturating_sub(SCROLL_STEP);
+        self.review.continuous_scroll = offset;
+        self.match_selected_file();
     }
 
     const fn diff_row_count(&self) -> usize {

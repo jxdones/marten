@@ -91,21 +91,17 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
                     let deletions = humanize_stat('-', entry.deletions);
                     let stats = format!("{insertions}{deletions}");
 
-                    let fixed_width = path_depth.len()
-                        + BORDER_WIDTH
-                        + STATUS_LETTER_WIDTH
-                        + stats.len();
+                    let fixed_width =
+                        path_depth.len() + BORDER_WIDTH + STATUS_LETTER_WIDTH + stats.len();
                     let max_path_width = (area.width as usize).saturating_sub(fixed_width);
 
                     let display_path = if path.chars().count() > max_path_width {
                         let mut truncated = String::new();
-                        let mut count = 0;
-                        for ch in path.chars() {
+                        for (count, ch) in path.chars().enumerate() {
                             if count + 1 >= max_path_width {
                                 break;
                             }
                             truncated.push(ch);
-                            count += 1;
                         }
                         truncated.push('…');
                         truncated
