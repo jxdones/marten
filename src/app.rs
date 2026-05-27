@@ -9,7 +9,6 @@ use crate::event::Event;
 use crate::git::repository::{self, DiffHunk, FileEntry, RepositoryStatus};
 use crate::state::{
     Diff, Files, Focus, Screen,
-    files::STATUS_ORDER,
     tree::{TreeRow, tree_rows},
 };
 use crate::state::{
@@ -56,11 +55,10 @@ impl App {
         let repo = Repository::discover(".").expect("not a git repo");
         let repository_status = repository::status(&repo).ok();
         let files = repository::files(&repo).ok().map(|mut f| {
-            f.sort_by_key(|e| {
-                STATUS_ORDER
-                    .iter()
-                    .position(|s| *s == e.status)
-                    .unwrap_or(99)
+            f.sort_by(|a, b| {
+                let a_key = (a.path.contains('/'), a.path.to_lowercase());
+                let b_key = (b.path.contains('/'), b.path.to_lowercase());
+                a_key.cmp(&b_key)
             });
             f
         });
@@ -239,9 +237,16 @@ impl App {
                 self.focus = focus;
             }
             Action::MoveDown => match self.focus {
-                Focus::Files => {
-                    self.select_next_file();
-                    self.refresh_diff();
+                Focus::Files => match self.review.mode {
+                    ViewMode::SingleFile => {
+                        self.select_next_file();
+                        self.refresh_diff();
+                    }
+                    ViewMode::Continuous => {
+                        self.select_next_file();
+                        self.refresh_diff();
+                        self.jump_to_selected_file();
+                    }
                 }
                 Focus::Diff => match self.review.mode {
                     ViewMode::Continuous => self.scroll_continuous_diff_down(),
@@ -249,9 +254,16 @@ impl App {
                 }
             },
             Action::MoveUp => match self.focus {
-                Focus::Files => {
-                    self.select_previous_file();
-                    self.refresh_diff();
+                Focus::Files => match self.review.mode {
+                    ViewMode::SingleFile => {
+                        self.select_previous_file();
+                        self.refresh_diff();
+                    }
+                    ViewMode::Continuous => {
+                        self.select_previous_file();
+                        self.refresh_diff();
+                        self.jump_to_selected_file();
+                    }
                 }
                 Focus::Diff => match self.review.mode {
                     ViewMode::Continuous => self.scroll_continuous_diff_up(),
@@ -270,11 +282,10 @@ impl App {
             Action::Refresh => {
                 self.repository_status = repository::status(&self.repo).ok();
                 self.files.entries = repository::files(&self.repo).ok().map(|mut f| {
-                    f.sort_by_key(|e| {
-                        STATUS_ORDER
-                            .iter()
-                            .position(|s| *s == e.status)
-                            .unwrap_or(99)
+                    f.sort_by(|a, b| {
+                        let a_key = (a.path.contains('/'), a.path.as_str());
+                        let b_key = (b.path.contains('/'), b.path.as_str());
+                        a_key.cmp(&b_key)
                     });
                     f
                 });
@@ -365,6 +376,17 @@ impl App {
             .enumerate()
             .find(|(_, row)| matches!(row, TreeRow::File(entry_idx, _) if *entry_idx == file_idx))
             .map(|(pos, _)| pos);
+    }
+
+    pub fn jump_to_selected_file(&mut self) {
+        let Some(file) = self.selected_file() else {
+            return;
+        };
+        let key = FileKey { path: file.path.clone(), status: file.status };
+        let Some(&file_idx) = self.review_doc.by_key.get(&key) else {
+            return;
+        };
+        self.review.continuous_scroll = self.review_doc.index.file_starts[file_idx];
     }
 
     pub const fn set_tree_row_count(&mut self, len: usize) {
@@ -478,10 +500,13 @@ impl App {
             self.diff.current_key = Some(cache_key.clone());
 
             if let Some(&slot_idx) = self.review_doc.by_key.get(&cache_key) {
-                self.review_doc.files[slot_idx].load = DiffLoadState::TooLarge {
-                    lines: n,
-                    forced: false,
-                };
+                if !matches!(self.review_doc.files[slot_idx].load, DiffLoadState::Loaded { .. }) {
+                    self.review_doc.files[slot_idx].load = DiffLoadState::TooLarge {
+                        lines: n,
+                        forced: false,
+                    };
+                    self.review_doc.index_dirty = true;
+                }
             }
             return;
         }
@@ -513,15 +538,54 @@ impl App {
     }
 
     fn select_next_hunk(&mut self) {
-        let len = self.diff_hunks().map_or(0, std::vec::Vec::len);
-        self.diff.state.select_next_hunk(len);
-        self.sync_diff_scroll_to_hunk();
+        match self.review.mode {
+            ViewMode::Continuous => self.select_next_continuous_hunk(),
+            ViewMode::SingleFile => {
+                let len = self.diff_hunks().map_or(0, std::vec::Vec::len);
+                self.diff.state.select_next_hunk(len);
+                self.sync_diff_scroll_to_hunk();
+            }
+        }
     }
 
     fn select_previous_hunk(&mut self) {
-        let len = self.diff_hunks().map_or(0, std::vec::Vec::len);
-        self.diff.state.select_previous_hunk(len);
-        self.sync_diff_scroll_to_hunk();
+        match self.review.mode {
+            ViewMode::Continuous => self.select_prev_continuous_hunk(),
+            ViewMode::SingleFile => {
+                let len = self.diff_hunks().map_or(0, std::vec::Vec::len);
+                self.diff.state.select_previous_hunk(len);
+                self.sync_diff_scroll_to_hunk();
+            }
+        }
+    }
+
+    fn continuous_hunk_rows(&self) -> Vec<usize> {
+        self.review_doc.files.iter().enumerate().flat_map(|(file_idx, slot)| {
+            let file_start = self.review_doc.index.file_starts.get(file_idx).copied().unwrap_or(0);
+            if let DiffLoadState::Loaded { index, .. } = &slot.load {
+                index.hunk_starts.iter().map(move |&h| file_start + 1 + h).collect::<Vec<_>>()
+            } else {
+                vec![]
+            }
+        }).collect()
+    }
+
+    fn select_next_continuous_hunk(&mut self) {
+        let current = self.review.continuous_scroll;
+        let rows = self.continuous_hunk_rows();
+        if let Some(&row) = rows.iter().find(|&&r| r > current) {
+            self.review.continuous_scroll = row;
+            self.match_selected_file();
+        }
+    }
+
+    fn select_prev_continuous_hunk(&mut self) {
+        let current = self.review.continuous_scroll;
+        let rows = self.continuous_hunk_rows();
+        if let Some(&row) = rows.iter().filter(|&&r| r < current).last() {
+            self.review.continuous_scroll = row;
+            self.match_selected_file();
+        }
     }
 
     fn scroll_diff_down(&mut self) {

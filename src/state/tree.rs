@@ -51,7 +51,11 @@ fn render(node: &FileNode, depth: usize, path: &str, collapsed: &HashSet<String>
         FileNode::Dir(name, children) => {
             if name == "/" {
                 let mut branch_rows = vec![];
-                for child in children.values() {
+                // Files before directories, both alphabetically
+                for child in children.values().filter(|c| matches!(c, FileNode::File(_))) {
+                    branch_rows.extend(render(child, depth + 1, "", collapsed));
+                }
+                for child in children.values().filter(|c| matches!(c, FileNode::Dir(..))) {
                     branch_rows.extend(render(child, depth + 1, "", collapsed));
                 }
                 return branch_rows;
