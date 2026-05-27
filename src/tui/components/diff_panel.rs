@@ -5,8 +5,9 @@ use ratatui::widgets::{Block, Borders, Paragraph};
 use ratatui::{Frame, layout::Rect};
 
 use crate::app::App;
-use crate::git::repository::{DIFF_LINE_THRESHOLD, DiffHunk, DiffLine, FileStatus};
-use crate::state::LineIndex;
+use crate::git::repository::{DIFF_LINE_THRESHOLD, DiffHunk, DiffLine, FileEntry, FileStatus};
+use crate::state::review::RenderedRow;
+use crate::state::{DiffLoadState, LineIndex, ReviewDoc, ViewMode};
 use crate::tui::theme::Theme;
 
 pub fn draw(frame: &mut Frame, area: Rect, app: &App, is_focused: bool) {
@@ -28,41 +29,20 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App, is_focused: bool) {
         .border_style(border_style)
         .style(Style::default().bg(theme.bg));
 
-    let diff_state = app.diff_state();
-    let hunks = app.diff_hunks();
+    let viewport_height = area.height.saturating_sub(2) as usize;
+    let panel_width = area.width as usize;
 
-    let lines = if let Some(line_count) = diff_state.too_large {
-        vec![
-            Line::from(Span::styled(
-                "File too large to render automatically.",
-                theme.muted(),
-            )),
-            Line::from(Span::styled(
-                format!("{line_count} lines (threshold: {DIFF_LINE_THRESHOLD})"),
-                theme.muted(),
-            )),
-            Line::from(Span::styled("Press Enter to view.", theme.muted())),
-        ]
-    } else if let Some(hunks) = hunks {
-        if hunks.is_empty() {
-            vec![Line::from(Span::styled("no changes", theme.muted()))]
-        } else {
-            render_diff_lines(
-                diff_state.scroll_offset,
-                area.height.saturating_sub(2) as usize,
-                hunks,
-                &diff_state.line_index,
-                diff_state.selected_hunk,
-                diff_state.show_line_numbers,
-                theme,
-                area.width as usize,
-            )
-        }
-    } else {
-        vec![Line::from(Span::styled(
-            "no available diffs",
-            theme.muted(),
-        ))]
+    let lines = match app.review_state().mode {
+        ViewMode::SingleFile => render_single_file(app, theme, viewport_height, panel_width),
+        ViewMode::Continuous => render_review_doc(
+            app.review_state().continuous_scroll,
+            viewport_height,
+            app.review_doc(),
+            app.diff_state().selected_hunk,
+            app.diff_state().show_line_numbers,
+            theme,
+            panel_width,
+        ),
     };
 
     let paragraph = Paragraph::new(Text::from(lines)).block(block);
@@ -134,7 +114,7 @@ fn hunk_header_line(
     header: &str,
     stats: (usize, usize),
     is_selected: bool,
-    theme: crate::tui::theme::Theme,
+    theme: Theme,
 ) -> Line<'static> {
     let style = if is_selected {
         Style::default()
@@ -156,6 +136,50 @@ fn hunk_header_line(
         Span::styled(" ", style),
         Span::styled(format!("-{deletions}"), Style::default().fg(theme.del_fg)),
     ])
+}
+
+fn render_single_file(
+    app: &App,
+    theme: Theme,
+    viewport_height: usize,
+    panel_width: usize,
+) -> Vec<Line<'static>> {
+    let diff_state = app.diff_state();
+    let hunks = app.diff_hunks();
+
+    if let Some(line_count) = diff_state.too_large {
+        vec![
+            Line::from(Span::styled(
+                "File too large to render automatically.",
+                theme.muted(),
+            )),
+            Line::from(Span::styled(
+                format!("{line_count} lines (threshold: {DIFF_LINE_THRESHOLD})"),
+                theme.muted(),
+            )),
+            Line::from(Span::styled("Press Enter to view.", theme.muted())),
+        ]
+    } else if let Some(hunks) = hunks {
+        if hunks.is_empty() {
+            vec![Line::from(Span::styled("no changes", theme.muted()))]
+        } else {
+            render_diff_lines(
+                diff_state.scroll_offset,
+                viewport_height,
+                hunks,
+                &diff_state.line_index,
+                diff_state.selected_hunk,
+                diff_state.show_line_numbers,
+                theme,
+                panel_width,
+            )
+        }
+    } else {
+        vec![Line::from(Span::styled(
+            "no available diffs",
+            theme.muted(),
+        ))]
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -206,7 +230,7 @@ fn diff_line(
     line: &DiffLine,
     is_selected: bool,
     show_line_numbers: bool,
-    theme: crate::tui::theme::Theme,
+    theme: Theme,
 ) -> Line<'static> {
     let base = match line.origin {
         '+' => theme.diff_add(),
@@ -235,11 +259,7 @@ fn line_number(line_number: Option<u32>) -> String {
     line_number.map_or_else(|| "    ".to_string(), |number| format!("{number:>4}"))
 }
 
-fn border_style(
-    line: &DiffLine,
-    is_selected: bool,
-    theme: crate::tui::theme::Theme,
-) -> Option<Style> {
+fn border_style(line: &DiffLine, is_selected: bool, theme: Theme) -> Option<Style> {
     if !is_selected {
         return None;
     }
@@ -269,4 +289,132 @@ fn bordered_line(
         Span::styled(text, style),
         Span::styled(" ".repeat(padding), style),
     ])
+}
+
+fn render_separator(width: usize, theme: Theme) -> Line<'static> {
+    Line::from(vec![Span::styled("─".repeat(width), theme.muted())])
+}
+
+fn render_file_header(width: usize, file: &FileEntry, theme: Theme) -> Line<'static> {
+    let collapse_symbol = "▼ ";
+    let mut spans = vec![Span::styled(collapse_symbol, theme.muted())];
+
+    let status_color = match file.status {
+        FileStatus::Staged => theme.staged(),
+        FileStatus::Partial => theme.partial(),
+        FileStatus::Unstaged => theme.unstaged(),
+        FileStatus::Untracked => theme.untracked(),
+        FileStatus::Conflicted => theme.conflict(),
+    };
+
+    let status_symbol = match file.status {
+        FileStatus::Staged => "S",
+        FileStatus::Partial => "P",
+        FileStatus::Unstaged => "M",
+        FileStatus::Untracked => "U",
+        FileStatus::Conflicted => "C",
+    };
+    let path = format!(" {}", file.path);
+    let stats = format!(
+        "+{} -{} {}",
+        file.insertions,
+        file.deletions,
+        file.status.label().to_lowercase()
+    );
+    let padding = width
+        .saturating_sub(collapse_symbol.len() + status_symbol.len() + path.len() + stats.len());
+
+    spans.push(Span::styled(status_symbol, status_color));
+    spans.push(Span::styled(path, theme.muted()));
+    spans.push(Span::raw((" ").repeat(padding)));
+    spans.push(Span::styled(
+        format!("+{}", file.insertions),
+        theme.success(),
+    ));
+    spans.push(Span::styled(" ", theme.muted()));
+    spans.push(Span::styled(
+        format!("-{}", file.deletions),
+        theme.unstaged(),
+    ));
+    spans.push(Span::styled("  ", theme.muted()));
+    spans.push(
+        Span::styled(file.status.label().to_lowercase(), status_color).add_modifier(Modifier::BOLD),
+    );
+
+    Line::from(spans)
+}
+
+fn render_review_doc(
+    scroll_offset: usize,
+    viewport_height: usize,
+    review_doc: &ReviewDoc,
+    selected_hunk: Option<usize>,
+    show_line_numbers: bool,
+    theme: Theme,
+    panel_width: usize,
+) -> Vec<Line<'static>> {
+    let row_width = panel_width.saturating_sub(2);
+    let visible_rows = scroll_offset..scroll_offset + viewport_height;
+
+    visible_rows
+        .flat_map(|global_row| match review_doc.lookup_row(global_row) {
+            Some(RenderedRow::FileHeader { file_idx }) => {
+                let entry = &review_doc.files[file_idx].entry;
+                vec![
+                    render_separator(row_width, theme),
+                    render_file_header(row_width, entry, theme),
+                    render_separator(row_width, theme),
+                ]
+            }
+            Some(RenderedRow::HunkHeader { file_idx, hunk_idx }) => {
+                let state = &review_doc.files[file_idx].load;
+                match state {
+                    DiffLoadState::Loaded { hunks, .. } => {
+                        let hunk = &hunks[hunk_idx];
+                        let is_selected = Some(hunk_idx) == selected_hunk;
+                        let header = hunk_header_line(
+                            row_width,
+                            hunk_idx,
+                            hunks.len(),
+                            hunk.header.trim_end(),
+                            (hunk.insertions, hunk.deletions),
+                            is_selected,
+                            theme,
+                        );
+                        vec![header]
+                    }
+                    _ => vec![],
+                }
+            }
+            Some(RenderedRow::DiffLine {
+                file_idx,
+                hunk_idx,
+                line_idx,
+            }) => {
+                let state = &review_doc.files[file_idx].load;
+                match state {
+                    DiffLoadState::Loaded { hunks, .. } => {
+                        let line = &hunks[hunk_idx].lines[line_idx];
+                        let is_selected = Some(hunk_idx) == selected_hunk;
+                        let diff =
+                            diff_line(row_width, line, is_selected, show_line_numbers, theme);
+                        vec![diff]
+                    }
+                    _ => vec![],
+                }
+            }
+            Some(RenderedRow::Loading { .. }) => {
+                vec![Line::from(Span::styled(" Loading..", theme.muted()))]
+            }
+            Some(RenderedRow::TooLarge { lines, .. }) => vec![Line::from(Span::styled(
+                format!("  File too large ({lines} lines) — press L to load"),
+                theme.muted(),
+            ))],
+            Some(RenderedRow::Error { msg, .. }) => vec![Line::from(Span::styled(
+                format!(" Error: {msg}"),
+                theme.muted(),
+            ))],
+            None => vec![],
+        })
+        .collect()
 }

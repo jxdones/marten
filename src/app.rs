@@ -125,7 +125,10 @@ impl App {
             repository_status,
         };
 
+        app.review_doc.rebuild_index();
         app.select_first_file();
+        app.ensure_rows();
+        app.refresh_diff();
         app
     }
 
@@ -279,6 +282,11 @@ impl App {
                 self.force_refresh_diff();
             }
         }
+
+        if self.review_doc.index_dirty {
+            self.review_doc.rebuild_index();
+            self.review_doc.index_dirty = false;
+        }
     }
 
     fn handle_key(&self, key: KeyEvent) -> Action {
@@ -349,6 +357,14 @@ impl App {
 
     pub fn cached_rows(&self) -> &[TreeRow] {
         &self.files.cached_rows
+    }
+
+    pub fn review_doc(&self) -> &ReviewDoc {
+        &self.review_doc
+    }
+
+    pub fn review_state(&self) -> &ReviewState {
+        &self.review
     }
 
     const fn select_first_file(&mut self) {
@@ -426,6 +442,7 @@ impl App {
 
             self.diff.state.line_index = LineIndex::new(hunks);
             self.diff.state.select_first_hunk(hunks.len());
+            self.review_doc.index_dirty = true;
         }
 
         self.diff.current_key = Some(cache_key);
