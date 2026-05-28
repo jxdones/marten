@@ -5,6 +5,7 @@ mod app;
 mod event;
 mod git;
 mod state;
+mod syntax;
 mod terminal;
 mod tui;
 

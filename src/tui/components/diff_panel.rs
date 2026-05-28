@@ -8,6 +8,7 @@ use crate::app::App;
 use crate::git::repository::{DIFF_LINE_THRESHOLD, DiffHunk, DiffLine, FileEntry, FileStatus};
 use crate::state::review::RenderedRow;
 use crate::state::{DiffLoadState, LineIndex, ReviewDoc, ViewMode};
+use crate::syntax;
 use crate::tui::theme::Theme;
 
 pub fn draw(frame: &mut Frame, area: Rect, app: &App, is_focused: bool) {
@@ -188,6 +189,7 @@ fn render_single_file(
 ) -> Vec<Line<'static>> {
     let diff_state = app.diff_state();
     let hunks = app.diff_hunks();
+    let path = app.selected_file().map(|file| file.path.as_str());
 
     if let Some(line_count) = diff_state.too_large {
         vec![
@@ -209,6 +211,7 @@ fn render_single_file(
                 diff_state.scroll_offset,
                 viewport_height,
                 hunks,
+                path,
                 &diff_state.line_index,
                 diff_state.selected_hunk,
                 diff_state.show_line_numbers,
@@ -229,6 +232,7 @@ fn render_diff_lines(
     scroll_offset: usize,
     viewport_height: usize,
     hunks: &[DiffHunk],
+    path: Option<&str>,
     line_index: &LineIndex,
     selected_hunk: Option<usize>,
     show_line_numbers: bool,
@@ -258,6 +262,7 @@ fn render_diff_lines(
                 Some(diff_line(
                     row_width,
                     &hunk.lines[line_in_hunk - 1],
+                    path,
                     is_selected,
                     show_line_numbers,
                     theme,
@@ -270,6 +275,7 @@ fn render_diff_lines(
 fn diff_line(
     width: usize,
     line: &DiffLine,
+    path: Option<&str>,
     is_selected: bool,
     show_line_numbers: bool,
     theme: Theme,
@@ -286,15 +292,26 @@ fn diff_line(
     };
     let style = if is_selected { selected } else { base };
     let content = line.content.trim_end().replace('\t', "    ");
-    let text = if show_line_numbers {
+    let prefix = if show_line_numbers {
         let old_lineno = line_number(line.old_lineno);
         let new_lineno = line_number(line.new_lineno);
-        format!("{old_lineno} {new_lineno} {} {}", line.origin, content)
+        format!("{old_lineno} {new_lineno} {} ", line.origin)
     } else {
-        format!("{} {}", line.origin, content)
+        format!("{} ", line.origin)
     };
 
-    bordered_line(width, text, style, border_style(line, is_selected, theme))
+    let mut spans = vec![Span::styled(prefix, style)];
+    if let Some(path) = path {
+        if let Some(highlighted) = syntax::highlight_line(path, &content, style) {
+            spans.extend(highlighted);
+        } else {
+            spans.push(Span::styled(content, style));
+        }
+    } else {
+        spans.push(Span::styled(content, style));
+    }
+
+    bordered_line(width, spans, style, border_style(line, is_selected, theme))
 }
 
 fn line_number(line_number: Option<u32>) -> String {
@@ -315,23 +332,27 @@ fn border_style(line: &DiffLine, is_selected: bool, theme: Theme) -> Option<Styl
 
 fn bordered_line(
     width: usize,
-    text: String,
+    spans: Vec<Span<'static>>,
     style: Style,
     border_style: Option<Style>,
 ) -> Line<'static> {
     let content_width = width.saturating_sub(1);
-    let padding = content_width.saturating_sub(text_width(&text));
+    let used_width = spans
+        .iter()
+        .map(|span| text_width(span.content.as_ref()))
+        .sum::<usize>();
+    let padding = content_width.saturating_sub(used_width);
     let border = border_style.map_or_else(
         || Span::styled(" ", style),
         |border| Span::styled("▌", border),
     );
 
-    Line::from(vec![
-        border,
-        Span::styled(text, style),
-        Span::styled(" ".repeat(padding), style),
-    ])
-    .style(style)
+    let mut line_spans = Vec::with_capacity(spans.len() + 2);
+    line_spans.push(border);
+    line_spans.extend(spans);
+    line_spans.push(Span::styled(" ".repeat(padding), style));
+
+    Line::from(line_spans).style(style)
 }
 
 fn render_file_header(width: usize, file: &FileEntry, theme: Theme) -> Line<'static> {
@@ -453,9 +474,16 @@ fn render_review_doc(
                     match state {
                         DiffLoadState::Loaded { hunks, .. } => {
                             let line = &hunks[hunk_idx].lines[line_idx];
+                            let path = &review_doc.files[file_idx].entry.path;
                             let is_selected = selected_hunk == Some((file_idx, hunk_idx));
-                            let diff =
-                                diff_line(row_width, line, is_selected, show_line_numbers, theme);
+                            let diff = diff_line(
+                                row_width,
+                                line,
+                                Some(path),
+                                is_selected,
+                                show_line_numbers,
+                                theme,
+                            );
                             vec![diff]
                         }
                         _ => vec![],
