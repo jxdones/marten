@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, HashSet};
 
-use crate::git::repository::FileEntry;
+use crate::state::FileSlot;
 
 pub enum TreeRow {
     File(usize, usize),
@@ -15,11 +15,11 @@ pub enum FileNode {
 const INITIAL_DEPTH: usize = 0;
 const ONE_CHILD_ONLY: usize = 1;
 
-pub fn tree_rows(files: &[FileEntry], collapsed: &HashSet<String>) -> Vec<TreeRow> {
+pub fn tree_rows(files: &[FileSlot], collapsed: &HashSet<String>) -> Vec<TreeRow> {
     let mut root = FileNode::Dir(String::from("/"), BTreeMap::new());
 
-    for (idx, entry) in files.iter().enumerate() {
-        let segments = entry.path.split('/').collect::<Vec<&str>>();
+    for (idx, slot) in files.iter().enumerate() {
+        let segments = slot.entry.path.split('/').collect::<Vec<&str>>();
         insert(&mut root, &segments, idx);
     }
     render(&root, INITIAL_DEPTH, "", collapsed)
@@ -111,14 +111,18 @@ fn render(node: &FileNode, depth: usize, path: &str, collapsed: &HashSet<String>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::git::repository::FileStatus;
+    use crate::git::repository::{FileEntry, FileStatus};
+    use crate::state::DiffLoadState;
 
-    fn file_entry(path: &str) -> FileEntry {
-        FileEntry {
-            path: path.to_string(),
-            status: FileStatus::Untracked,
-            insertions: 0,
-            deletions: 0,
+    fn file_entry(path: &str) -> FileSlot {
+        FileSlot {
+            entry: FileEntry {
+                path: path.to_string(),
+                status: FileStatus::Untracked,
+                insertions: 0,
+                deletions: 0,
+            },
+            load: DiffLoadState::NotLoaded,
         }
     }
 

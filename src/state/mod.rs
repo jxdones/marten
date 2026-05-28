@@ -12,7 +12,8 @@ pub use files::Files;
 pub use focus::Focus;
 pub use line_index::LineIndex;
 pub use review::{
-    DiffLoadState, FileKey, FileSlot, LoadingProgress, ReviewDoc, ReviewIndex, ReviewState, WorkerResult,
+    DiffLoadState, FileKey, FileSlot, LoadingProgress, ReviewDoc, ReviewIndex, ReviewState,
+    WorkerResult,
 };
 pub use screen::Screen;
 pub use tree::TreeRow;

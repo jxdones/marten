@@ -26,24 +26,10 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
         is_focused,
     );
 
-    let Some(files) = app.files().cloned() else {
-        let mut list_state = ListState::default();
-        let items = vec![ListItem::new(Line::from(Span::styled(
-            "unable to read git status",
-            theme.muted(),
-        )))];
-
-        let list = List::new(items)
-            .block(block)
-            .highlight_style(Style::default().bg(theme.select));
-
-        frame.render_stateful_widget(list, area, &mut list_state);
-        return;
-    };
-
     app.ensure_rows();
     let selected_index = app.files_state().selected;
     app.set_tree_row_count(app.cached_rows().len());
+    let files = app.files();
 
     let collapsed = app.collapsed_files().clone();
     let selected_row;
@@ -75,7 +61,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
                     ])));
                 }
                 TreeRow::File(idx, depth) => {
-                    let entry = &files[*idx];
+                    let entry = &files[*idx].entry;
                     let status_letter = match entry.status {
                         FileStatus::Staged => Span::styled("S ", theme.staged()),
                         FileStatus::Partial => Span::styled("P ", theme.partial()),

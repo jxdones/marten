@@ -1,18 +1,8 @@
-use crate::git::repository::FileStatus;
-
 #[derive(Debug, Default)]
 pub struct Files {
     pub selected: Option<usize>,
     pub tree_row_count: usize,
 }
-
-pub const STATUS_ORDER: [FileStatus; 5] = [
-    FileStatus::Staged,
-    FileStatus::Partial,
-    FileStatus::Conflicted,
-    FileStatus::Unstaged,
-    FileStatus::Untracked,
-];
 
 impl Files {
     pub const fn select_first(&mut self) {
