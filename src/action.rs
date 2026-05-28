@@ -18,4 +18,6 @@ pub enum Action {
     ToggleCollapsed,
     ToggleViewMode,
     ForceLoadDiff,
+    NextFile,
+    PreviousFile,
 }

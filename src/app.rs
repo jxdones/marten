@@ -182,11 +182,11 @@ impl App {
             Action::MoveDown => match self.focus {
                 Focus::Files => match self.review.mode {
                     ViewMode::SingleFile => {
-                        self.select_next_file();
+                        self.select_next_row();
                         self.refresh_diff();
                     }
                     ViewMode::Continuous => {
-                        self.select_next_file();
+                        self.select_next_row();
                         self.refresh_diff();
                         self.jump_to_selected_file();
                     }
@@ -199,11 +199,11 @@ impl App {
             Action::MoveUp => match self.focus {
                 Focus::Files => match self.review.mode {
                     ViewMode::SingleFile => {
-                        self.select_previous_file();
+                        self.select_previous_row();
                         self.refresh_diff();
                     }
                     ViewMode::Continuous => {
-                        self.select_previous_file();
+                        self.select_previous_row();
                         self.refresh_diff();
                         self.jump_to_selected_file();
                     }
@@ -218,6 +218,20 @@ impl App {
             }
             Action::PreviousHunk => {
                 self.select_previous_hunk();
+            }
+            Action::NextFile => {
+                self.select_next_file();
+                self.refresh_diff();
+                if self.review.mode == ViewMode::Continuous {
+                    self.jump_to_selected_file();
+                }
+            }
+            Action::PreviousFile => {
+                self.select_previous_file();
+                self.refresh_diff();
+                if self.review.mode == ViewMode::Continuous {
+                    self.jump_to_selected_file();
+                }
             }
             Action::ToggleDiffLineNumbers => {
                 self.diff.state.toggle_line_numbers();
@@ -270,6 +284,8 @@ impl App {
             KeyCode::Up | KeyCode::Char('k') => Action::MoveUp,
             KeyCode::Char(']') if self.focus == Focus::Diff => Action::NextHunk,
             KeyCode::Char('[') if self.focus == Focus::Diff => Action::PreviousHunk,
+            KeyCode::Char('n') => Action::NextFile,
+            KeyCode::Char('p') => Action::PreviousFile,
             KeyCode::Char('l') if self.focus == Focus::Diff => Action::ToggleDiffLineNumbers,
             KeyCode::Char('v') => Action::ToggleViewMode,
             KeyCode::Char('r') => Action::Refresh,
@@ -376,12 +392,40 @@ impl App {
         self.files.state.select_last();
     }
 
-    const fn select_next_file(&mut self) {
+    const fn select_next_row(&mut self) {
         self.files.state.select_next();
     }
 
-    const fn select_previous_file(&mut self) {
+    const fn select_previous_row(&mut self) {
         self.files.state.select_previous();
+    }
+
+    fn select_next_file(&mut self) {
+        let rows = &self.files.cached_rows;
+        let current = self.files.state.selected.unwrap_or(0);
+        if let Some(next) = rows
+            .iter()
+            .enumerate()
+            .skip(current + 1)
+            .find(|(_, row)| matches!(row, TreeRow::File(..)))
+            .map(|(i, _)| i)
+        {
+            self.files.state.selected = Some(next);
+        }
+    }
+
+    fn select_previous_file(&mut self) {
+        let rows = &self.files.cached_rows;
+        let current = self.files.state.selected.unwrap_or(0);
+        if let Some(prev) = rows
+            .iter()
+            .enumerate()
+            .take(current)
+            .rfind(|(_, row)| matches!(row, TreeRow::File(..)))
+            .map(|(i, _)| i)
+        {
+            self.files.state.selected = Some(prev);
+        }
     }
 
     pub fn refresh_diff(&mut self) {
