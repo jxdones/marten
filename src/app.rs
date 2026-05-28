@@ -483,14 +483,14 @@ impl App {
             self.diff.state.line_index = LineIndex::new(&[]);
             self.diff.current_key = Some(cache_key.clone());
 
-            if let Some(&slot_idx) = self.review_doc.by_key.get(&cache_key) {
-                if !matches!(
+            if let Some(&slot_idx) = self.review_doc.by_key.get(&cache_key)
+                && !matches!(
                     self.review_doc.files[slot_idx].load,
                     DiffLoadState::Loaded { .. }
-                ) {
-                    self.review_doc.files[slot_idx].load = DiffLoadState::TooLarge { lines: n };
-                    self.review_doc.index_dirty = true;
-                }
+                )
+            {
+                self.review_doc.files[slot_idx].load = DiffLoadState::TooLarge { lines: n };
+                self.review_doc.index_dirty = true;
             }
             return;
         }
@@ -686,7 +686,7 @@ impl App {
     fn select_prev_continuous_hunk(&mut self) {
         let current = self.review.continuous_scroll;
         let rows = self.continuous_hunk_rows();
-        if let Some(&row) = rows.iter().filter(|&&r| r < current).last() {
+        if let Some(&row) = rows.iter().rfind(|&&r| r < current) {
             self.review.continuous_scroll = row;
             self.match_selected_file();
         }

@@ -6,7 +6,7 @@ use ratatui::{Frame, layout::Rect};
 
 use crate::app::App;
 use crate::git::repository::{DIFF_LINE_THRESHOLD, DiffHunk, DiffLine, FileEntry, FileStatus};
-use crate::inline_diff;
+use crate::inline_diff::{self, Range};
 use crate::state::review::RenderedRow;
 use crate::state::{DiffLoadState, LineIndex, ReviewDoc, ViewMode};
 use crate::syntax;
@@ -260,12 +260,14 @@ fn render_diff_lines(
                     theme,
                 ))
             } else {
+                let line_idx = line_in_hunk - 1;
+                let line = &hunk.lines[line_idx];
+                let ranges = inline_ranges(hunk, line_idx, line.origin);
                 Some(diff_line(
                     row_width,
-                    hunk,
-                    line_in_hunk - 1,
-                    &hunk.lines[line_in_hunk - 1],
+                    line,
                     path,
+                    &ranges,
                     is_selected,
                     show_line_numbers,
                     theme,
@@ -277,10 +279,9 @@ fn render_diff_lines(
 
 fn diff_line(
     width: usize,
-    hunk: &DiffHunk,
-    line_idx: usize,
     line: &DiffLine,
     path: Option<&str>,
+    inline_ranges: &[Range],
     is_selected: bool,
     show_line_numbers: bool,
     theme: Theme,
@@ -302,12 +303,11 @@ fn diff_line(
     };
 
     let mut spans = vec![Span::styled(prefix, line_style)];
-    let inline_ranges = inline_ranges(hunk, line_idx, line.origin);
     if let Some(path) = path {
         if let Some(highlighted) = syntax::highlight_line(path, &content, content_style) {
             spans.extend(style_content_spans(
                 highlighted,
-                &inline_ranges,
+                inline_ranges,
                 line.origin,
                 false,
                 theme,
@@ -315,7 +315,7 @@ fn diff_line(
         } else {
             spans.extend(style_content_spans(
                 vec![Span::styled(content, content_style)],
-                &inline_ranges,
+                inline_ranges,
                 line.origin,
                 false,
                 theme,
@@ -324,7 +324,7 @@ fn diff_line(
     } else {
         spans.extend(style_content_spans(
             vec![Span::styled(content, content_style)],
-            &inline_ranges,
+            inline_ranges,
             line.origin,
             false,
             theme,
@@ -339,7 +339,7 @@ fn diff_line(
     )
 }
 
-fn inline_ranges(hunk: &DiffHunk, line_idx: usize, origin: char) -> Vec<(usize, usize)> {
+fn inline_ranges(hunk: &DiffHunk, line_idx: usize, origin: char) -> Vec<Range> {
     match origin {
         '-' => {
             let Some(next_line) = hunk.lines.get(line_idx + 1) else {
@@ -379,7 +379,7 @@ fn inline_ranges(hunk: &DiffHunk, line_idx: usize, origin: char) -> Vec<(usize, 
 
 fn style_content_spans(
     spans: Vec<Span<'static>>,
-    ranges: &[(usize, usize)],
+    ranges: &[Range],
     origin: char,
     is_selected: bool,
     theme: Theme,
@@ -404,7 +404,7 @@ fn style_content_spans(
         let mut segment_started = false;
 
         for (local_idx, ch) in span.content.chars().enumerate() {
-            let changed = in_ranges(offset + local_idx, &ranges);
+            let changed = in_ranges(offset + local_idx, ranges);
             if segment_started && changed != segment_changed {
                 let style = if segment_changed {
                     span.style.patch(inline_overlay)
@@ -438,7 +438,7 @@ fn style_content_spans(
     highlighted
 }
 
-fn in_ranges(index: usize, ranges: &[(usize, usize)]) -> bool {
+fn in_ranges(index: usize, ranges: &[Range]) -> bool {
     ranges
         .iter()
         .any(|(start, end)| *start <= index && index < *end)
@@ -606,12 +606,12 @@ fn render_review_doc(
                             let line = &hunks[hunk_idx].lines[line_idx];
                             let path = &review_doc.files[file_idx].entry.path;
                             let is_selected = selected_hunk == Some((file_idx, hunk_idx));
+                            let ranges = inline_ranges(&hunks[hunk_idx], line_idx, line.origin);
                             let diff = diff_line(
                                 row_width,
-                                &hunks[hunk_idx],
-                                line_idx,
                                 line,
                                 Some(path),
+                                &ranges,
                                 is_selected,
                                 show_line_numbers,
                                 theme,

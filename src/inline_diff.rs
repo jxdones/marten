@@ -1,6 +1,9 @@
 use similar::{ChangeTag, TextDiff};
 
-pub fn changed_ranges(old: &str, new: &str) -> (Vec<(usize, usize)>, Vec<(usize, usize)>) {
+pub type Range = (usize, usize);
+pub type Ranges = Vec<Range>;
+
+pub fn changed_ranges(old: &str, new: &str) -> (Ranges, Ranges) {
     let diff = TextDiff::from_unicode_words(old, new);
     let mut old_ranges = Vec::new();
     let mut new_ranges = Vec::new();
@@ -28,8 +31,8 @@ pub fn changed_ranges(old: &str, new: &str) -> (Vec<(usize, usize)>, Vec<(usize,
     (merge_ranges(old_ranges), merge_ranges(new_ranges))
 }
 
-fn merge_ranges(ranges: Vec<(usize, usize)>) -> Vec<(usize, usize)> {
-    let mut merged: Vec<(usize, usize)> = Vec::new();
+fn merge_ranges(ranges: Ranges) -> Ranges {
+    let mut merged: Ranges = Vec::new();
 
     for (start, end) in ranges.into_iter().filter(|(start, end)| start < end) {
         if let Some((_, prev_end)) = merged.last_mut()
