@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex};
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crossterm::{execute, terminal::SetTitle};
@@ -602,26 +603,59 @@ impl App {
 
     fn spawn_diff_workers(&self) {
         let generation = self.review_doc.generation;
-        for (file_idx, file) in self.review_doc.files.iter().enumerate() {
-            let tx_clone = self.worker_tx.clone();
-            let path = file.entry.path.clone();
-            let status = file.entry.status;
-            std::thread::spawn(move || {
-                let repo = Repository::discover(".").unwrap();
-                let result = repository::file_diff(&repo, &path, status)
-                    .map(|hunks| {
-                        let index = LineIndex::new(&hunks);
-                        (hunks, index)
-                    })
-                    .map_err(|e| e.to_string());
 
-                tx_clone
-                    .send(WorkerResult {
-                        generation,
-                        file_idx,
-                        result,
-                    })
-                    .ok();
+        // Collect every file's work item up front, then hand them to a small,
+        // fixed pool of workers that share the queue. Spawning one thread per
+        // file would open thousands of git handles at once (causing a file-descriptor
+        // exhaustion) and thousands of thread stacks. A bounded pool keeps both
+        // proportional to the pool size, not the repo size.
+        let jobs: Vec<_> = self
+            .review_doc
+            .files
+            .iter()
+            .enumerate()
+            .map(|(file_idx, file)| (file_idx, file.entry.path.clone(), file.entry.status))
+            .collect();
+        let queue = Arc::new(Mutex::new(jobs.into_iter()));
+
+        let worker_count = std::thread::available_parallelism()
+            .map_or(4, |n| n.get())
+            .min(8);
+
+        for _ in 0..worker_count {
+            let tx_clone = self.worker_tx.clone();
+            let queue = Arc::clone(&queue);
+            std::thread::spawn(move || {
+                // Repository is !Send, so it must be created inside the thread,
+                // never shared across threads.
+                let Ok(repo) = Repository::discover(".") else {
+                    return;
+                };
+
+                loop {
+                    let job = queue.lock().unwrap().next();
+                    let Some((file_idx, path, status)) = job else {
+                        break;
+                    };
+
+                    let result = repository::file_diff(&repo, &path, status)
+                        .map(|hunks| {
+                            let index = LineIndex::new(&hunks);
+                            (hunks, index)
+                        })
+                        .map_err(|e| e.to_string());
+
+                    if tx_clone
+                        .send(WorkerResult {
+                            generation,
+                            file_idx,
+                            result,
+                        })
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
             });
         }
     }
