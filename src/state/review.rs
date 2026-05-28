@@ -16,6 +16,7 @@ pub struct FileKey {
 #[derive(Debug)]
 pub enum DiffLoadState {
     NotLoaded,
+    #[allow(dead_code)]
     Loading,
     Loaded {
         hunks: Vec<DiffHunk>,
@@ -23,7 +24,6 @@ pub enum DiffLoadState {
     },
     TooLarge {
         lines: usize,
-        forced: bool,
     },
     Error(String),
 }
@@ -40,14 +40,6 @@ pub struct ReviewIndex {
     pub total_rows: usize,
 }
 
-#[derive(Debug, Default)]
-pub struct LoadingProgress {
-    pub total: usize,
-    pub completed: usize,
-    pub active: bool,
-    pub errors: usize,
-}
-
 #[derive(Debug)]
 pub struct ReviewDoc {
     pub files: Vec<FileSlot>,
@@ -55,15 +47,12 @@ pub struct ReviewDoc {
     pub index: ReviewIndex,
     pub index_dirty: bool,
     pub generation: u64,
-    pub loading: LoadingProgress,
 }
 
 #[derive(Debug, Default)]
 pub struct ReviewState {
     pub mode: ViewMode,
     pub continuous_scroll: usize,
-    pub single_scroll: usize,
-    pub selected_file: usize,
 }
 
 #[derive(Debug)]
@@ -80,15 +69,11 @@ pub enum RenderedRow {
         hunk_idx: usize,
         line_idx: usize,
     },
-    Loading {
-        file_idx: usize,
-    },
+    Loading,
     TooLarge {
-        file_idx: usize,
         lines: usize,
     },
     Error {
-        file_idx: usize,
         msg: String,
     },
 }
@@ -158,17 +143,11 @@ impl ReviewDoc {
                         })
                     }
                 }
-                DiffLoadState::Loading | DiffLoadState::NotLoaded => {
-                    Some(RenderedRow::Loading { file_idx })
+                DiffLoadState::Loading | DiffLoadState::NotLoaded => Some(RenderedRow::Loading),
+                DiffLoadState::TooLarge { lines, .. } => {
+                    Some(RenderedRow::TooLarge { lines: *lines })
                 }
-                DiffLoadState::TooLarge { lines, .. } => Some(RenderedRow::TooLarge {
-                    file_idx,
-                    lines: *lines,
-                }),
-                DiffLoadState::Error(msg) => Some(RenderedRow::Error {
-                    file_idx,
-                    msg: msg.clone(),
-                }),
+                DiffLoadState::Error(msg) => Some(RenderedRow::Error { msg: msg.clone() }),
             }
         }
     }

@@ -91,7 +91,10 @@ fn render(node: &FileNode, depth: usize, path: &str, collapsed: &HashSet<String>
                         if collapsed.contains(&fullpath) {
                             return vec![TreeRow::Dir(fullpath, depth)];
                         }
-                        vec![TreeRow::Dir(fullpath, depth), TreeRow::File(*idx, depth + 1)]
+                        vec![
+                            TreeRow::Dir(fullpath, depth),
+                            TreeRow::File(*idx, depth + 1),
+                        ]
                     }
                 }
             } else {

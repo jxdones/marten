@@ -12,8 +12,8 @@ use crate::state::{
     tree::{TreeRow, tree_rows},
 };
 use crate::state::{
-    DiffLoadState, FileKey, FileSlot, LineIndex, LoadingProgress, ReviewDoc, ReviewIndex,
-    ReviewState, ViewMode, WorkerResult,
+    DiffLoadState, FileKey, FileSlot, LineIndex, ReviewDoc, ReviewIndex, ReviewState, ViewMode,
+    WorkerResult,
 };
 use crate::tui::theme::{self, Theme};
 
@@ -488,10 +488,7 @@ impl App {
                     self.review_doc.files[slot_idx].load,
                     DiffLoadState::Loaded { .. }
                 ) {
-                    self.review_doc.files[slot_idx].load = DiffLoadState::TooLarge {
-                        lines: n,
-                        forced: false,
-                    };
+                    self.review_doc.files[slot_idx].load = DiffLoadState::TooLarge { lines: n };
                     self.review_doc.index_dirty = true;
                 }
             }
@@ -838,7 +835,6 @@ impl App {
             index: ReviewIndex::default(),
             index_dirty: false,
             generation,
-            loading: LoadingProgress::default(),
         }
     }
 }

@@ -621,7 +621,7 @@ fn render_review_doc(
                         _ => vec![],
                     }
                 }
-                Some(RenderedRow::Loading { .. }) => {
+                Some(RenderedRow::Loading) => {
                     vec![Line::from(Span::styled(" Loading..", theme.muted()))]
                 }
                 Some(RenderedRow::TooLarge { lines, .. }) => vec![Line::from(Span::styled(
