@@ -4,6 +4,7 @@ mod action;
 mod app;
 mod event;
 mod git;
+mod inline_diff;
 mod state;
 mod syntax;
 mod terminal;

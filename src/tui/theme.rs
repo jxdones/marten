@@ -17,9 +17,11 @@ pub struct Theme {
     pub hunk_header_bg: Color,
 
     pub add_bg: Color,
+    pub add_inline_bg: Color,
     pub add_fg: Color,
     pub add_gutter: Color,
     pub del_bg: Color,
+    pub del_inline_bg: Color,
     pub del_fg: Color,
     pub del_gutter: Color,
 
@@ -46,9 +48,11 @@ pub const DEFAULT: Theme = Theme {
     hunk_header_bg: Color::Rgb(40, 32, 26),
 
     add_bg: Color::Rgb(42, 43, 29),
+    add_inline_bg: Color::Rgb(68, 82, 38),
     add_fg: Color::Rgb(181, 201, 122),
     add_gutter: Color::Rgb(138, 168, 105),
     del_bg: Color::Rgb(50, 27, 20),
+    del_inline_bg: Color::Rgb(86, 35, 27),
     del_fg: Color::Rgb(224, 139, 111),
     del_gutter: Color::Rgb(196, 82, 58),
 

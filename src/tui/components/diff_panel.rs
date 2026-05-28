@@ -6,6 +6,7 @@ use ratatui::{Frame, layout::Rect};
 
 use crate::app::App;
 use crate::git::repository::{DIFF_LINE_THRESHOLD, DiffHunk, DiffLine, FileEntry, FileStatus};
+use crate::inline_diff;
 use crate::state::review::RenderedRow;
 use crate::state::{DiffLoadState, LineIndex, ReviewDoc, ViewMode};
 use crate::syntax;
@@ -261,6 +262,8 @@ fn render_diff_lines(
             } else {
                 Some(diff_line(
                     row_width,
+                    hunk,
+                    line_in_hunk - 1,
                     &hunk.lines[line_in_hunk - 1],
                     path,
                     is_selected,
@@ -274,6 +277,8 @@ fn render_diff_lines(
 
 fn diff_line(
     width: usize,
+    hunk: &DiffHunk,
+    line_idx: usize,
     line: &DiffLine,
     path: Option<&str>,
     is_selected: bool,
@@ -285,12 +290,8 @@ fn diff_line(
         '-' => theme.diff_del(),
         _ => theme.muted().bg(theme.bg),
     };
-    let selected = match line.origin {
-        '+' => Style::default().fg(theme.add_fg).bg(theme.select_hi),
-        '-' => Style::default().fg(theme.del_fg).bg(theme.select_hi),
-        _ => theme.muted(),
-    };
-    let style = if is_selected { selected } else { base };
+    let line_style = base;
+    let content_style = base;
     let content = line.content.trim_end().replace('\t', "    ");
     let prefix = if show_line_numbers {
         let old_lineno = line_number(line.old_lineno);
@@ -300,18 +301,147 @@ fn diff_line(
         format!("{} ", line.origin)
     };
 
-    let mut spans = vec![Span::styled(prefix, style)];
+    let mut spans = vec![Span::styled(prefix, line_style)];
+    let inline_ranges = inline_ranges(hunk, line_idx, line.origin);
     if let Some(path) = path {
-        if let Some(highlighted) = syntax::highlight_line(path, &content, style) {
-            spans.extend(highlighted);
+        if let Some(highlighted) = syntax::highlight_line(path, &content, content_style) {
+            spans.extend(style_content_spans(
+                highlighted,
+                &inline_ranges,
+                line.origin,
+                false,
+                theme,
+            ));
         } else {
-            spans.push(Span::styled(content, style));
+            spans.extend(style_content_spans(
+                vec![Span::styled(content, content_style)],
+                &inline_ranges,
+                line.origin,
+                false,
+                theme,
+            ));
         }
     } else {
-        spans.push(Span::styled(content, style));
+        spans.extend(style_content_spans(
+            vec![Span::styled(content, content_style)],
+            &inline_ranges,
+            line.origin,
+            false,
+            theme,
+        ));
     }
 
-    bordered_line(width, spans, style, border_style(line, is_selected, theme))
+    bordered_line(
+        width,
+        spans,
+        line_style,
+        border_style(line, is_selected, theme),
+    )
+}
+
+fn inline_ranges(hunk: &DiffHunk, line_idx: usize, origin: char) -> Vec<(usize, usize)> {
+    match origin {
+        '-' => {
+            let Some(next_line) = hunk.lines.get(line_idx + 1) else {
+                return Vec::new();
+            };
+            if next_line.origin != '+' {
+                return Vec::new();
+            }
+
+            let (old_ranges, _) = inline_diff::changed_ranges(
+                hunk.lines[line_idx].content.trim_end(),
+                next_line.content.trim_end(),
+            );
+            old_ranges
+        }
+        '+' => {
+            if line_idx == 0 {
+                return Vec::new();
+            }
+
+            let Some(previous_line) = hunk.lines.get(line_idx - 1) else {
+                return Vec::new();
+            };
+            if previous_line.origin != '-' {
+                return Vec::new();
+            }
+
+            let (_, new_ranges) = inline_diff::changed_ranges(
+                previous_line.content.trim_end(),
+                hunk.lines[line_idx].content.trim_end(),
+            );
+            new_ranges
+        }
+        _ => Vec::new(),
+    }
+}
+
+fn style_content_spans(
+    spans: Vec<Span<'static>>,
+    ranges: &[(usize, usize)],
+    origin: char,
+    is_selected: bool,
+    theme: Theme,
+) -> Vec<Span<'static>> {
+    if ranges.is_empty() && !is_selected {
+        return spans;
+    }
+
+    let mut highlighted = Vec::new();
+    let mut offset = 0;
+    let inline_bg = match origin {
+        '+' => theme.add_inline_bg,
+        '-' => theme.del_inline_bg,
+        _ => theme.select_hi,
+    };
+    let inline_overlay = Style::default().bg(inline_bg).add_modifier(Modifier::BOLD);
+    let selected_overlay = Style::default().bg(theme.select_hi);
+
+    for span in spans {
+        let mut segment = String::new();
+        let mut segment_changed = false;
+        let mut segment_started = false;
+
+        for (local_idx, ch) in span.content.chars().enumerate() {
+            let changed = in_ranges(offset + local_idx, &ranges);
+            if segment_started && changed != segment_changed {
+                let style = if segment_changed {
+                    span.style.patch(inline_overlay)
+                } else if is_selected {
+                    span.style.patch(selected_overlay)
+                } else {
+                    span.style
+                };
+                highlighted.push(Span::styled(std::mem::take(&mut segment), style));
+            }
+
+            segment_started = true;
+            segment_changed = changed;
+            segment.push(ch);
+        }
+
+        if !segment.is_empty() {
+            let style = if segment_changed {
+                span.style.patch(inline_overlay)
+            } else if is_selected {
+                span.style.patch(selected_overlay)
+            } else {
+                span.style
+            };
+            highlighted.push(Span::styled(segment, style));
+        }
+
+        offset += span.content.chars().count();
+    }
+
+    highlighted
+}
+
+fn in_ranges(index: usize, ranges: &[(usize, usize)]) -> bool {
+    ranges
+        .iter()
+        .any(|(start, end)| *start <= index && index < *end)
 }
 
 fn line_number(line_number: Option<u32>) -> String {
@@ -478,6 +608,8 @@ fn render_review_doc(
                             let is_selected = selected_hunk == Some((file_idx, hunk_idx));
                             let diff = diff_line(
                                 row_width,
+                                &hunks[hunk_idx],
+                                line_idx,
                                 line,
                                 Some(path),
                                 is_selected,
