@@ -531,7 +531,7 @@ fn render_file_header(width: usize, file: &FileEntry, theme: Theme) -> Line<'sta
         format!("-{}", file.deletions),
         theme.unstaged().patch(bg),
     ));
-    spans.push(Span::styled("  ", theme.muted().patch(bg)));
+    spans.push(Span::styled(" ", theme.muted().patch(bg)));
     spans.push(
         Span::styled(file.status.label().to_lowercase(), status_color.patch(bg))
             .add_modifier(Modifier::BOLD),
