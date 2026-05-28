@@ -757,7 +757,21 @@ impl App {
         });
     }
 
-    fn build_review_doc(entries: Vec<FileEntry>, generation: u64) -> ReviewDoc {
+    fn tree_sort_key(path: &str) -> Vec<(u8, &str)> {
+        let segments: Vec<&str> = path.split('/').collect();
+        let last = segments.len().saturating_sub(1);
+        segments
+            .into_iter()
+            .enumerate()
+            // 0u8 = directory (not last segment), 1u8 = file (last segment)
+            // sorts dirs before files
+            .map(|(i, seg)| (if i == last { 1u8 } else { 0u8 }, seg))
+            .collect()
+    }
+
+    fn build_review_doc(mut entries: Vec<FileEntry>, generation: u64) -> ReviewDoc {
+        entries.sort_by(|a, b| Self::tree_sort_key(&a.path).cmp(&Self::tree_sort_key(&b.path)));
+
         let mut file_slots = Vec::new();
         let mut by_key = HashMap::new();
 

@@ -54,10 +54,15 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
                     } else {
                         "⌄ "
                     };
+                    let label = if *depth == 0 {
+                        dir_name.as_str()
+                    } else {
+                        dir_name.split('/').next_back().unwrap_or(dir_name)
+                    };
                     items.push(ListItem::new(Line::from(vec![
                         Span::raw(path_depth),
                         Span::styled(symbol, theme.muted()),
-                        Span::styled(dir_name, theme.muted()),
+                        Span::styled(label.to_string(), theme.muted()),
                     ])));
                 }
                 TreeRow::File(idx, depth) => {

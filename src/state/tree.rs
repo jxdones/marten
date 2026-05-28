@@ -51,11 +51,10 @@ fn render(node: &FileNode, depth: usize, path: &str, collapsed: &HashSet<String>
         FileNode::Dir(name, children) => {
             if name == "/" {
                 let mut branch_rows = vec![];
-                // Files before directories, both alphabetically
-                for child in children.values().filter(|c| matches!(c, FileNode::File(_))) {
+                for child in children.values().filter(|c| matches!(c, FileNode::Dir(..))) {
                     branch_rows.extend(render(child, depth + 1, "", collapsed));
                 }
-                for child in children.values().filter(|c| matches!(c, FileNode::Dir(..))) {
+                for child in children.values().filter(|c| matches!(c, FileNode::File(_))) {
                     branch_rows.extend(render(child, depth + 1, "", collapsed));
                 }
                 return branch_rows;
@@ -84,7 +83,15 @@ fn render(node: &FileNode, depth: usize, path: &str, collapsed: &HashSet<String>
                         branch_rows
                     }
                     FileNode::File(idx) => {
-                        vec![TreeRow::File(*idx, depth)]
+                        let fullpath = if path.is_empty() {
+                            name.clone()
+                        } else {
+                            format!("{path}/{name}")
+                        };
+                        if collapsed.contains(&fullpath) {
+                            return vec![TreeRow::Dir(fullpath, depth)];
+                        }
+                        vec![TreeRow::Dir(fullpath, depth), TreeRow::File(*idx, depth + 1)]
                     }
                 }
             } else {
@@ -99,7 +106,10 @@ fn render(node: &FileNode, depth: usize, path: &str, collapsed: &HashSet<String>
                 }
 
                 let mut branch_rows = vec![TreeRow::Dir(fullpath.clone(), depth)];
-                for child in children.values() {
+                for child in children.values().filter(|c| matches!(c, FileNode::Dir(..))) {
+                    branch_rows.extend(render(child, depth + 1, &fullpath, collapsed));
+                }
+                for child in children.values().filter(|c| matches!(c, FileNode::File(_))) {
                     branch_rows.extend(render(child, depth + 1, &fullpath, collapsed));
                 }
                 branch_rows
