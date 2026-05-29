@@ -45,7 +45,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
             ))));
         }
 
-        for row in rows {
+        for (i, row) in rows.iter().enumerate() {
             match row {
                 TreeRow::Dir(dir_name, depth) => {
                     let path_depth = "  ".repeat(*depth);
@@ -54,15 +54,23 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
                     } else {
                         "⌄ "
                     };
-                    let label = if *depth == 0 {
-                        dir_name.as_str()
+                    let segs: Vec<&str> = dir_name.split('/').collect();
+                    let label = if segs.len() > *depth {
+                        let next_is_child_dir = rows
+                            .get(i + 1)
+                            .is_some_and(|r| matches!(r, TreeRow::Dir(_, d) if *d == depth + 1));
+                        if next_is_child_dir {
+                            segs[depth.saturating_sub(1)].to_string()
+                        } else {
+                            segs[depth.saturating_sub(1)..].join("/")
+                        }
                     } else {
-                        dir_name.split('/').next_back().unwrap_or(dir_name)
+                        segs.last().copied().unwrap_or(dir_name).to_string()
                     };
                     items.push(ListItem::new(Line::from(vec![
                         Span::raw(path_depth),
                         Span::styled(symbol, theme.muted()),
-                        Span::styled(label.to_string(), theme.muted()),
+                        Span::styled(label, theme.muted()),
                     ])));
                 }
                 TreeRow::File(idx, depth) => {
