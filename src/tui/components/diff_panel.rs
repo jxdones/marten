@@ -5,8 +5,11 @@ use ratatui::widgets::{Block, Borders, Paragraph};
 use ratatui::{Frame, layout::Rect};
 
 use crate::app::App;
-use crate::git::repository::{DIFF_LINE_THRESHOLD, DiffHunk, DiffLine, FileEntry, FileStatus};
+use crate::git::repository::{
+    DIFF_LINE_THRESHOLD, DiffHunk, DiffLine, DiffSectionKind, FileEntry, FileStatus,
+};
 use crate::inline_diff::{self, Range};
+use crate::state::line_index::IndexRow;
 use crate::state::review::RenderedRow;
 use crate::state::{DiffLoadState, LineIndex, ReviewDoc, ViewMode};
 use crate::syntax;
@@ -142,6 +145,20 @@ fn diff_title(app: &App) -> Line<'static> {
     Line::from(spans)
 }
 
+fn section_header_line(width: usize, kind: DiffSectionKind, theme: Theme) -> Line<'static> {
+    let (label, label_style) = match kind {
+        DiffSectionKind::Staged => (" staged ", theme.staged().bg(theme.hunk_header_bg)),
+        DiffSectionKind::Unstaged => (" unstaged ", theme.unstaged().bg(theme.hunk_header_bg)),
+    };
+    let dash_style = label_style;
+    let dashes = "─".repeat(width.saturating_sub(label.len()));
+    Line::from(vec![
+        Span::styled(label, label_style.add_modifier(Modifier::BOLD)),
+        Span::styled(dashes, dash_style),
+    ])
+    .style(Style::default().bg(theme.hunk_header_bg))
+}
+
 fn hunk_header_line(
     width: usize,
     index: usize,
@@ -244,12 +261,14 @@ fn render_diff_lines(
     let visible_rows = scroll_offset..scroll_offset + viewport_height;
 
     visible_rows
-        .filter_map(|global_row| {
-            let (hunk_idx, line_in_hunk) = line_index.lookup(global_row)?;
-            let hunk = &hunks[hunk_idx];
-            let is_selected = Some(hunk_idx) == selected_hunk;
-
-            if line_in_hunk == 0 {
+        .filter_map(|global_row| match line_index.lookup(global_row)? {
+            IndexRow::SectionHeader(section_idx) => {
+                let kind = line_index.section_header_rows[section_idx].1;
+                Some(section_header_line(row_width, kind, theme))
+            }
+            IndexRow::HunkHeader(hunk_idx) => {
+                let hunk = &hunks[hunk_idx];
+                let is_selected = Some(hunk_idx) == selected_hunk;
                 Some(hunk_header_line(
                     row_width,
                     hunk_idx,
@@ -259,8 +278,10 @@ fn render_diff_lines(
                     is_selected,
                     theme,
                 ))
-            } else {
-                let line_idx = line_in_hunk - 1;
+            }
+            IndexRow::DiffLine(hunk_idx, line_idx) => {
+                let hunk = &hunks[hunk_idx];
+                let is_selected = Some(hunk_idx) == selected_hunk;
                 let line = &hunk.lines[line_idx];
                 let ranges = inline_ranges(hunk, line_idx, line.origin);
                 Some(diff_line(
@@ -574,6 +595,9 @@ fn render_review_doc(
                         let entry = &review_doc.files[file_idx].entry;
                         vec![render_file_header(row_width, entry, theme)]
                     }
+                }
+                Some(RenderedRow::SectionHeader { kind, .. }) => {
+                    vec![section_header_line(row_width, kind, theme)]
                 }
                 Some(RenderedRow::HunkHeader { file_idx, hunk_idx }) => {
                     let state = &review_doc.files[file_idx].load;

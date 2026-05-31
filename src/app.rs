@@ -7,7 +7,8 @@ use git2::Repository;
 
 use crate::action::Action;
 use crate::event::Event;
-use crate::git::repository::{self, DiffHunk, FileEntry, RepositoryStatus};
+use crate::git::repository::{self, DiffHunk, DiffSection, FileEntry, RepositoryStatus};
+use crate::state::line_index::IndexRow;
 use crate::state::{
     Diff, Files, Focus, Screen,
     tree::{TreeRow, tree_rows},
@@ -446,7 +447,11 @@ impl App {
 
             let slot = &mut self.review_doc.files[msg.file_idx];
             slot.load = match msg.result {
-                Ok((hunks, index)) => DiffLoadState::Loaded { hunks, index },
+                Ok((sections, hunks, index)) => DiffLoadState::Loaded {
+                    sections,
+                    hunks,
+                    index,
+                },
                 Err(e) => DiffLoadState::Error(e),
             };
             self.review_doc.index_dirty = true;
@@ -502,18 +507,26 @@ impl App {
             if matches!(
                 self.review_doc.files[slot_idx].load,
                 DiffLoadState::NotLoaded
-            ) && let Ok(hunks) = repository::file_diff(&self.repo, &path, status)
+            ) && let Ok(sections) = repository::file_diff(&self.repo, &path, status)
             {
-                let index = LineIndex::new(&hunks);
-                self.review_doc.files[slot_idx].load = DiffLoadState::Loaded { hunks, index };
+                let hunks: Vec<DiffHunk> = sections.iter().flat_map(|s| s.hunks.clone()).collect();
+                let index = LineIndex::new(&sections);
+                self.review_doc.files[slot_idx].load = DiffLoadState::Loaded {
+                    sections,
+                    hunks,
+                    index,
+                };
             }
 
-            let hunks: &[DiffHunk] = match &self.review_doc.files[slot_idx].load {
-                DiffLoadState::Loaded { hunks, .. } => hunks,
-                _ => &[],
-            };
+            let (sections, hunks): (&[DiffSection], &[DiffHunk]) =
+                match &self.review_doc.files[slot_idx].load {
+                    DiffLoadState::Loaded {
+                        sections, hunks, ..
+                    } => (sections, hunks),
+                    _ => (&[], &[]),
+                };
 
-            self.diff.state.line_index = LineIndex::new(hunks);
+            self.diff.state.line_index = LineIndex::new(sections);
             self.diff.state.select_first_hunk(hunks.len());
             self.review_doc.index_dirty = true;
         }
@@ -639,9 +652,11 @@ impl App {
                     };
 
                     let result = repository::file_diff(&repo, &path, status)
-                        .map(|hunks| {
-                            let index = LineIndex::new(&hunks);
-                            (hunks, index)
+                        .map(|sections| {
+                            let hunks: Vec<DiffHunk> =
+                                sections.iter().flat_map(|s| s.hunks.clone()).collect();
+                            let index = LineIndex::new(&sections);
+                            (sections, hunks, index)
                         })
                         .map_err(|e| e.to_string());
 
@@ -789,22 +804,22 @@ impl App {
     }
 
     fn sync_diff_selection_to_scroll(&mut self) {
-        let Some((hunk_idx, line_in_hunk)) = self
+        let row = self
             .diff
             .state
             .line_index
-            .lookup(self.diff.state.scroll_offset)
-        else {
-            self.diff.state.select_first_hunk(0);
-            return;
-        };
-
-        let line_idx = if line_in_hunk == 0 {
-            0
-        } else {
-            line_in_hunk - 1
-        };
-        self.diff.state.select_hunk_line(hunk_idx, line_idx);
+            .lookup(self.diff.state.scroll_offset);
+        match row {
+            Some(IndexRow::HunkHeader(hunk_idx)) => {
+                self.diff.state.select_hunk_line(hunk_idx, 0);
+            }
+            Some(IndexRow::DiffLine(hunk_idx, line_idx)) => {
+                self.diff.state.select_hunk_line(hunk_idx, line_idx);
+            }
+            _ => {
+                self.diff.state.select_first_hunk(0);
+            }
+        }
     }
 
     fn selected_dir(&self) -> Option<String> {

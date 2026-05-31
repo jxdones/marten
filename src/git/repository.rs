@@ -212,21 +212,7 @@ pub fn file_diff_line_count(repo: &Repository, path: &str, status: FileStatus) -
     Ok(count)
 }
 
-pub fn file_diff(repo: &Repository, path: &str, status: FileStatus) -> GitResult<Vec<DiffHunk>> {
-    match status {
-        FileStatus::Staged => staged_file_diff(repo, path),
-        FileStatus::Partial => staged_file_diff(repo, path),
-        FileStatus::Unstaged => unstaged_file_diff(repo, path),
-        FileStatus::Untracked => untracked_file_diff(repo, path),
-        FileStatus::Conflicted => Ok(vec![]),
-    }
-}
-
-pub fn file_diff_sections(
-    repo: &Repository,
-    path: &str,
-    status: FileStatus,
-) -> GitResult<Vec<DiffSection>> {
+pub fn file_diff(repo: &Repository, path: &str, status: FileStatus) -> GitResult<Vec<DiffSection>> {
     match status {
         FileStatus::Staged => Ok(vec![DiffSection {
             kind: DiffSectionKind::Staged,

@@ -1,29 +1,61 @@
-use crate::git::repository::DiffHunk;
+use crate::git::repository::{DiffSection, DiffSectionKind};
 
 const HUNK_HEADER_ROWS: usize = 1;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IndexRow {
+    SectionHeader(usize),
+    HunkHeader(usize),
+    DiffLine(usize, usize),
+}
 
 #[derive(Debug)]
 pub struct LineIndex {
     pub hunk_starts: Vec<usize>,
+    pub section_header_rows: Vec<(usize, DiffSectionKind)>,
     pub total_rows: usize,
 }
 
 impl LineIndex {
-    pub fn new(hunks: &[DiffHunk]) -> Self {
-        let mut hunk_starts = Vec::with_capacity(hunks.len());
+    pub fn new(sections: &[DiffSection]) -> Self {
+        let total_hunks = sections.iter().map(|s| s.hunks.len()).sum();
+        let mut hunk_starts = Vec::with_capacity(total_hunks);
+        let mut section_header_rows = Vec::new();
+        let show_headers = sections.len() > 1;
         let mut offset = 0;
-        for hunk in hunks {
-            hunk_starts.push(offset);
-            offset += HUNK_HEADER_ROWS + hunk.lines.len();
+
+        for section in sections {
+            if show_headers {
+                section_header_rows.push((offset, section.kind));
+                offset += 1;
+            }
+            for hunk in &section.hunks {
+                hunk_starts.push(offset);
+                offset += HUNK_HEADER_ROWS + hunk.lines.len();
+            }
         }
+
         Self {
             hunk_starts,
+            section_header_rows,
             total_rows: offset,
         }
     }
 
-    pub fn lookup(&self, global_row: usize) -> Option<(usize, usize)> {
-        if global_row >= self.total_rows || self.hunk_starts.is_empty() {
+    pub fn lookup(&self, global_row: usize) -> Option<IndexRow> {
+        if global_row >= self.total_rows {
+            return None;
+        }
+
+        if let Some(idx) = self
+            .section_header_rows
+            .iter()
+            .position(|&(row, _)| row == global_row)
+        {
+            return Some(IndexRow::SectionHeader(idx));
+        }
+
+        if self.hunk_starts.is_empty() {
             return None;
         }
 
@@ -31,14 +63,19 @@ impl LineIndex {
             .hunk_starts
             .partition_point(|&s| s <= global_row)
             .checked_sub(1)?;
-        Some((hunk_idx, global_row - self.hunk_starts[hunk_idx]))
+        let offset = global_row - self.hunk_starts[hunk_idx];
+        if offset == 0 {
+            Some(IndexRow::HunkHeader(hunk_idx))
+        } else {
+            Some(IndexRow::DiffLine(hunk_idx, offset - 1))
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::git::repository::{DiffHunk, DiffLine};
+    use crate::git::repository::{DiffHunk, DiffLine, DiffSection, DiffSectionKind};
 
     fn line(content: &str) -> DiffLine {
         DiffLine {
@@ -56,6 +93,13 @@ mod tests {
             insertions: count,
             deletions: 0,
         }
+    }
+
+    fn single_section(hunks: Vec<DiffHunk>) -> Vec<DiffSection> {
+        vec![DiffSection {
+            kind: DiffSectionKind::Staged,
+            hunks,
+        }]
     }
 
     #[test]
@@ -80,15 +124,14 @@ mod tests {
     #[test]
     fn single_hunk_no_lines() {
         const HEADER_COUNT: usize = 1;
-        const HUNK_HEADER: (usize, usize) = (0, 0);
 
-        let hunks = vec![DiffHunk {
+        let sections = single_section(vec![DiffHunk {
             header: "@@ -1,1 +1,1 @@".to_string(),
             lines: vec![],
             insertions: 0,
             deletions: 0,
-        }];
-        let index = LineIndex::new(&hunks);
+        }]);
+        let index = LineIndex::new(&sections);
 
         assert_eq!(
             index.total_rows, HEADER_COUNT,
@@ -96,7 +139,7 @@ mod tests {
         );
         assert_eq!(
             index.lookup(0),
-            Some(HUNK_HEADER),
+            Some(IndexRow::HunkHeader(0)),
             "row 0 should be the hunk header"
         );
         assert_eq!(
@@ -109,13 +152,9 @@ mod tests {
     #[test]
     fn single_hunk_three_lines() {
         const HEADER_WITH_LINES: usize = 4;
-        const HUNK_HEADER: (usize, usize) = (0, 0);
-        const HUNK_0_LINE_0: (usize, usize) = (0, 1);
-        const HUNK_0_LINE_1: (usize, usize) = (0, 2);
-        const HUNK_0_LINE_2: (usize, usize) = (0, 3);
 
-        let hunks = vec![hunk_with_lines(3)];
-        let index = LineIndex::new(&hunks);
+        let sections = single_section(vec![hunk_with_lines(3)]);
+        let index = LineIndex::new(&sections);
 
         assert_eq!(
             index.total_rows, HEADER_WITH_LINES,
@@ -123,22 +162,22 @@ mod tests {
         );
         assert_eq!(
             index.lookup(0),
-            Some(HUNK_HEADER),
+            Some(IndexRow::HunkHeader(0)),
             "row 0 should be the hunk header"
         );
         assert_eq!(
             index.lookup(1),
-            Some(HUNK_0_LINE_0),
+            Some(IndexRow::DiffLine(0, 0)),
             "row 1 should be hunk 0, line 0"
         );
         assert_eq!(
             index.lookup(2),
-            Some(HUNK_0_LINE_1),
+            Some(IndexRow::DiffLine(0, 1)),
             "row 2 should be hunk 0, line 1"
         );
         assert_eq!(
             index.lookup(3),
-            Some(HUNK_0_LINE_2),
+            Some(IndexRow::DiffLine(0, 2)),
             "row 3 should be hunk 0, line 2"
         );
         assert_eq!(index.lookup(4), None, "row 4 should be out of bounds");
@@ -147,14 +186,11 @@ mod tests {
     #[test]
     fn multiple_hunks() {
         const TOTAL_ROWS: usize = 7;
-        const HUNK_0_LAST_ROW: (usize, usize) = (0, 2);
-        const HUNK_1_HEADER: (usize, usize) = (1, 0);
-        const HUNK_1_MIDDLE: (usize, usize) = (1, 2);
 
         // Hunk 0: header + 2 lines → rows 0, 1, 2
         // Hunk 1: header + 3 lines → rows 3, 4, 5, 6
-        let hunks = vec![hunk_with_lines(2), hunk_with_lines(3)];
-        let index = LineIndex::new(&hunks);
+        let sections = single_section(vec![hunk_with_lines(2), hunk_with_lines(3)]);
+        let index = LineIndex::new(&sections);
 
         assert_eq!(
             index.total_rows, TOTAL_ROWS,
@@ -162,17 +198,17 @@ mod tests {
         );
         assert_eq!(
             index.lookup(2),
-            Some(HUNK_0_LAST_ROW),
+            Some(IndexRow::DiffLine(0, 1)),
             "row 2 should be the last line of hunk 0"
         );
         assert_eq!(
             index.lookup(3),
-            Some(HUNK_1_HEADER),
+            Some(IndexRow::HunkHeader(1)),
             "row 3 should be the header of hunk 1"
         );
         assert_eq!(
             index.lookup(5),
-            Some(HUNK_1_MIDDLE),
+            Some(IndexRow::DiffLine(1, 1)),
             "row 5 should be a middle line of hunk 1"
         );
     }
@@ -182,9 +218,9 @@ mod tests {
         const PAST_THE_END: usize = 2;
         const FAR_PAST_THE_END: usize = 1000;
 
-        // Hunk 0: header + 1 lines -> rows 0, 1
-        let hunks = vec![hunk_with_lines(1)];
-        let index = LineIndex::new(&hunks);
+        // Hunk 0: header + 1 line -> rows 0, 1
+        let sections = single_section(vec![hunk_with_lines(1)]);
+        let index = LineIndex::new(&sections);
 
         assert_eq!(
             index.lookup(PAST_THE_END),
@@ -195,6 +231,60 @@ mod tests {
             index.lookup(FAR_PAST_THE_END),
             None,
             "row far past the end should return None"
+        );
+    }
+
+    #[test]
+    fn two_sections_insert_headers() {
+        // Section 0 (Staged): 1 hunk with 2 lines  → header@0, hunk_header@1, lines@2,3
+        // Section 1 (Unstaged): 1 hunk with 1 line → header@4, hunk_header@5, line@6
+        let sections = vec![
+            DiffSection {
+                kind: DiffSectionKind::Staged,
+                hunks: vec![hunk_with_lines(2)],
+            },
+            DiffSection {
+                kind: DiffSectionKind::Unstaged,
+                hunks: vec![hunk_with_lines(1)],
+            },
+        ];
+        let index = LineIndex::new(&sections);
+
+        assert_eq!(index.total_rows, 7, "two sections should have 7 total rows");
+        assert_eq!(
+            index.lookup(0),
+            Some(IndexRow::SectionHeader(0)),
+            "row 0 should be section header 0"
+        );
+        assert_eq!(
+            index.lookup(1),
+            Some(IndexRow::HunkHeader(0)),
+            "row 1 should be hunk header 0"
+        );
+        assert_eq!(
+            index.lookup(2),
+            Some(IndexRow::DiffLine(0, 0)),
+            "row 2 should be hunk 0, line 0"
+        );
+        assert_eq!(
+            index.lookup(3),
+            Some(IndexRow::DiffLine(0, 1)),
+            "row 3 should be hunk 0, line 1"
+        );
+        assert_eq!(
+            index.lookup(4),
+            Some(IndexRow::SectionHeader(1)),
+            "row 4 should be section header 1"
+        );
+        assert_eq!(
+            index.lookup(5),
+            Some(IndexRow::HunkHeader(1)),
+            "row 5 should be hunk header 1"
+        );
+        assert_eq!(
+            index.lookup(6),
+            Some(IndexRow::DiffLine(1, 0)),
+            "row 6 should be hunk 1, line 0"
         );
     }
 }

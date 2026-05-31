@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use crate::git::repository::{DiffHunk, FileEntry, FileStatus};
+use crate::git::repository::{DiffHunk, DiffSection, DiffSectionKind, FileEntry, FileStatus};
+use crate::state::line_index::IndexRow;
 use crate::state::{LineIndex, ViewMode};
 
 const HEADER_ROW: usize = 1;
 const CONTENT_ROW: usize = 1;
-const HUNK_HEADER_ROW: usize = 0;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FileKey {
@@ -19,6 +19,7 @@ pub enum DiffLoadState {
     #[allow(dead_code)]
     Loading,
     Loaded {
+        sections: Vec<DiffSection>,
         hunks: Vec<DiffHunk>,
         index: LineIndex,
     },
@@ -60,6 +61,9 @@ pub enum RenderedRow {
     FileHeader {
         file_idx: usize,
     },
+    SectionHeader {
+        kind: DiffSectionKind,
+    },
     HunkHeader {
         file_idx: usize,
         hunk_idx: usize,
@@ -82,7 +86,7 @@ pub enum RenderedRow {
 pub struct WorkerResult {
     pub generation: u64,
     pub file_idx: usize,
-    pub result: Result<(Vec<DiffHunk>, LineIndex), String>,
+    pub result: Result<(Vec<DiffSection>, Vec<DiffHunk>, LineIndex), String>,
 }
 
 impl ReviewIndex {
@@ -131,18 +135,20 @@ impl ReviewDoc {
         } else {
             let diff_row = local_row - 1;
             match &self.files[file_idx].load {
-                DiffLoadState::Loaded { index, .. } => {
-                    let (hunk_idx, line_in_hunk) = index.lookup(diff_row)?;
-                    if line_in_hunk == HUNK_HEADER_ROW {
-                        Some(RenderedRow::HunkHeader { file_idx, hunk_idx })
-                    } else {
-                        Some(RenderedRow::DiffLine {
-                            file_idx,
-                            hunk_idx,
-                            line_idx: line_in_hunk - 1,
-                        })
+                DiffLoadState::Loaded { index, .. } => match index.lookup(diff_row)? {
+                    IndexRow::SectionHeader(section_idx) => {
+                        let kind = index.section_header_rows[section_idx].1;
+                        Some(RenderedRow::SectionHeader { kind })
                     }
-                }
+                    IndexRow::HunkHeader(hunk_idx) => {
+                        Some(RenderedRow::HunkHeader { file_idx, hunk_idx })
+                    }
+                    IndexRow::DiffLine(hunk_idx, line_idx) => Some(RenderedRow::DiffLine {
+                        file_idx,
+                        hunk_idx,
+                        line_idx,
+                    }),
+                },
                 DiffLoadState::Loading | DiffLoadState::NotLoaded => Some(RenderedRow::Loading),
                 DiffLoadState::TooLarge { lines, .. } => {
                     Some(RenderedRow::TooLarge { lines: *lines })
