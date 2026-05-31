@@ -472,4 +472,287 @@ fn diff_stats(diff: &Diff<'_>) -> Result<HashMap<String, (usize, usize)>, git2::
     Ok(stats)
 }
 
-// TODO: Add unit tests for status, head_status, repository_name, ahead_behind, and change_counts.
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::Path;
+
+    use git2::{Repository, Signature};
+    use tempfile::TempDir;
+
+    use super::*;
+
+    fn init_repo(dir_name: &str) -> (TempDir, Repository) {
+        let parent = TempDir::new().unwrap();
+        let repo_path = parent.path().join(dir_name);
+        let repo = Repository::init(&repo_path).unwrap();
+        (parent, repo)
+    }
+
+    fn signature() -> Signature<'static> {
+        Signature::now("Test User", "test@example.com").unwrap()
+    }
+
+    fn write_file(repo: &Repository, path: &str, content: &str) {
+        let workdir = repo.workdir().expect("bare repos are unsupported in tests");
+        let full = workdir.join(path);
+        if let Some(parent) = full.parent() {
+            fs::create_dir_all(parent).unwrap();
+        }
+        fs::write(full, content).unwrap();
+    }
+
+    fn stage_path(repo: &Repository, path: &str) {
+        let mut index = repo.index().unwrap();
+        index
+            .add_path(Path::new(path))
+            .expect("failed to stage path");
+        index.write().unwrap();
+    }
+
+    fn commit_index(repo: &Repository, message: &str) -> git2::Oid {
+        let mut index = repo.index().unwrap();
+        let tree_id = index.write_tree_to(repo).unwrap();
+        let tree = repo.find_tree(tree_id).unwrap();
+        let sig = signature();
+
+        let parent = repo.head().ok().and_then(|head| head.target());
+        if let Some(parent_id) = parent {
+            let parent_commit = repo.find_commit(parent_id).unwrap();
+            repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &[&parent_commit])
+                .unwrap()
+        } else {
+            repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &[])
+                .unwrap()
+        }
+    }
+
+    fn write_and_commit(repo: &Repository, path: &str, content: &str, message: &str) -> git2::Oid {
+        write_file(repo, path, content);
+        stage_path(repo, path);
+        commit_index(repo, message)
+    }
+
+    fn set_upstream(repo: &Repository, remote: &Repository, upstream_oid: git2::Oid) {
+        let branch_name = repo
+            .head()
+            .unwrap()
+            .shorthand()
+            .expect("detached HEAD is unsupported in upstream tests")
+            .to_string();
+
+        if repo.find_remote("origin").is_err() {
+            repo.remote("origin", remote.path().to_str().unwrap())
+                .unwrap();
+        }
+
+        repo.reference(
+            &format!("refs/remotes/origin/{branch_name}"),
+            upstream_oid,
+            true,
+            "test upstream",
+        )
+        .unwrap();
+
+        let mut branch = repo
+            .find_branch(&branch_name, git2::BranchType::Local)
+            .unwrap();
+        branch
+            .set_upstream(Some(&format!("origin/{branch_name}")))
+            .unwrap();
+    }
+
+    fn stage_partial_file(repo: &Repository, path: &str, staged: &str, working: &str) {
+        write_file(repo, path, staged);
+        stage_path(repo, path);
+        write_file(repo, path, working);
+    }
+
+    fn entry<'a>(entries: &'a [FileEntry], path: &str) -> &'a FileEntry {
+        entries
+            .iter()
+            .find(|entry| entry.path == path)
+            .unwrap_or_else(|| panic!("missing file entry for {path}"))
+    }
+
+    #[test]
+    fn repository_name_uses_workdir_basename() {
+        let (_dir, repo) = init_repo("my-fixture-repo");
+        let status = status(&repo).unwrap();
+        assert_eq!(status.name, "my-fixture-repo");
+    }
+
+    #[test]
+    fn head_status_is_unknown_on_unborn_branch() {
+        let (_dir, repo) = init_repo("unborn");
+        let status = status(&repo).unwrap();
+
+        assert!(matches!(status.head, Head::Unknown));
+        assert_eq!(status.ahead, 0);
+        assert_eq!(status.behind, 0);
+    }
+
+    #[test]
+    fn head_status_reports_branch_after_initial_commit() {
+        let (_dir, repo) = init_repo("branch");
+        write_and_commit(&repo, "README.md", "hello\n", "init");
+
+        let status = status(&repo).unwrap();
+        assert!(matches!(status.head, Head::Branch(_)));
+        if let Head::Branch(name) = status.head {
+            assert!(!name.is_empty());
+        }
+    }
+
+    #[test]
+    fn change_counts_are_zero_on_clean_repo() {
+        let (_dir, repo) = init_repo("clean");
+        write_and_commit(&repo, "README.md", "hello\n", "init");
+
+        let status = status(&repo).unwrap();
+        assert_eq!(status.changes.staged, 0);
+        assert_eq!(status.changes.unstaged, 0);
+        assert_eq!(status.changes.untracked, 0);
+        assert_eq!(status.changes.conflicted, 0);
+    }
+
+    #[test]
+    fn change_counts_track_staged_unstaged_and_untracked_files() {
+        let (_dir, repo) = init_repo("counts");
+        write_and_commit(&repo, "tracked.txt", "base\n", "init");
+
+        write_file(&repo, "staged.txt", "staged\n");
+        stage_path(&repo, "staged.txt");
+
+        write_file(&repo, "tracked.txt", "base\nmodified\n");
+        write_file(&repo, "untracked.txt", "new\n");
+
+        let status = status(&repo).unwrap();
+        assert_eq!(status.changes.staged, 1);
+        assert_eq!(status.changes.unstaged, 1);
+        assert_eq!(status.changes.untracked, 1);
+    }
+
+    #[test]
+    fn ahead_behind_is_zero_without_upstream() {
+        let (_dir, repo) = init_repo("no-upstream");
+        write_and_commit(&repo, "README.md", "one\n", "first");
+        write_and_commit(&repo, "README.md", "one\ntwo\n", "second");
+
+        let status = status(&repo).unwrap();
+        assert_eq!(status.ahead, 0);
+        assert_eq!(status.behind, 0);
+    }
+
+    #[test]
+    fn ahead_behind_counts_local_and_remote_divergence() {
+        let parent = TempDir::new().unwrap();
+        let remote = Repository::init_bare(parent.path().join("remote.git")).unwrap();
+        let repo = Repository::init(parent.path().join("local")).unwrap();
+
+        let first = write_and_commit(&repo, "README.md", "one\n", "first");
+        let second = write_and_commit(&repo, "README.md", "one\ntwo\n", "second");
+
+        set_upstream(&repo, &remote, first);
+        let ahead = status(&repo).unwrap();
+        assert_eq!(ahead.ahead, 1);
+        assert_eq!(ahead.behind, 0);
+
+        repo.reset(
+            &repo.find_commit(first).unwrap().into_object(),
+            git2::ResetType::Hard,
+            None,
+        )
+        .unwrap();
+        set_upstream(&repo, &remote, second);
+        let behind = status(&repo).unwrap();
+        assert_eq!(behind.ahead, 0);
+        assert_eq!(behind.behind, 1);
+
+        repo.reset(
+            &repo.find_commit(second).unwrap().into_object(),
+            git2::ResetType::Hard,
+            None,
+        )
+        .unwrap();
+        set_upstream(&repo, &remote, second);
+        let even = status(&repo).unwrap();
+        assert_eq!(even.ahead, 0);
+        assert_eq!(even.behind, 0);
+    }
+
+    #[test]
+    fn files_classifies_staged_unstaged_untracked_and_partial_entries() {
+        let (_dir, repo) = init_repo("files");
+        write_and_commit(&repo, "partial.txt", "base\n", "init");
+
+        write_file(&repo, "staged.txt", "staged\n");
+        stage_path(&repo, "staged.txt");
+
+        stage_partial_file(
+            &repo,
+            "partial.txt",
+            "base\nstaged\n",
+            "base\nstaged\nworking\n",
+        );
+
+        write_file(&repo, "untracked.txt", "new\n");
+
+        let entries = files(&repo).unwrap();
+        assert_eq!(entry(&entries, "staged.txt").status, FileStatus::Staged);
+        assert_eq!(
+            entry(&entries, "untracked.txt").status,
+            FileStatus::Untracked
+        );
+        assert_eq!(entry(&entries, "partial.txt").status, FileStatus::Partial);
+    }
+
+    #[test]
+    fn file_diff_returns_staged_and_unstaged_sections_for_partial_files() {
+        let (_dir, repo) = init_repo("partial-diff");
+        write_and_commit(&repo, "partial.txt", "base\n", "init");
+        stage_partial_file(
+            &repo,
+            "partial.txt",
+            "base\nstaged\n",
+            "base\nstaged\nworking\n",
+        );
+
+        let sections = file_diff(&repo, "partial.txt", FileStatus::Partial).unwrap();
+        assert_eq!(sections.len(), 2);
+        assert_eq!(sections[0].kind, DiffSectionKind::Staged);
+        assert_eq!(sections[1].kind, DiffSectionKind::Unstaged);
+        assert!(!sections[0].hunks.is_empty());
+        assert!(!sections[1].hunks.is_empty());
+    }
+
+    #[test]
+    fn file_diff_renders_untracked_lines_as_insertions() {
+        let (_dir, repo) = init_repo("untracked-diff");
+        write_and_commit(&repo, "README.md", "hello\n", "init");
+        write_file(&repo, "new.txt", "alpha\nbeta\n");
+
+        let sections = file_diff(&repo, "new.txt", FileStatus::Untracked).unwrap();
+        assert_eq!(sections.len(), 1);
+        assert_eq!(sections[0].kind, DiffSectionKind::Unstaged);
+
+        let hunk = &sections[0].hunks[0];
+        assert_eq!(hunk.insertions, 2);
+        assert_eq!(hunk.deletions, 0);
+        assert!(hunk.lines.iter().all(|line| line.origin == '+'));
+    }
+
+    #[test]
+    fn file_diff_line_count_matches_visible_diff_lines() {
+        let (_dir, repo) = init_repo("line-count");
+        write_and_commit(&repo, "tracked.txt", "one\n", "init");
+        write_file(&repo, "tracked.txt", "one\ntwo\n");
+
+        let entries = files(&repo).unwrap();
+        let file = entry(&entries, "tracked.txt");
+        assert_eq!(file.status, FileStatus::Unstaged);
+
+        let line_count = file_diff_line_count(&repo, "tracked.txt", FileStatus::Unstaged).unwrap();
+        assert!(line_count >= 2);
+    }
+}

@@ -12,3 +12,6 @@ git2 = "0.20.4"
 ratatui = "0.30.0"
 similar = { version = "3.1.1", features = ["unicode"] }
 syntect = "5.2.0"
+
+[dev-dependencies]
+tempfile = "3.25.0"
