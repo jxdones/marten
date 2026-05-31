@@ -64,6 +64,18 @@ pub struct DiffHunk {
     pub deletions: usize,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DiffSectionKind {
+    Staged,
+    Unstaged,
+}
+
+#[derive(Debug, Clone)]
+pub struct DiffSection {
+    pub kind: DiffSectionKind,
+    pub hunks: Vec<DiffHunk>,
+}
+
 impl FileStatus {
     pub const fn label(self) -> &'static str {
         match self {
@@ -201,35 +213,59 @@ pub fn file_diff_line_count(repo: &Repository, path: &str, status: FileStatus) -
 }
 
 pub fn file_diff(repo: &Repository, path: &str, status: FileStatus) -> GitResult<Vec<DiffHunk>> {
-    if status == FileStatus::Untracked {
-        return untracked_file_diff(repo, path);
+    match status {
+        FileStatus::Staged => staged_file_diff(repo, path),
+        FileStatus::Partial => staged_file_diff(repo, path),
+        FileStatus::Unstaged => unstaged_file_diff(repo, path),
+        FileStatus::Untracked => untracked_file_diff(repo, path),
+        FileStatus::Conflicted => Ok(vec![]),
     }
+}
 
-    let head = repo.head()?;
+pub fn file_diff_sections(
+    repo: &Repository,
+    path: &str,
+    status: FileStatus,
+) -> GitResult<Vec<DiffSection>> {
+    match status {
+        FileStatus::Staged => Ok(vec![DiffSection {
+            kind: DiffSectionKind::Staged,
+            hunks: staged_file_diff(repo, path)?,
+        }]),
+        FileStatus::Partial => Ok(vec![
+            DiffSection {
+                kind: DiffSectionKind::Staged,
+                hunks: staged_file_diff(repo, path)?,
+            },
+            DiffSection {
+                kind: DiffSectionKind::Unstaged,
+                hunks: unstaged_file_diff(repo, path)?,
+            },
+        ]),
+        FileStatus::Unstaged => Ok(vec![DiffSection {
+            kind: DiffSectionKind::Unstaged,
+            hunks: unstaged_file_diff(repo, path)?,
+        }]),
+        FileStatus::Untracked => Ok(vec![DiffSection {
+            kind: DiffSectionKind::Unstaged,
+            hunks: untracked_file_diff(repo, path)?,
+        }]),
+        FileStatus::Conflicted => Ok(vec![]),
+    }
+}
 
-    let mut opts = DiffOptions::new();
-    opts.pathspec(path);
-
-    let diff = match status {
-        FileStatus::Staged | FileStatus::Partial => {
-            let head_commit = head.peel_to_commit()?;
-            let head_tree = head_commit.tree()?;
-            repo.diff_tree_to_index(Some(&head_tree), None, Some(&mut opts))?
-        }
-        FileStatus::Unstaged => repo.diff_index_to_workdir(None, Some(&mut opts))?,
-        _ => return Ok(vec![]),
-    };
-
-    let Some(diff_patch) = Patch::from_diff(&diff, 0)? else {
+fn diff_hunks(diff: Diff<'_>) -> GitResult<Vec<DiffHunk>> {
+    let Some(patch) = Patch::from_diff(&diff, 0)? else {
         return Ok(vec![]);
     };
 
     let mut hunks: Vec<DiffHunk> = Vec::new();
-    for hunk_idx in 0..diff_patch.num_hunks() {
+    for hunk_idx in 0..patch.num_hunks() {
         let mut diff_lines: Vec<DiffLine> = Vec::new();
-        let (hunk, num_lines) = diff_patch.hunk(hunk_idx)?;
+        let (hunk, num_lines) = patch.hunk(hunk_idx)?;
+
         for line_idx in 0..num_lines {
-            let line = diff_patch.line_in_hunk(hunk_idx, line_idx)?;
+            let line = patch.line_in_hunk(hunk_idx, line_idx)?;
             diff_lines.push(DiffLine {
                 old_lineno: line.old_lineno(),
                 new_lineno: line.new_lineno(),
@@ -237,11 +273,14 @@ pub fn file_diff(repo: &Repository, path: &str, status: FileStatus) -> GitResult
                 content: String::from_utf8_lossy(line.content()).to_string(),
             });
         }
-        let (insertions, deletions) = diff_lines.iter().fold((0, 0), |(i, d), l| match l.origin {
-            '+' => (i + 1, d),
-            '-' => (i, d + 1),
-            _ => (i, d),
-        });
+        let (insertions, deletions) =
+            diff_lines
+                .iter()
+                .fold((0, 0), |(insertion, deletion), line| match line.origin {
+                    '+' => (insertion + 1, deletion),
+                    '-' => (insertion, deletion + 1),
+                    _ => (insertion, deletion),
+                });
         hunks.push(DiffHunk {
             header: String::from_utf8_lossy(hunk.header()).to_string(),
             lines: diff_lines,
@@ -250,6 +289,28 @@ pub fn file_diff(repo: &Repository, path: &str, status: FileStatus) -> GitResult
         });
     }
 
+    Ok(hunks)
+}
+
+fn staged_file_diff(repo: &Repository, path: &str) -> GitResult<Vec<DiffHunk>> {
+    let head = repo.head()?;
+    let mut opts = DiffOptions::new();
+    opts.pathspec(path);
+
+    let head_commit = head.peel_to_commit()?;
+    let head_tree = head_commit.tree()?;
+    let diff = repo.diff_tree_to_index(Some(&head_tree), None, Some(&mut opts))?;
+
+    let hunks = diff_hunks(diff)?;
+    Ok(hunks)
+}
+
+fn unstaged_file_diff(repo: &Repository, path: &str) -> GitResult<Vec<DiffHunk>> {
+    let mut opts = DiffOptions::new();
+    opts.pathspec(path);
+
+    let diff = repo.diff_index_to_workdir(None, Some(&mut opts))?;
+    let hunks = diff_hunks(diff)?;
     Ok(hunks)
 }
 
