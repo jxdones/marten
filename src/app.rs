@@ -161,7 +161,7 @@ impl App {
         self.sync_diff_selection_to_scroll();
     }
 
-    pub fn handle_event(&self, event: Event) -> Action {
+    pub fn handle_event(&mut self, event: Event) -> Action {
         match event {
             Event::Key(key) => self.handle_key(key),
             Event::Resize(..) => Action::Noop,
@@ -276,7 +276,7 @@ impl App {
         }
     }
 
-    fn handle_key(&self, key: KeyEvent) -> Action {
+    fn handle_key(&mut self, key: KeyEvent) -> Action {
         match key.code {
             KeyCode::Char('q') => Action::Quit,
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => Action::Quit,
@@ -286,7 +286,13 @@ impl App {
             KeyCode::Char('1') => Action::FocusPanel(Focus::Files),
             KeyCode::Down | KeyCode::Char('j') => Action::MoveDown,
             KeyCode::Up | KeyCode::Char('k') => Action::MoveUp,
-            KeyCode::Char(']') if self.focus == Focus::Diff => Action::NextHunk,
+            KeyCode::Char(']') => match self.focus() {
+                Focus::Diff => Action::NextHunk,
+                Focus::Files => {
+                    self.focus = Focus::Diff;
+                    Action::NextHunk
+                }
+            },
             KeyCode::Char('[') if self.focus == Focus::Diff => Action::PreviousHunk,
             KeyCode::Char('n') => Action::NextFile,
             KeyCode::Char('p') => Action::PreviousFile,
