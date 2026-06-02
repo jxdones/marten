@@ -470,7 +470,9 @@ impl App {
         self.refresh_diff_internal(true);
     }
 
-    pub fn poll_workers(&mut self) {
+    pub fn poll_workers(&mut self) -> bool {
+        let mut changed = false;
+
         while let Ok(msg) = self.worker_rx.try_recv() {
             if msg.generation != self.review_doc.generation {
                 continue;
@@ -486,6 +488,7 @@ impl App {
                 Err(e) => DiffLoadState::Error(e),
             };
             self.review_doc.index_dirty = true;
+            changed = true;
         }
 
         if self.review_doc.index_dirty {
@@ -495,7 +498,10 @@ impl App {
             self.review_doc.rebuild_index();
             self.review_doc.index_dirty = false;
             self.sync_continuous_scroll_to_file(file_anchor);
+            changed = true;
         }
+
+        changed
     }
 
     fn refresh_diff_internal(&mut self, force: bool) {

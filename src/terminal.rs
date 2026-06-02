@@ -30,14 +30,23 @@ fn init_terminal() -> io::Result<DefaultTerminal> {
 }
 
 fn run_loop(terminal: &mut DefaultTerminal, app: &mut App) -> io::Result<()> {
+    let mut needs_draw = true;
+
     while !app.should_quit() {
-        app.poll_workers();
-        terminal.draw(|frame| tui::draw(frame, app))?;
+        if app.poll_workers() {
+            needs_draw = true;
+        }
+
+        if needs_draw {
+            terminal.draw(|frame| tui::draw(frame, app))?;
+            needs_draw = false;
+        }
 
         if event::poll(Duration::from_millis(50))? {
             let event = read_event()?;
             let action = app.handle_event(event);
             app.update(action);
+            needs_draw = true;
         }
     }
 
