@@ -1,11 +1,17 @@
-use ratatui::{Frame, layout::{Alignment, Constraint, Layout, Rect}, text::{Line, Span}, widgets::Paragraph};
+use ratatui::{
+    Frame,
+    layout::{Alignment, Constraint, Layout, Rect},
+    text::{Line, Span},
+    widgets::Paragraph,
+};
 
 use crate::{
     app::App,
     state::Focus,
     tui::{
         components::{diff_panel, left_sidebar, shortcuts, top_bar},
-        layout, theme::Theme,
+        layout,
+        theme::Theme,
     },
 };
 
@@ -57,13 +63,15 @@ fn draw_too_small(frame: &mut Frame, area: Rect, theme: Theme) {
         Constraint::Fill(1),
         Constraint::Length(3),
         Constraint::Fill(1),
-    ]).split(area);
+    ])
+    .split(area);
 
     let horizontal = Layout::horizontal([
         Constraint::Fill(1),
         Constraint::Length(max_width),
         Constraint::Fill(1),
-    ]).split(vertical[1]);
+    ])
+    .split(vertical[1]);
 
     frame.render_widget(widget, horizontal[1]);
 }

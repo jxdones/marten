@@ -52,10 +52,12 @@ pub struct App {
 
 impl App {
     pub fn new() -> Self {
-        // set app title
         execute!(std::io::stdout(), SetTitle("marten")).ok();
-
         let repo = Repository::discover(".").expect("not a git repo");
+        Self::init(repo)
+    }
+
+    fn init(repo: Repository) -> Self {
         let repository_status = repository::status(&repo).ok();
         let files = repository::files(&repo).ok().map(|mut f| {
             Self::sort_file_entries(&mut f);
@@ -324,6 +326,35 @@ impl App {
         else {
             return;
         };
+
+        if let Some(pos) = self
+            .files
+            .cached_rows
+            .iter()
+            .enumerate()
+            .find(|(_, row)| matches!(row, TreeRow::File(entry_idx, _) if *entry_idx == file_idx))
+            .map(|(pos, _)| pos)
+        {
+            self.files.state.selected = Some(pos);
+            return;
+        }
+
+        let path = &self.review_doc.files[file_idx].entry.path;
+        let to_expand: Vec<String> = self
+            .files
+            .collapsed
+            .iter()
+            .filter(|c| **path == **c || path.starts_with(&format!("{c}/")))
+            .cloned()
+            .collect();
+
+        for dir in to_expand {
+            self.files.collapsed.remove(&dir);
+        }
+
+        self.files.dirty = true;
+        self.ensure_rows();
+
         self.files.state.selected = self
             .files
             .cached_rows
@@ -891,5 +922,63 @@ impl App {
 impl std::fmt::Debug for App {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("App").finish_non_exhaustive()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use git2::Repository;
+    use tempfile::TempDir;
+
+    use super::*;
+    use crate::state::tree::TreeRow;
+
+    fn init_repo() -> (TempDir, Repository) {
+        let dir = TempDir::new().unwrap();
+        let repo = Repository::init(dir.path()).unwrap();
+        (dir, repo)
+    }
+
+    #[test]
+    fn match_selected_file_expands_collapsed_dir() {
+        let (dir, repo) = init_repo();
+
+        let file_path = dir.path().join("src").join("main.rs");
+        fs::create_dir_all(file_path.parent().unwrap()).unwrap();
+        fs::write(&file_path, "fn main() {}\n").unwrap();
+
+        let mut app = App::init(repo);
+        assert_eq!(app.review_doc.files.len(), 1);
+        assert_eq!(app.review_doc.files[0].entry.path, "src/main.rs");
+        assert!(
+            app.files
+                .cached_rows
+                .iter()
+                .any(|r| matches!(r, TreeRow::File(..)))
+        );
+
+        app.files.collapsed.insert("src".to_string());
+        app.files.dirty = true;
+        app.ensure_rows();
+        assert!(
+            !app.files
+                .cached_rows
+                .iter()
+                .any(|r| matches!(r, TreeRow::File(..)))
+        );
+        assert!(app.files.collapsed.contains("src"));
+
+        app.review.continuous_scroll = app.review_doc.index.file_starts[0];
+        app.match_selected_file();
+        assert!(!app.files.collapsed.contains("src"));
+        assert!(
+            app.files
+                .cached_rows
+                .iter()
+                .any(|r| matches!(r, TreeRow::File(..)))
+        );
+        assert_eq!(app.files.state.selected, Some(1));
     }
 }
