@@ -9,6 +9,7 @@ pub struct Diff {
     pub show_line_numbers: bool,
     pub line_index: LineIndex,
     pub too_large: Option<usize>,
+    pub is_binary: bool,
 }
 
 impl Default for Diff {
@@ -21,6 +22,7 @@ impl Default for Diff {
             show_line_numbers: true,
             line_index: LineIndex::new(&[]),
             too_large: None,
+            is_binary: false,
         }
     }
 }

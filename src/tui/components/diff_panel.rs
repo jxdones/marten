@@ -98,7 +98,8 @@ fn diff_title(app: &App) -> Line<'static> {
                         };
                         (Some(path), hunk_idx + 1, total, line_idx, line_count)
                     }
-                    Some(RenderedRow::FileHeader { file_idx }) => {
+                    Some(RenderedRow::FileHeader { file_idx })
+                    | Some(RenderedRow::Binary { file_idx }) => {
                         let path = review_doc.files[file_idx].entry.path.clone();
                         (Some(path), 0, 0, 0, 0)
                     }
@@ -209,7 +210,12 @@ fn render_single_file(
     let hunks = app.diff_hunks();
     let path = app.selected_file().map(|file| file.path.as_str());
 
-    if let Some(line_count) = diff_state.too_large {
+    if diff_state.is_binary {
+        vec![Line::from(Span::styled(
+            "Binary file — skipped",
+            theme.muted(),
+        ))]
+    } else if let Some(line_count) = diff_state.too_large {
         vec![
             Line::from(Span::styled(
                 "File too large to render automatically.",
@@ -506,26 +512,33 @@ fn bordered_line(
     Line::from(line_spans).style(style)
 }
 
-fn render_file_header(width: usize, file: &FileEntry, theme: Theme) -> Line<'static> {
-    let collapse_symbol = "▼ ";
-    let bg = Style::default().bg(theme.file_header_bg);
-    let mut spans = vec![Span::styled(collapse_symbol, theme.muted().patch(bg))];
-
-    let status_color = match file.status {
+fn file_status_color(status: FileStatus, theme: Theme) -> Style {
+    match status {
         FileStatus::Staged => theme.staged(),
         FileStatus::Partial => theme.partial(),
         FileStatus::Unstaged => theme.unstaged(),
         FileStatus::Untracked => theme.untracked(),
         FileStatus::Conflicted => theme.conflict(),
-    };
+    }
+}
 
-    let status_symbol = match file.status {
+fn file_status_symbol(status: FileStatus) -> &'static str {
+    match status {
         FileStatus::Staged => "S",
         FileStatus::Partial => "P",
         FileStatus::Unstaged => "M",
         FileStatus::Untracked => "U",
         FileStatus::Conflicted => "C",
-    };
+    }
+}
+
+fn render_file_header(width: usize, file: &FileEntry, theme: Theme) -> Line<'static> {
+    let collapse_symbol = "▼ ";
+    let bg = Style::default().bg(theme.file_header_bg);
+    let mut spans = vec![Span::styled(collapse_symbol, theme.muted().patch(bg))];
+
+    let status_color = file_status_color(file.status, theme);
+    let status_symbol = file_status_symbol(file.status);
     let path = format!(" {}", file.path);
     let stats = format!(
         "+{} -{} {}",
@@ -561,6 +574,26 @@ fn render_file_header(width: usize, file: &FileEntry, theme: Theme) -> Line<'sta
     Line::from(spans).style(bg)
 }
 
+fn render_binary_header(width: usize, file: &FileEntry, theme: Theme) -> Line<'static> {
+    let bg = Style::default().bg(theme.file_header_bg);
+    let status_color = file_status_color(file.status, theme);
+    let status_symbol = file_status_symbol(file.status);
+    let prefix = "  ";
+    let path = format!(" {}", file.path);
+    let tag = " binary";
+    let padding = width.saturating_sub(
+        text_width(prefix) + text_width(status_symbol) + text_width(&path) + text_width(tag),
+    );
+    Line::from(vec![
+        Span::styled(prefix, theme.muted().patch(bg)),
+        Span::styled(status_symbol, status_color.patch(bg)),
+        Span::styled(path, theme.muted().patch(bg)),
+        Span::styled(" ".repeat(padding), bg),
+        Span::styled(tag, theme.muted().patch(bg)),
+    ])
+    .style(bg)
+}
+
 fn text_width(text: &str) -> usize {
     text.chars().count()
 }
@@ -579,8 +612,12 @@ fn render_review_doc(
 
     let pinned_file_idx = review_doc.index.file_at_row(scroll_offset).map(|(i, _)| i);
     let mut lines: Vec<Line<'static>> = if let Some(file_idx) = pinned_file_idx {
-        let entry = &review_doc.files[file_idx].entry;
-        vec![render_file_header(row_width, entry, theme)]
+        let slot = &review_doc.files[file_idx];
+        if matches!(slot.load, DiffLoadState::Binary) {
+            vec![]
+        } else {
+            vec![render_file_header(row_width, &slot.entry, theme)]
+        }
     } else {
         vec![]
     };
@@ -647,6 +684,10 @@ fn render_review_doc(
                 }
                 Some(RenderedRow::Loading) => {
                     vec![Line::from(Span::styled(" Loading..", theme.muted()))]
+                }
+                Some(RenderedRow::Binary { file_idx }) => {
+                    let entry = &review_doc.files[file_idx].entry;
+                    vec![render_binary_header(row_width, entry, theme)]
                 }
                 Some(RenderedRow::TooLarge { lines, .. }) => vec![Line::from(Span::styled(
                     format!("  File too large ({lines} lines) — press Enter to load"),

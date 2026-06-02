@@ -480,11 +480,12 @@ impl App {
 
             let slot = &mut self.review_doc.files[msg.file_idx];
             slot.load = match msg.result {
-                Ok((sections, hunks, index)) => DiffLoadState::Loaded {
+                Ok(Some((sections, hunks, index))) => DiffLoadState::Loaded {
                     sections,
                     hunks,
                     index,
                 },
+                Ok(None) => DiffLoadState::Binary,
                 Err(e) => DiffLoadState::Error(e),
             };
             self.review_doc.index_dirty = true;
@@ -523,6 +524,7 @@ impl App {
             && n > repository::DIFF_LINE_THRESHOLD
         {
             self.diff.state.too_large = Some(n);
+            self.diff.state.is_binary = false;
             self.diff.state.line_index = LineIndex::new(&[]);
             self.diff.current_key = Some(cache_key.clone());
 
@@ -544,16 +546,27 @@ impl App {
             if matches!(
                 self.review_doc.files[slot_idx].load,
                 DiffLoadState::NotLoaded
-            ) && let Ok(sections) = repository::file_diff(&self.repo, &path, status)
-            {
-                let hunks: Vec<DiffHunk> = sections.iter().flat_map(|s| s.hunks.clone()).collect();
-                let index = LineIndex::new(&sections);
-                self.review_doc.files[slot_idx].load = DiffLoadState::Loaded {
-                    sections,
-                    hunks,
-                    index,
-                };
+            ) {
+                match repository::file_diff(&self.repo, &path, status) {
+                    Ok(Some(sections)) => {
+                        let hunks: Vec<DiffHunk> =
+                            sections.iter().flat_map(|s| s.hunks.clone()).collect();
+                        let index = LineIndex::new(&sections);
+                        self.review_doc.files[slot_idx].load = DiffLoadState::Loaded {
+                            sections,
+                            hunks,
+                            index,
+                        };
+                    }
+                    Ok(None) => {
+                        self.review_doc.files[slot_idx].load = DiffLoadState::Binary;
+                    }
+                    Err(_) => {}
+                }
             }
+
+            self.diff.state.is_binary =
+                matches!(self.review_doc.files[slot_idx].load, DiffLoadState::Binary);
 
             let (sections, hunks): (&[DiffSection], &[DiffHunk]) =
                 match &self.review_doc.files[slot_idx].load {
@@ -689,11 +702,13 @@ impl App {
                     };
 
                     let result = repository::file_diff(&repo, &path, status)
-                        .map(|sections| {
-                            let hunks: Vec<DiffHunk> =
-                                sections.iter().flat_map(|s| s.hunks.clone()).collect();
-                            let index = LineIndex::new(&sections);
-                            (sections, hunks, index)
+                        .map(|maybe_sections| {
+                            maybe_sections.map(|sections| {
+                                let hunks: Vec<DiffHunk> =
+                                    sections.iter().flat_map(|s| s.hunks.clone()).collect();
+                                let index = LineIndex::new(&sections);
+                                (sections, hunks, index)
+                            })
                         })
                         .map_err(|e| e.to_string());
 

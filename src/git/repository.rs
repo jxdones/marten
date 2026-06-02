@@ -212,38 +212,69 @@ pub fn file_diff_line_count(repo: &Repository, path: &str, status: FileStatus) -
     Ok(count)
 }
 
-pub fn file_diff(repo: &Repository, path: &str, status: FileStatus) -> GitResult<Vec<DiffSection>> {
+pub fn file_diff(
+    repo: &Repository,
+    path: &str,
+    status: FileStatus,
+) -> GitResult<Option<Vec<DiffSection>>> {
     match status {
-        FileStatus::Staged => Ok(vec![DiffSection {
-            kind: DiffSectionKind::Staged,
-            hunks: staged_file_diff(repo, path)?,
-        }]),
-        FileStatus::Partial => Ok(vec![
-            DiffSection {
+        FileStatus::Staged => {
+            let Some(hunks) = staged_file_diff(repo, path)? else {
+                return Ok(None);
+            };
+            Ok(Some(vec![DiffSection {
                 kind: DiffSectionKind::Staged,
-                hunks: staged_file_diff(repo, path)?,
-            },
-            DiffSection {
+                hunks,
+            }]))
+        }
+        FileStatus::Partial => {
+            let Some(staged) = staged_file_diff(repo, path)? else {
+                return Ok(None);
+            };
+            let Some(unstaged) = unstaged_file_diff(repo, path)? else {
+                return Ok(None);
+            };
+            Ok(Some(vec![
+                DiffSection {
+                    kind: DiffSectionKind::Staged,
+                    hunks: staged,
+                },
+                DiffSection {
+                    kind: DiffSectionKind::Unstaged,
+                    hunks: unstaged,
+                },
+            ]))
+        }
+        FileStatus::Unstaged => {
+            let Some(hunks) = unstaged_file_diff(repo, path)? else {
+                return Ok(None);
+            };
+            Ok(Some(vec![DiffSection {
                 kind: DiffSectionKind::Unstaged,
-                hunks: unstaged_file_diff(repo, path)?,
-            },
-        ]),
-        FileStatus::Unstaged => Ok(vec![DiffSection {
-            kind: DiffSectionKind::Unstaged,
-            hunks: unstaged_file_diff(repo, path)?,
-        }]),
-        FileStatus::Untracked => Ok(vec![DiffSection {
-            kind: DiffSectionKind::Unstaged,
-            hunks: untracked_file_diff(repo, path)?,
-        }]),
-        FileStatus::Conflicted => Ok(vec![]),
+                hunks,
+            }]))
+        }
+        FileStatus::Untracked => {
+            let Some(hunks) = untracked_file_diff(repo, path)? else {
+                return Ok(None);
+            };
+            Ok(Some(vec![DiffSection {
+                kind: DiffSectionKind::Unstaged,
+                hunks,
+            }]))
+        }
+        FileStatus::Conflicted => Ok(Some(vec![])),
     }
 }
 
-fn diff_hunks(diff: Diff<'_>) -> GitResult<Vec<DiffHunk>> {
+fn diff_hunks(diff: Diff<'_>) -> GitResult<Option<Vec<DiffHunk>>> {
     let Some(patch) = Patch::from_diff(&diff, 0)? else {
-        return Ok(vec![]);
+        return Ok(Some(vec![]));
     };
+
+    if patch.delta().flags().is_binary() {
+        return Ok(None);
+    }
 
     let mut hunks: Vec<DiffHunk> = Vec::new();
     for hunk_idx in 0..patch.num_hunks() {
@@ -275,10 +306,10 @@ fn diff_hunks(diff: Diff<'_>) -> GitResult<Vec<DiffHunk>> {
         });
     }
 
-    Ok(hunks)
+    Ok(Some(hunks))
 }
 
-fn staged_file_diff(repo: &Repository, path: &str) -> GitResult<Vec<DiffHunk>> {
+fn staged_file_diff(repo: &Repository, path: &str) -> GitResult<Option<Vec<DiffHunk>>> {
     let head = repo.head()?;
     let mut opts = DiffOptions::new();
     opts.pathspec(path);
@@ -291,7 +322,7 @@ fn staged_file_diff(repo: &Repository, path: &str) -> GitResult<Vec<DiffHunk>> {
     Ok(hunks)
 }
 
-fn unstaged_file_diff(repo: &Repository, path: &str) -> GitResult<Vec<DiffHunk>> {
+fn unstaged_file_diff(repo: &Repository, path: &str) -> GitResult<Option<Vec<DiffHunk>>> {
     let mut opts = DiffOptions::new();
     opts.pathspec(path);
 
@@ -300,8 +331,13 @@ fn unstaged_file_diff(repo: &Repository, path: &str) -> GitResult<Vec<DiffHunk>>
     Ok(hunks)
 }
 
-fn untracked_file_diff(repo: &Repository, path: &str) -> GitResult<Vec<DiffHunk>> {
-    let content = untracked_file_content(repo, path)?;
+fn untracked_file_diff(repo: &Repository, path: &str) -> GitResult<Option<Vec<DiffHunk>>> {
+    let file_path = repo.workdir().unwrap_or_else(|| Path::new(".")).join(path);
+    let bytes = fs::read(&file_path)?;
+    if bytes.contains(&0u8) {
+        return Ok(None);
+    }
+    let content = String::from_utf8_lossy(&bytes).into_owned();
     let lines = content
         .lines()
         .enumerate()
@@ -314,12 +350,12 @@ fn untracked_file_diff(repo: &Repository, path: &str) -> GitResult<Vec<DiffHunk>
         .collect::<Vec<_>>();
 
     let insertions = lines.len();
-    Ok(vec![DiffHunk {
+    Ok(Some(vec![DiffHunk {
         header: format!("@@ -0,0 +1,{insertions} @@ {path}"),
         lines,
         insertions,
         deletions: 0,
-    }])
+    }]))
 }
 
 fn untracked_line_count(repo: &Repository, path: &str) -> GitResult<usize> {
@@ -718,7 +754,9 @@ mod tests {
             "base\nstaged\nworking\n",
         );
 
-        let sections = file_diff(&repo, "partial.txt", FileStatus::Partial).unwrap();
+        let sections = file_diff(&repo, "partial.txt", FileStatus::Partial)
+            .unwrap()
+            .expect("not binary");
         assert_eq!(sections.len(), 2);
         assert_eq!(sections[0].kind, DiffSectionKind::Staged);
         assert_eq!(sections[1].kind, DiffSectionKind::Unstaged);
@@ -732,7 +770,9 @@ mod tests {
         write_and_commit(&repo, "README.md", "hello\n", "init");
         write_file(&repo, "new.txt", "alpha\nbeta\n");
 
-        let sections = file_diff(&repo, "new.txt", FileStatus::Untracked).unwrap();
+        let sections = file_diff(&repo, "new.txt", FileStatus::Untracked)
+            .unwrap()
+            .expect("not binary");
         assert_eq!(sections.len(), 1);
         assert_eq!(sections[0].kind, DiffSectionKind::Unstaged);
 

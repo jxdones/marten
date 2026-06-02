@@ -23,6 +23,7 @@ pub enum DiffLoadState {
         hunks: Vec<DiffHunk>,
         index: LineIndex,
     },
+    Binary,
     TooLarge {
         lines: usize,
     },
@@ -74,6 +75,9 @@ pub enum RenderedRow {
         line_idx: usize,
     },
     Loading,
+    Binary {
+        file_idx: usize,
+    },
     TooLarge {
         lines: usize,
     },
@@ -82,11 +86,13 @@ pub enum RenderedRow {
     },
 }
 
+type DiffPayload = (Vec<DiffSection>, Vec<DiffHunk>, LineIndex);
+
 #[derive(Debug)]
 pub struct WorkerResult {
     pub generation: u64,
     pub file_idx: usize,
-    pub result: Result<(Vec<DiffSection>, Vec<DiffHunk>, LineIndex), String>,
+    pub result: Result<Option<DiffPayload>, String>,
 }
 
 impl ReviewIndex {
@@ -106,6 +112,7 @@ impl ReviewIndex {
 impl FileSlot {
     pub fn row_count(&self) -> usize {
         match &self.load {
+            DiffLoadState::Binary => HEADER_ROW,
             DiffLoadState::NotLoaded
             | DiffLoadState::Loading
             | DiffLoadState::Error(_)
@@ -131,7 +138,11 @@ impl ReviewDoc {
         let (file_idx, local_row) = self.index.file_at_row(global_row)?;
 
         if local_row == 0 {
-            Some(RenderedRow::FileHeader { file_idx })
+            if matches!(self.files[file_idx].load, DiffLoadState::Binary) {
+                Some(RenderedRow::Binary { file_idx })
+            } else {
+                Some(RenderedRow::FileHeader { file_idx })
+            }
         } else {
             let diff_row = local_row - 1;
             match &self.files[file_idx].load {
@@ -150,6 +161,13 @@ impl ReviewDoc {
                     }),
                 },
                 DiffLoadState::Loading | DiffLoadState::NotLoaded => Some(RenderedRow::Loading),
+                DiffLoadState::Binary => {
+                    debug_assert!(
+                        false,
+                        "binary slot has row_count=1, local_row>0 unreachable"
+                    );
+                    None
+                }
                 DiffLoadState::TooLarge { lines, .. } => {
                     Some(RenderedRow::TooLarge { lines: *lines })
                 }
