@@ -6,6 +6,7 @@
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)
+[![Built With Ratatui](https://ratatui.rs/built-with-ratatui/badge.svg)](https://ratatui.rs/)
 ![Status](https://img.shields.io/badge/status-early%20development-yellow.svg)
 </div>
 
@@ -94,12 +95,6 @@ For UI testing with local untracked files:
 make dev-files
 make clean-dev-files
 ```
-
-## Built with
-
-- [ratatui](https://github.com/ratatui/ratatui) — terminal UI framework
-- [git2](https://github.com/rust-lang/git2-rs) — libgit2 bindings for Rust
-- [crossterm](https://github.com/crossterm-rs/crossterm) — cross-platform terminal input/output
 
 ## License
 
