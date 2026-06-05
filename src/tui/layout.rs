@@ -18,9 +18,21 @@ pub fn home(area: Rect) -> Home {
         ])
         .split(area);
 
+    let sidebar_width = if area.width <= 120 {
+        Constraint::Percentage(0)
+    } else {
+        Constraint::Percentage(20)
+    };
+
+    let diff_width = if area.width <= 120 {
+        Constraint::Percentage(100)
+    } else {
+        Constraint::Percentage(80)
+    };
+
     let cols = Layout::default()
         .direction(Direction::Horizontal)
-        .constraints([Constraint::Percentage(20), Constraint::Percentage(80)])
+        .constraints([sidebar_width, diff_width])
         .split(rows[1]);
 
     Home {
