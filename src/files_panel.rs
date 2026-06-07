@@ -7,9 +7,9 @@ use crate::state::{FileKey, Files, Focus, TreeRow};
 use crate::store::DiffStore;
 
 pub struct FilesPanel {
-    pub(crate) state: Files,
-    pub(crate) cached_rows: Vec<TreeRow>,
-    pub(crate) collapsed: HashSet<String>,
+    state: Files,
+    cached_rows: Vec<TreeRow>,
+    collapsed: HashSet<String>,
     dirty: bool,
 }
 
@@ -63,6 +63,22 @@ impl FilesPanel {
 
     pub fn mark_dirty(&mut self) {
         self.dirty = true;
+    }
+
+    pub const fn state(&self) -> &Files {
+        &self.state
+    }
+
+    pub fn set_tree_row_count(&mut self, len: usize) {
+        self.state.tree_row_count = len;
+    }
+
+    pub fn cached_rows(&self) -> &[TreeRow] {
+        &self.cached_rows
+    }
+
+    pub const fn collapsed(&self) -> &HashSet<String> {
+        &self.collapsed
     }
 
     pub fn ensure_rows(&mut self, store: &DiffStore) {
@@ -228,5 +244,11 @@ impl FilesPanel {
                 .min(self.cached_rows.len() - 1),
         );
         self.selected_file_idx()
+    }
+
+    #[cfg(test)]
+    pub fn collapse_dir_for_test(&mut self, path: impl Into<String>) {
+        self.collapsed.insert(path.into());
+        self.mark_dirty();
     }
 }

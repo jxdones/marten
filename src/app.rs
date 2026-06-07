@@ -70,7 +70,7 @@ impl App {
     }
 
     pub const fn files_state(&self) -> &Files {
-        &self.files.state
+        self.files.state()
     }
 
     pub const fn theme(&self) -> Theme {
@@ -94,7 +94,7 @@ impl App {
     }
 
     pub const fn diff_state(&self) -> &Diff {
-        &self.diff.state
+        self.diff.state()
     }
 
     pub fn diff_hunks(&self) -> Option<&Vec<DiffHunk>> {
@@ -102,11 +102,11 @@ impl App {
     }
 
     pub const fn collapsed_files(&self) -> &HashSet<String> {
-        &self.files.collapsed
+        self.files.collapsed()
     }
 
     pub fn set_tree_row_count(&mut self, len: usize) {
-        self.files.state.tree_row_count = len;
+        self.files.set_tree_row_count(len);
     }
 
     pub fn set_diff_viewport_height(&mut self, height: usize) {
@@ -118,7 +118,7 @@ impl App {
     }
 
     pub fn cached_rows(&self) -> &[TreeRow] {
-        &self.files.cached_rows
+        self.files.cached_rows()
     }
 
     pub fn review_doc(&self) -> &ReviewDoc {
@@ -126,7 +126,7 @@ impl App {
     }
 
     pub fn review_state(&self) -> &ReviewState {
-        &self.diff.review
+        self.diff.review()
     }
 
     pub fn handle_event(&mut self, event: Event) -> Action {
@@ -225,7 +225,7 @@ impl App {
             KeyCode::Char('r') => Action::Refresh,
             KeyCode::Char('g') if self.focus == Focus::Files => Action::GoToFirst,
             KeyCode::Char('G') if self.focus == Focus::Files => Action::GoToLast,
-            KeyCode::Enter if self.focus == Focus::Diff && self.diff.state.too_large.is_some() => {
+            KeyCode::Enter if self.focus == Focus::Diff && self.diff.is_too_large() => {
                 Action::ForceLoadDiff
             }
             KeyCode::Enter | KeyCode::Char(' ') if self.focus == Focus::Files => {
@@ -271,32 +271,32 @@ mod tests {
         assert_eq!(app.store.review_doc.files[0].entry.path, "src/main.rs");
         assert!(
             app.files
-                .cached_rows
+                .cached_rows()
                 .iter()
                 .any(|r| matches!(r, TreeRow::File(..)))
         );
 
-        app.files.collapsed.insert("src".to_string());
-        app.files.mark_dirty();
+        app.files.collapse_dir_for_test("src");
         app.ensure_rows();
         assert!(
             !app.files
-                .cached_rows
+                .cached_rows()
                 .iter()
                 .any(|r| matches!(r, TreeRow::File(..)))
         );
-        assert!(app.files.collapsed.contains("src"));
+        assert!(app.files.collapsed().contains("src"));
 
-        app.diff.review.continuous_scroll = app.store.review_doc.index.file_starts[0];
-        let scroll = app.diff.review.continuous_scroll;
+        app.diff
+            .set_continuous_scroll(app.store.review_doc.index.file_starts[0]);
+        let scroll = app.diff.continuous_scroll();
         app.files.match_selected_file(&app.store, scroll);
-        assert!(!app.files.collapsed.contains("src"));
+        assert!(!app.files.collapsed().contains("src"));
         assert!(
             app.files
-                .cached_rows
+                .cached_rows()
                 .iter()
                 .any(|r| matches!(r, TreeRow::File(..)))
         );
-        assert_eq!(app.files.state.selected, Some(1));
+        assert_eq!(app.files.state().selected, Some(1));
     }
 }

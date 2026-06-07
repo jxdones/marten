@@ -11,9 +11,9 @@ use crate::store::DiffStore;
 const SCROLL_STEP: usize = 1;
 
 pub struct DiffPanel {
-    pub(crate) state: Diff,
+    state: Diff,
     current_key: Option<FileKey>,
-    pub(crate) review: ReviewState,
+    review: ReviewState,
 }
 
 impl DiffPanel {
@@ -99,6 +99,18 @@ impl DiffPanel {
         self.reset();
         store.spawn_workers();
         self.refresh(files, store, repo);
+    }
+
+    pub const fn state(&self) -> &Diff {
+        &self.state
+    }
+
+    pub const fn review(&self) -> &ReviewState {
+        &self.review
+    }
+
+    pub const fn is_too_large(&self) -> bool {
+        self.state.too_large.is_some()
     }
 
     pub fn refresh(&mut self, files: &mut FilesPanel, store: &mut DiffStore, repo: &Repository) {
@@ -312,6 +324,16 @@ impl DiffPanel {
             .index
             .file_at_row(self.review.continuous_scroll)
             .map(|(file_idx, _)| file_idx)
+    }
+
+    #[cfg(test)]
+    pub fn continuous_scroll(&self) -> usize {
+        self.review.continuous_scroll
+    }
+
+    #[cfg(test)]
+    pub fn set_continuous_scroll(&mut self, scroll: usize) {
+        self.review.continuous_scroll = scroll;
     }
 
     fn sync_files_to_scroll(&mut self, files: &mut FilesPanel, store: &DiffStore) {
