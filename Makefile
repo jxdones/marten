@@ -1,8 +1,9 @@
 .DEFAULT_GOAL := help
 
 APP := marten
+VERSION := 0.1.0
 
-.PHONY: help build run run-release play dev-files clean-dev-files check test fmt lint lint-strict audit ci ci-full release install clean
+.PHONY: help build run run-release play dev-files clean-dev-files check test fmt lint lint-strict audit ci ci-full release install clean tag
 
 help:
 	@printf "\n"
@@ -24,6 +25,7 @@ help:
 	@printf "  %-12s %s\n" "release" "Build optimized release binary."
 	@printf "  %-12s %s\n" "install" "Install binary from this path."
 	@printf "  %-12s %s\n" "clean" "Remove Cargo build artifacts."
+	@printf "  %-12s %s\n" "tag" "Create and push git tag v\$(VERSION)."
 	@printf "\n"
 
 build:
@@ -92,3 +94,7 @@ install:
 
 clean:
 	cargo clean
+
+tag:
+	git tag v$(VERSION)
+	git push origin v$(VERSION)
