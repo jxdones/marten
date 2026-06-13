@@ -3,7 +3,10 @@ use std::{io, time::Duration};
 use crossterm::{
     event::{self, Event as CrosstermEvent, KeyEventKind},
     execute,
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+    terminal::{
+        BeginSynchronizedUpdate, EndSynchronizedUpdate, EnterAlternateScreen, LeaveAlternateScreen,
+        disable_raw_mode, enable_raw_mode,
+    },
 };
 
 use ratatui::{DefaultTerminal, TerminalOptions, Viewport, prelude::CrosstermBackend};
@@ -38,33 +41,48 @@ fn run_loop(terminal: &mut DefaultTerminal, app: &mut App) -> io::Result<()> {
         }
 
         if needs_draw {
-            terminal.draw(|frame| tui::draw(frame, app))?;
+            draw(terminal, app)?;
             needs_draw = false;
         }
 
         if event::poll(Duration::from_millis(50))? {
-            let event = read_event()?;
-            let action = app.handle_event(event);
-            app.update(action);
-            needs_draw = true;
+            match event::read()? {
+                CrosstermEvent::Resize(w, h) => {
+                    // Drain queued resize events and keep only the last size,
+                    // so a resize-drag becomes one redraw instead of N.
+                    let mut last = (w, h);
+                    while event::poll(Duration::from_secs(0))? {
+                        if let CrosstermEvent::Resize(w, h) = event::read()? {
+                            last = (w, h);
+                        }
+                    }
+                    let action = app.handle_event(Event::Resize(last.0, last.1));
+                    app.update(action);
+                    // Paint immediately so there's no gap between the terminal
+                    // reflowing and marten repainting.
+                    draw(terminal, app)?;
+                    needs_draw = false;
+                }
+                CrosstermEvent::Key(key) if key.kind == KeyEventKind::Press => {
+                    let action = app.handle_event(Event::Key(key));
+                    app.update(action);
+                    needs_draw = true;
+                }
+                _ => {}
+            }
         }
     }
 
     Ok(())
 }
 
-fn read_event() -> io::Result<Event> {
-    loop {
-        match event::read()? {
-            CrosstermEvent::Key(key) if key.kind == KeyEventKind::Press => {
-                return Ok(Event::Key(key));
-            }
-            CrosstermEvent::Resize(width, height) => {
-                return Ok(Event::Resize(width, height));
-            }
-            _ => {}
-        }
-    }
+fn draw(terminal: &mut DefaultTerminal, app: &mut App) -> io::Result<()> {
+    // use synchronization mode to avoid the tearing effect when resizing
+    execute!(io::stdout(), BeginSynchronizedUpdate)?;
+    let res = terminal.draw(|frame| tui::draw(frame, app));
+    execute!(io::stdout(), EndSynchronizedUpdate)?;
+    res?;
+    Ok(())
 }
 
 fn restore_terminal(mut terminal: DefaultTerminal) -> io::Result<()> {
