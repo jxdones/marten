@@ -1,7 +1,10 @@
-use crate::app::App;
+use clap::Parser;
+
+use crate::{app::App, cli::Cli};
 
 mod action;
 mod app;
+mod cli;
 mod diff_panel;
 mod event;
 mod files_panel;
@@ -14,6 +17,7 @@ mod terminal;
 mod tui;
 
 fn main() -> std::io::Result<()> {
-    let mut app = App::new();
+    let cli = Cli::parse();
+    let mut app = App::new(cli.command);
     terminal::run(&mut app)
 }

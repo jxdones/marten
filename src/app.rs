@@ -5,6 +5,7 @@ use crossterm::{execute, terminal::SetTitle};
 use git2::Repository;
 
 use crate::action::Action;
+use crate::cli::Command;
 use crate::diff_panel::DiffPanel;
 use crate::event::Event;
 use crate::files_panel::FilesPanel;
@@ -20,6 +21,8 @@ pub struct App {
     repo: Repository,
     repository_status: Option<repository::RepositoryStatus>,
     should_quit: bool,
+    #[allow(dead_code)]
+    command: Option<Command>,
 
     files: FilesPanel,
     diff: DiffPanel,
@@ -27,13 +30,13 @@ pub struct App {
 }
 
 impl App {
-    pub fn new() -> Self {
+    pub fn new(command: Option<Command>) -> Self {
         execute!(std::io::stdout(), SetTitle("marten")).ok();
         let repo = Repository::discover(".").expect("not a git repo");
-        Self::init(repo)
+        Self::init(repo, command)
     }
 
-    fn init(repo: Repository) -> Self {
+    fn init(repo: Repository, command: Option<Command>) -> Self {
         let repository_status = repository::status(&repo).ok();
         let entries = repository::files(&repo).ok().unwrap_or_default();
 
@@ -65,6 +68,7 @@ impl App {
             theme: theme::DEFAULT,
             repo,
             should_quit: false,
+            command,
             repository_status,
         }
     }
@@ -280,7 +284,7 @@ mod tests {
         fs::create_dir_all(file_path.parent().unwrap()).unwrap();
         fs::write(&file_path, "fn main() {}\n").unwrap();
 
-        let mut app = App::init(repo);
+        let mut app = App::init(repo, None);
         assert_eq!(app.store.review_doc.files.len(), 1);
         assert_eq!(app.store.review_doc.files[0].entry.path, "src/main.rs");
         assert!(
