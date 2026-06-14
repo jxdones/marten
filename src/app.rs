@@ -48,9 +48,17 @@ impl App {
         let mut diff = DiffPanel::new();
         diff.refresh(&mut files, &mut store, &repo);
 
+        let (width, _) = crossterm::terminal::size().unwrap_or((0, 0));
+
+        let focus = if width <= 120 {
+            Focus::Diff
+        } else {
+            Focus::Files
+        };
+
         Self {
             screen: Screen::Home,
-            focus: Focus::Files,
+            focus,
             files,
             diff,
             store,
@@ -132,7 +140,13 @@ impl App {
     pub fn handle_event(&mut self, event: Event) -> Action {
         match event {
             Event::Key(key) => self.handle_key(key),
-            Event::Resize(..) => Action::Noop,
+            Event::Resize(width, _) => {
+                if width <= 120 && self.focus != Focus::Diff {
+                    Action::FocusPanel(Focus::Diff)
+                } else {
+                    Action::Noop
+                }
+            }
         }
     }
 
