@@ -29,5 +29,5 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
-    Show { commit: String },
+    Show { oid: String },
 }

@@ -97,7 +97,7 @@ impl DiffPanel {
         let restored_file_idx = files.restore_selection(store, selected_key);
         self.sync_continuous_scroll_to_file(restored_file_idx, store);
         self.reset();
-        store.spawn_workers();
+        store.spawn_workers(None);
         self.refresh(files, store, repo);
     }
 

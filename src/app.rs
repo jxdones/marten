@@ -21,9 +21,6 @@ pub struct App {
     repo: Repository,
     repository_status: Option<repository::RepositoryStatus>,
     should_quit: bool,
-    #[allow(dead_code)]
-    command: Option<Command>,
-
     files: FilesPanel,
     diff: DiffPanel,
     store: DiffStore,
@@ -38,11 +35,20 @@ impl App {
 
     fn init(repo: Repository, command: Option<Command>) -> Self {
         let repository_status = repository::status(&repo).ok();
-        let entries = repository::files(&repo).ok().unwrap_or_default();
+        let entries = match &command {
+            Some(Command::Show { oid }) => repository::files_from_commit(&repo, oid)
+                .ok()
+                .unwrap_or_default(),
+            _ => repository::files(&repo).ok().unwrap_or_default(),
+        };
 
         let mut store = DiffStore::new(entries);
         store.review_doc.rebuild_index();
-        store.spawn_workers();
+        let commit_hash = match &command {
+            Some(Command::Show { oid }) => Some(oid.clone()),
+            _ => None,
+        };
+        store.spawn_workers(commit_hash);
 
         let mut files = FilesPanel::new();
         files.ensure_rows(&store);
@@ -68,7 +74,6 @@ impl App {
             theme: theme::DEFAULT,
             repo,
             should_quit: false,
-            command,
             repository_status,
         }
     }

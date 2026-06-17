@@ -55,7 +55,7 @@ impl DiffStore {
         changed
     }
 
-    pub fn spawn_workers(&self) {
+    pub fn spawn_workers(&self, commit_hash: Option<String>) {
         let generation = self.review_doc.generation;
         let jobs: Vec<_> = self
             .review_doc
@@ -72,6 +72,7 @@ impl DiffStore {
         for _ in 0..worker_count {
             let tx = self.worker_tx.clone();
             let queue = Arc::clone(&queue);
+            let commit_hash = commit_hash.clone();
             std::thread::spawn(move || {
                 // Repository is !Send; open a fresh handle per worker thread.
                 let Ok(repo) = Repository::discover(".") else {
@@ -82,16 +83,20 @@ impl DiffStore {
                     let Some((file_idx, path, status)) = job else {
                         break;
                     };
-                    let result = repository::file_diff(&repo, &path, status)
-                        .map(|maybe_sections| {
-                            maybe_sections.map(|sections| {
-                                let hunks: Vec<DiffHunk> =
-                                    sections.iter().flat_map(|s| s.hunks.clone()).collect();
-                                let index = LineIndex::new(&sections);
-                                (sections, hunks, index)
-                            })
+                    let result = if let Some(ref hash) = commit_hash {
+                        repository::files_diff_from_commit(&repo, hash, &path)
+                    } else {
+                        repository::file_diff(&repo, &path, status)
+                    }
+                    .map(|maybe_sections| {
+                        maybe_sections.map(|sections| {
+                            let hunks: Vec<DiffHunk> =
+                                sections.iter().flat_map(|s| s.hunks.clone()).collect();
+                            let index = LineIndex::new(&sections);
+                            (sections, hunks, index)
                         })
-                        .map_err(|e| e.to_string());
+                    })
+                    .map_err(|e| e.to_string());
                     if tx
                         .send(WorkerResult {
                             generation,

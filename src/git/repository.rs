@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fs, path::Path};
 
 use crate::git::GitResult;
-use git2::{self, Diff, DiffOptions, Patch, Reference, Repository, Status, StatusOptions};
+use git2::{self, Diff, DiffOptions, Oid, Patch, Reference, Repository, Status, StatusOptions};
 
 const DEFAULT_HEAD: &str = "HEAD";
 const SHORT_COMMIT_LEN: usize = 7;
@@ -177,6 +177,41 @@ pub fn files(repo: &Repository) -> GitResult<Vec<FileEntry>> {
     Ok(entries)
 }
 
+pub fn files_from_commit(repo: &Repository, commit_hash: &str) -> GitResult<Vec<FileEntry>> {
+    let oid = Oid::from_str(commit_hash)?;
+    let commit = repo.find_commit(oid)?;
+
+    let old_tree = if commit.parent_count() > 0 {
+        Some(commit.parent(0)?.tree()?)
+    } else {
+        None
+    };
+    let current_tree = commit.tree()?;
+    let commit_diff = repo.diff_tree_to_tree(old_tree.as_ref(), Some(&current_tree), None)?;
+    let staged_map: HashMap<String, (usize, usize)> = diff_stats(&commit_diff)?;
+    let mut entries = Vec::new();
+
+    for delta in commit_diff.deltas() {
+        let path = delta
+            .new_file()
+            .path()
+            .or_else(|| delta.old_file().path())
+            .and_then(|p| p.to_str())
+            .unwrap_or_default();
+
+        let (insertions, deletions) = staged_map.get(path).copied().unwrap_or((0, 0));
+
+        entries.push(FileEntry {
+            path: path.to_string(),
+            status: FileStatus::Staged,
+            insertions,
+            deletions,
+        });
+    }
+
+    Ok(entries)
+}
+
 pub fn file_diff_line_count(repo: &Repository, path: &str, status: FileStatus) -> GitResult<usize> {
     if status == FileStatus::Untracked {
         return Ok(untracked_file_content(repo, path)?.lines().count());
@@ -265,6 +300,36 @@ pub fn file_diff(
         }
         FileStatus::Conflicted => Ok(Some(vec![])),
     }
+}
+
+pub fn files_diff_from_commit(
+    repo: &Repository,
+    commit_hash: &str,
+    path: &str,
+) -> GitResult<Option<Vec<DiffSection>>> {
+    let oid = Oid::from_str(commit_hash)?;
+    let commit = repo.find_commit(oid)?;
+
+    let old_tree = if commit.parent_count() > 0 {
+        Some(commit.parent(0)?.tree()?)
+    } else {
+        None
+    };
+    let current_tree = commit.tree()?;
+
+    let mut opts = DiffOptions::new();
+    opts.pathspec(path);
+    let commit_diff =
+        repo.diff_tree_to_tree(old_tree.as_ref(), Some(&current_tree), Some(&mut opts))?;
+
+    let Some(hunks) = diff_hunks(commit_diff)? else {
+        return Ok(None);
+    };
+
+    Ok(Some(vec![DiffSection {
+        kind: DiffSectionKind::Staged,
+        hunks,
+    }]))
 }
 
 fn diff_hunks(diff: Diff<'_>) -> GitResult<Option<Vec<DiffHunk>>> {
