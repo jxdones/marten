@@ -85,7 +85,7 @@ impl FilesPanel {
         if !self.dirty {
             return;
         }
-        self.cached_rows = tree_rows(&store.review_doc.files, &self.collapsed);
+        self.cached_rows = tree_rows(&store.continuous_diff.files, &self.collapsed);
         self.state.tree_row_count = self.cached_rows.len();
         self.dirty = false;
     }
@@ -146,7 +146,7 @@ impl FilesPanel {
         let idx = self.state.selected?;
         if let TreeRow::File(entry_idx, _) = self.cached_rows.get(idx)? {
             return store
-                .review_doc
+                .continuous_diff
                 .files
                 .get(*entry_idx)
                 .map(|slot| &slot.entry);
@@ -179,7 +179,7 @@ impl FilesPanel {
     }
 
     pub fn match_selected_file(&mut self, store: &DiffStore, continuous_scroll: usize) {
-        let Some((file_idx, _)) = store.review_doc.index.file_at_row(continuous_scroll) else {
+        let Some((file_idx, _)) = store.continuous_diff.index.file_at_row(continuous_scroll) else {
             return;
         };
 
@@ -194,7 +194,7 @@ impl FilesPanel {
             return;
         }
 
-        let path = &store.review_doc.files[file_idx].entry.path;
+        let path = &store.continuous_diff.files[file_idx].entry.path;
         let to_expand: Vec<String> = self
             .collapsed
             .iter()
@@ -228,7 +228,7 @@ impl FilesPanel {
         }
 
         if let Some(key) = selected_key
-            && let Some(&file_idx) = store.review_doc.by_key.get(&key)
+            && let Some(&file_idx) = store.continuous_diff.by_key.get(&key)
             && let Some(row_idx) = self.cached_rows.iter().position(
                 |row| matches!(row, TreeRow::File(entry_idx, _) if *entry_idx == file_idx),
             )

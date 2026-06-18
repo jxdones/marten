@@ -12,7 +12,7 @@ pub use files::Files;
 pub use focus::Focus;
 pub use line_index::LineIndex;
 pub use review::{
-    DiffLoadState, FileKey, FileSlot, ReviewDoc, ReviewIndex, ReviewState, WorkerResult,
+    ContinuousDiff, DiffLoadState, FileKey, FileSlot, ReviewIndex, ReviewState, WorkerResult,
 };
 pub use screen::Screen;
 pub use tree::TreeRow;

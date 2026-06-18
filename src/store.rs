@@ -5,11 +5,11 @@ use git2::Repository;
 
 use crate::git::repository::{self, DiffHunk, FileEntry};
 use crate::state::{
-    DiffLoadState, FileKey, FileSlot, LineIndex, ReviewDoc, ReviewIndex, WorkerResult,
+    ContinuousDiff, DiffLoadState, FileKey, FileSlot, LineIndex, ReviewIndex, WorkerResult,
 };
 
 pub struct DiffStore {
-    pub review_doc: ReviewDoc,
+    pub continuous_diff: ContinuousDiff,
     worker_tx: std::sync::mpsc::Sender<WorkerResult>,
     worker_rx: std::sync::mpsc::Receiver<WorkerResult>,
 }
@@ -18,28 +18,28 @@ impl DiffStore {
     pub fn new(entries: Vec<FileEntry>) -> Self {
         let (tx, rx) = std::sync::mpsc::channel::<WorkerResult>();
         Self {
-            review_doc: build_review_doc(entries, 0),
+            continuous_diff: build_continuous_diff(entries, 0),
             worker_tx: tx,
             worker_rx: rx,
         }
     }
 
     pub fn reload(&mut self, entries: Vec<FileEntry>) {
-        let next_generation = self.review_doc.generation + 1;
+        let next_generation = self.continuous_diff.generation + 1;
         let (tx, rx) = std::sync::mpsc::channel::<WorkerResult>();
         self.worker_tx = tx;
         self.worker_rx = rx;
-        self.review_doc = build_review_doc(entries, next_generation);
-        self.review_doc.rebuild_index();
+        self.continuous_diff = build_continuous_diff(entries, next_generation);
+        self.continuous_diff.rebuild_index();
     }
 
     pub fn poll_workers(&mut self) -> bool {
         let mut changed = false;
         while let Ok(msg) = self.worker_rx.try_recv() {
-            if msg.generation != self.review_doc.generation {
+            if msg.generation != self.continuous_diff.generation {
                 continue;
             }
-            let slot = &mut self.review_doc.files[msg.file_idx];
+            let slot = &mut self.continuous_diff.files[msg.file_idx];
             slot.load = match msg.result {
                 Ok(Some((sections, hunks, index))) => DiffLoadState::Loaded {
                     sections,
@@ -49,16 +49,16 @@ impl DiffStore {
                 Ok(None) => DiffLoadState::Binary,
                 Err(e) => DiffLoadState::Error(e),
             };
-            self.review_doc.index_dirty = true;
+            self.continuous_diff.index_dirty = true;
             changed = true;
         }
         changed
     }
 
     pub fn spawn_workers(&self, commit_hash: Option<String>) {
-        let generation = self.review_doc.generation;
+        let generation = self.continuous_diff.generation;
         let jobs: Vec<_> = self
-            .review_doc
+            .continuous_diff
             .files
             .iter()
             .enumerate()
@@ -127,7 +127,7 @@ fn tree_sort_key(path: &str) -> Vec<(u8, &str)> {
         .collect()
 }
 
-fn build_review_doc(mut entries: Vec<FileEntry>, generation: u64) -> ReviewDoc {
+fn build_continuous_diff(mut entries: Vec<FileEntry>, generation: u64) -> ContinuousDiff {
     sort_entries(&mut entries);
 
     let mut file_slots = Vec::new();
@@ -145,7 +145,7 @@ fn build_review_doc(mut entries: Vec<FileEntry>, generation: u64) -> ReviewDoc {
         });
     }
 
-    ReviewDoc {
+    ContinuousDiff {
         files: file_slots,
         by_key,
         index: ReviewIndex::default(),

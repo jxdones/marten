@@ -1,7 +1,7 @@
 use std::{collections::HashMap, fs, path::Path};
 
 use crate::git::GitResult;
-use git2::{self, Diff, DiffOptions, Oid, Patch, Reference, Repository, Status, StatusOptions};
+use git2::{self, Diff, DiffOptions, Patch, Reference, Repository, Status, StatusOptions};
 
 const DEFAULT_HEAD: &str = "HEAD";
 const SHORT_COMMIT_LEN: usize = 7;
@@ -178,8 +178,7 @@ pub fn files(repo: &Repository) -> GitResult<Vec<FileEntry>> {
 }
 
 pub fn files_from_commit(repo: &Repository, commit_hash: &str) -> GitResult<Vec<FileEntry>> {
-    let oid = Oid::from_str(commit_hash)?;
-    let commit = repo.find_commit(oid)?;
+    let commit = repo.revparse_single(commit_hash)?.peel_to_commit()?;
 
     let old_tree = if commit.parent_count() > 0 {
         Some(commit.parent(0)?.tree()?)
@@ -307,8 +306,7 @@ pub fn files_diff_from_commit(
     commit_hash: &str,
     path: &str,
 ) -> GitResult<Option<Vec<DiffSection>>> {
-    let oid = Oid::from_str(commit_hash)?;
-    let commit = repo.find_commit(oid)?;
+    let commit = repo.revparse_single(commit_hash)?.peel_to_commit()?;
 
     let old_tree = if commit.parent_count() > 0 {
         Some(commit.parent(0)?.tree()?)

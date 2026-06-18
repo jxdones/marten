@@ -43,7 +43,7 @@ pub struct ReviewIndex {
 }
 
 #[derive(Debug)]
-pub struct ReviewDoc {
+pub struct ContinuousDiff {
     pub files: Vec<FileSlot>,
     pub by_key: HashMap<FileKey, usize>,
     pub index: ReviewIndex,
@@ -122,7 +122,7 @@ impl FileSlot {
     }
 }
 
-impl ReviewDoc {
+impl ContinuousDiff {
     pub fn rebuild_index(&mut self) {
         let mut file_starts = Vec::new();
         let mut offset = 0;

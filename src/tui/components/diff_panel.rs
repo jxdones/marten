@@ -11,7 +11,7 @@ use crate::git::repository::{
 use crate::inline_diff::{self, Range};
 use crate::state::line_index::IndexRow;
 use crate::state::review::RenderedRow;
-use crate::state::{DiffLoadState, LineIndex, ReviewDoc, ViewMode};
+use crate::state::{ContinuousDiff, DiffLoadState, LineIndex, ViewMode};
 use crate::syntax;
 use crate::tui::theme::Theme;
 
@@ -41,18 +41,18 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App, is_focused: bool) {
         ViewMode::SingleFile => render_single_file(app, theme, viewport_height, panel_width),
         ViewMode::Continuous => {
             let scroll = app.review_state().continuous_scroll;
-            let review_doc = app.review_doc();
-            let selected_hunk = match review_doc.lookup_row(scroll) {
+            let continuous_diff = app.continuous_diff();
+            let selected_hunk = match continuous_diff.lookup_row(scroll) {
                 Some(RenderedRow::HunkHeader { file_idx, hunk_idx }) => Some((file_idx, hunk_idx)),
                 Some(RenderedRow::DiffLine {
                     file_idx, hunk_idx, ..
                 }) => Some((file_idx, hunk_idx)),
                 _ => None,
             };
-            render_review_doc(
+            render_continuous_diff(
                 scroll,
                 viewport_height,
-                review_doc,
+                continuous_diff,
                 selected_hunk,
                 app.diff_state().show_line_numbers,
                 theme,
@@ -71,12 +71,12 @@ fn diff_title(app: &App) -> Line<'static> {
     let (file_path, selected_hunk, hunk_count, selected_line, line_count) =
         match app.review_state().mode {
             ViewMode::Continuous => {
-                let review_doc = app.review_doc();
+                let continuous_diff = app.continuous_diff();
                 let scroll = app.review_state().continuous_scroll;
-                match review_doc.lookup_row(scroll) {
+                match continuous_diff.lookup_row(scroll) {
                     Some(RenderedRow::HunkHeader { file_idx, hunk_idx }) => {
-                        let path = review_doc.files[file_idx].entry.path.clone();
-                        let (total, line_count) = match &review_doc.files[file_idx].load {
+                        let path = continuous_diff.files[file_idx].entry.path.clone();
+                        let (total, line_count) = match &continuous_diff.files[file_idx].load {
                             DiffLoadState::Loaded { hunks, .. } => {
                                 (hunks.len(), hunks[hunk_idx].lines.len())
                             }
@@ -89,8 +89,8 @@ fn diff_title(app: &App) -> Line<'static> {
                         hunk_idx,
                         line_idx,
                     }) => {
-                        let path = review_doc.files[file_idx].entry.path.clone();
-                        let (total, line_count) = match &review_doc.files[file_idx].load {
+                        let path = continuous_diff.files[file_idx].entry.path.clone();
+                        let (total, line_count) = match &continuous_diff.files[file_idx].load {
                             DiffLoadState::Loaded { hunks, .. } => {
                                 (hunks.len(), hunks[hunk_idx].lines.len())
                             }
@@ -100,7 +100,7 @@ fn diff_title(app: &App) -> Line<'static> {
                     }
                     Some(RenderedRow::FileHeader { file_idx })
                     | Some(RenderedRow::Binary { file_idx }) => {
-                        let path = review_doc.files[file_idx].entry.path.clone();
+                        let path = continuous_diff.files[file_idx].entry.path.clone();
                         (Some(path), 0, 0, 0, 0)
                     }
                     _ => (None, 0, 0, 0, 0),
@@ -598,10 +598,10 @@ fn text_width(text: &str) -> usize {
     text.chars().count()
 }
 
-fn render_review_doc(
+fn render_continuous_diff(
     scroll_offset: usize,
     viewport_height: usize,
-    review_doc: &ReviewDoc,
+    continuous_diff: &ContinuousDiff,
     selected_hunk: Option<(usize, usize)>,
     show_line_numbers: bool,
     theme: Theme,
@@ -610,9 +610,12 @@ fn render_review_doc(
     let row_width = panel_width.saturating_sub(2);
     let visible_rows = scroll_offset..scroll_offset + viewport_height;
 
-    let pinned_file_idx = review_doc.index.file_at_row(scroll_offset).map(|(i, _)| i);
+    let pinned_file_idx = continuous_diff
+        .index
+        .file_at_row(scroll_offset)
+        .map(|(i, _)| i);
     let mut lines: Vec<Line<'static>> = if let Some(file_idx) = pinned_file_idx {
-        let slot = &review_doc.files[file_idx];
+        let slot = &continuous_diff.files[file_idx];
         if matches!(slot.load, DiffLoadState::Binary) {
             vec![]
         } else {
@@ -624,12 +627,12 @@ fn render_review_doc(
 
     lines.extend(
         visible_rows
-            .flat_map(|global_row| match review_doc.lookup_row(global_row) {
+            .flat_map(|global_row| match continuous_diff.lookup_row(global_row) {
                 Some(RenderedRow::FileHeader { file_idx }) => {
                     if Some(file_idx) == pinned_file_idx {
                         vec![]
                     } else {
-                        let entry = &review_doc.files[file_idx].entry;
+                        let entry = &continuous_diff.files[file_idx].entry;
                         vec![render_file_header(row_width, entry, theme)]
                     }
                 }
@@ -637,7 +640,7 @@ fn render_review_doc(
                     vec![section_header_line(row_width, kind, theme)]
                 }
                 Some(RenderedRow::HunkHeader { file_idx, hunk_idx }) => {
-                    let state = &review_doc.files[file_idx].load;
+                    let state = &continuous_diff.files[file_idx].load;
                     match state {
                         DiffLoadState::Loaded { hunks, .. } => {
                             let hunk = &hunks[hunk_idx];
@@ -661,11 +664,11 @@ fn render_review_doc(
                     hunk_idx,
                     line_idx,
                 }) => {
-                    let state = &review_doc.files[file_idx].load;
+                    let state = &continuous_diff.files[file_idx].load;
                     match state {
                         DiffLoadState::Loaded { hunks, .. } => {
                             let line = &hunks[hunk_idx].lines[line_idx];
-                            let path = &review_doc.files[file_idx].entry.path;
+                            let path = &continuous_diff.files[file_idx].entry.path;
                             let is_selected = selected_hunk == Some((file_idx, hunk_idx));
                             let ranges = inline_ranges(&hunks[hunk_idx], line_idx, line.origin);
                             let diff = diff_line(
@@ -686,7 +689,7 @@ fn render_review_doc(
                     vec![Line::from(Span::styled(" Loading..", theme.muted()))]
                 }
                 Some(RenderedRow::Binary { file_idx }) => {
-                    let entry = &review_doc.files[file_idx].entry;
+                    let entry = &continuous_diff.files[file_idx].entry;
                     vec![render_binary_header(row_width, entry, theme)]
                 }
                 Some(RenderedRow::TooLarge { lines, .. }) => vec![Line::from(Span::styled(

@@ -135,44 +135,47 @@ impl DiffPanel {
             self.state.line_index = LineIndex::new(&[]);
             self.current_key = Some(cache_key.clone());
 
-            if let Some(&slot_idx) = store.review_doc.by_key.get(&cache_key)
+            if let Some(&slot_idx) = store.continuous_diff.by_key.get(&cache_key)
                 && !matches!(
-                    store.review_doc.files[slot_idx].load,
+                    store.continuous_diff.files[slot_idx].load,
                     DiffLoadState::Loaded { .. }
                 )
             {
-                store.review_doc.files[slot_idx].load = DiffLoadState::TooLarge { lines: n };
-                store.review_doc.index_dirty = true;
+                store.continuous_diff.files[slot_idx].load = DiffLoadState::TooLarge { lines: n };
+                store.continuous_diff.index_dirty = true;
             }
             return;
         }
 
         self.state.too_large = None;
 
-        if let Some(&slot_idx) = store.review_doc.by_key.get(&cache_key) {
+        if let Some(&slot_idx) = store.continuous_diff.by_key.get(&cache_key) {
             if matches!(
-                store.review_doc.files[slot_idx].load,
+                store.continuous_diff.files[slot_idx].load,
                 DiffLoadState::NotLoaded
             ) {
                 match repository::file_diff(repo, &path, status) {
                     Ok(Some(sections)) => {
                         let hunks = sections.iter().flat_map(|s| s.hunks.clone()).collect();
                         let index = LineIndex::new(&sections);
-                        store.review_doc.files[slot_idx].load = DiffLoadState::Loaded {
+                        store.continuous_diff.files[slot_idx].load = DiffLoadState::Loaded {
                             sections,
                             hunks,
                             index,
                         };
                     }
                     Ok(None) => {
-                        store.review_doc.files[slot_idx].load = DiffLoadState::Binary;
+                        store.continuous_diff.files[slot_idx].load = DiffLoadState::Binary;
                     }
                     Err(_) => {}
                 }
             }
 
-            let is_binary = matches!(store.review_doc.files[slot_idx].load, DiffLoadState::Binary);
-            let (new_line_index, hunk_count) = match &store.review_doc.files[slot_idx].load {
+            let is_binary = matches!(
+                store.continuous_diff.files[slot_idx].load,
+                DiffLoadState::Binary
+            );
+            let (new_line_index, hunk_count) = match &store.continuous_diff.files[slot_idx].load {
                 DiffLoadState::Loaded {
                     sections, hunks, ..
                 } => (LineIndex::new(sections), hunks.len()),
@@ -182,7 +185,7 @@ impl DiffPanel {
             self.state.is_binary = is_binary;
             self.state.line_index = new_line_index;
             self.state.select_first_hunk(hunk_count);
-            store.review_doc.index_dirty = true;
+            store.continuous_diff.index_dirty = true;
         }
 
         self.current_key = Some(cache_key);
@@ -204,8 +207,8 @@ impl DiffPanel {
 
     pub fn diff_hunks<'a>(&self, store: &'a DiffStore) -> Option<&'a Vec<DiffHunk>> {
         let key = self.current_key.as_ref()?;
-        let slot_idx = store.review_doc.by_key.get(key)?;
-        let slot = store.review_doc.files.get(*slot_idx)?;
+        let slot_idx = store.continuous_diff.by_key.get(key)?;
+        let slot = store.continuous_diff.files.get(*slot_idx)?;
         match &slot.load {
             DiffLoadState::Loaded { hunks, .. } => Some(hunks),
             _ => None,
@@ -274,10 +277,10 @@ impl DiffPanel {
             path: file.path.clone(),
             status: file.status,
         };
-        let Some(&file_idx) = store.review_doc.by_key.get(&key) else {
+        let Some(&file_idx) = store.continuous_diff.by_key.get(&key) else {
             return;
         };
-        self.review.continuous_scroll = store.review_doc.index.file_starts[file_idx];
+        self.review.continuous_scroll = store.continuous_diff.index.file_starts[file_idx];
     }
 
     pub fn sync_scroll_to_hunk(&mut self) {
@@ -307,7 +310,7 @@ impl DiffPanel {
 
     pub fn sync_continuous_scroll_to_file(&mut self, file_idx: Option<usize>, store: &DiffStore) {
         if let Some(file_idx) = file_idx
-            && let Some(&row) = store.review_doc.index.file_starts.get(file_idx)
+            && let Some(&row) = store.continuous_diff.index.file_starts.get(file_idx)
         {
             self.review.continuous_scroll = row;
             return;
@@ -320,7 +323,7 @@ impl DiffPanel {
 
     pub fn current_continuous_file_idx(&self, store: &DiffStore) -> Option<usize> {
         store
-            .review_doc
+            .continuous_diff
             .index
             .file_at_row(self.review.continuous_scroll)
             .map(|(file_idx, _)| file_idx)
@@ -358,13 +361,13 @@ impl DiffPanel {
 
     fn continuous_hunk_rows(&self, store: &DiffStore) -> Vec<usize> {
         store
-            .review_doc
+            .continuous_diff
             .files
             .iter()
             .enumerate()
             .flat_map(|(file_idx, slot)| {
                 let file_start = store
-                    .review_doc
+                    .continuous_diff
                     .index
                     .file_starts
                     .get(file_idx)
@@ -397,7 +400,7 @@ impl DiffPanel {
 
     fn max_continuous_scroll_offset(&self, store: &DiffStore) -> usize {
         store
-            .review_doc
+            .continuous_diff
             .index
             .total_rows
             .saturating_sub(self.state.viewport_height)

@@ -10,7 +10,7 @@ use crate::diff_panel::DiffPanel;
 use crate::event::Event;
 use crate::files_panel::FilesPanel;
 use crate::git::repository::{self, DiffHunk};
-use crate::state::{Diff, FileSlot, Files, Focus, ReviewDoc, ReviewState, Screen, TreeRow};
+use crate::state::{ContinuousDiff, Diff, FileSlot, Files, Focus, ReviewState, Screen, TreeRow};
 use crate::store::DiffStore;
 use crate::tui::theme::{self, Theme};
 
@@ -43,7 +43,7 @@ impl App {
         };
 
         let mut store = DiffStore::new(entries);
-        store.review_doc.rebuild_index();
+        store.continuous_diff.rebuild_index();
         let commit_hash = match &command {
             Some(Command::Show { oid }) => Some(oid.clone()),
             _ => None,
@@ -103,7 +103,7 @@ impl App {
     }
 
     pub fn files(&self) -> &[FileSlot] {
-        &self.store.review_doc.files
+        &self.store.continuous_diff.files
     }
 
     pub fn selected_file(&self) -> Option<&repository::FileEntry> {
@@ -138,8 +138,8 @@ impl App {
         self.files.cached_rows()
     }
 
-    pub fn review_doc(&self) -> &ReviewDoc {
-        &self.store.review_doc
+    pub fn continuous_diff(&self) -> &ContinuousDiff {
+        &self.store.continuous_diff
     }
 
     pub fn review_state(&self) -> &ReviewState {
@@ -198,25 +198,25 @@ impl App {
             }
         }
 
-        if store.review_doc.index_dirty {
+        if store.continuous_diff.index_dirty {
             let file_anchor = files
                 .selected_file_idx()
                 .or_else(|| diff.current_continuous_file_idx(store));
-            store.review_doc.rebuild_index();
-            store.review_doc.index_dirty = false;
+            store.continuous_diff.rebuild_index();
+            store.continuous_diff.index_dirty = false;
             diff.sync_continuous_scroll_to_file(file_anchor, store);
         }
     }
 
     pub fn poll_workers(&mut self) -> bool {
         let changed = self.store.poll_workers();
-        if self.store.review_doc.index_dirty {
+        if self.store.continuous_diff.index_dirty {
             let file_anchor = self
                 .files
                 .selected_file_idx()
                 .or_else(|| self.diff.current_continuous_file_idx(&self.store));
-            self.store.review_doc.rebuild_index();
-            self.store.review_doc.index_dirty = false;
+            self.store.continuous_diff.rebuild_index();
+            self.store.continuous_diff.index_dirty = false;
             self.diff
                 .sync_continuous_scroll_to_file(file_anchor, &self.store);
         }
@@ -290,8 +290,8 @@ mod tests {
         fs::write(&file_path, "fn main() {}\n").unwrap();
 
         let mut app = App::init(repo, None);
-        assert_eq!(app.store.review_doc.files.len(), 1);
-        assert_eq!(app.store.review_doc.files[0].entry.path, "src/main.rs");
+        assert_eq!(app.store.continuous_diff.files.len(), 1);
+        assert_eq!(app.store.continuous_diff.files[0].entry.path, "src/main.rs");
         assert!(
             app.files
                 .cached_rows()
@@ -310,7 +310,7 @@ mod tests {
         assert!(app.files.collapsed().contains("src"));
 
         app.diff
-            .set_continuous_scroll(app.store.review_doc.index.file_starts[0]);
+            .set_continuous_scroll(app.store.continuous_diff.index.file_starts[0]);
         let scroll = app.diff.continuous_scroll();
         app.files.match_selected_file(&app.store, scroll);
         assert!(!app.files.collapsed().contains("src"));
