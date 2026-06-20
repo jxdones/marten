@@ -236,8 +236,12 @@ impl App {
             KeyCode::Char(']') => match self.focus {
                 Focus::Diff => Action::NextHunk,
                 Focus::Files => {
-                    self.focus = Focus::Diff;
-                    Action::NextHunk
+                    if !self.files().is_empty() {
+                        self.focus = Focus::Diff;
+                        Action::NextHunk
+                    } else {
+                        Action::Noop
+                    }
                 }
             },
             KeyCode::Char('[') if self.focus == Focus::Diff => Action::PreviousHunk,
