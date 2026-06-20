@@ -1,4 +1,4 @@
-use ratatui::layout::Alignment;
+use ratatui::layout::{Alignment, Constraint, Layout};
 use ratatui::style::{Modifier, Style, Stylize};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Borders, Paragraph};
@@ -61,8 +61,44 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App, is_focused: bool) {
         }
     };
 
+    if lines.is_empty() {
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+        draw_empty_diff(frame, inner, theme);
+        return;
+    }
+
     let paragraph = Paragraph::new(Text::from(lines)).block(block);
     frame.render_widget(paragraph, area);
+}
+
+fn draw_empty_diff(frame: &mut Frame, area: Rect, theme: Theme) {
+    let lines = vec![
+        Line::from(Span::styled("No changes yet", theme.muted())),
+        Line::from(Span::styled(
+            "Edit files in this repository to start a diff.",
+            theme.muted(),
+        )),
+    ];
+
+    let lines_max_width = lines.iter().map(|l| l.width()).max().unwrap_or(0) as u16;
+    let widget = Paragraph::new(lines).alignment(Alignment::Center);
+
+    let vertical = Layout::vertical([
+        Constraint::Fill(1),
+        Constraint::Length(2),
+        Constraint::Fill(1),
+    ])
+    .split(area);
+
+    let horizontal = Layout::horizontal([
+        Constraint::Fill(1),
+        Constraint::Length(lines_max_width),
+        Constraint::Fill(1),
+    ])
+    .split(vertical[1]);
+
+    frame.render_widget(widget, horizontal[1]);
 }
 
 fn diff_title(app: &App) -> Line<'static> {
