@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use crossterm::{execute, terminal::SetTitle};
 use git2::Repository;
 
@@ -149,6 +149,7 @@ impl App {
     pub fn handle_event(&mut self, event: Event) -> Action {
         match event {
             Event::Key(key) => self.handle_key(key),
+            Event::Mouse(mouse) => self.handle_mouse(mouse),
             Event::Resize(width, _) => {
                 if width <= 120 && self.focus != Focus::Diff {
                     Action::FocusPanel(Focus::Diff)
@@ -221,6 +222,14 @@ impl App {
                 .sync_continuous_scroll_to_file(file_anchor, &self.store);
         }
         changed
+    }
+
+    fn handle_mouse(&mut self, mouse: MouseEvent) -> Action {
+        match mouse.kind {
+            MouseEventKind::ScrollUp => Action::MoveUp,
+            MouseEventKind::ScrollDown => Action::MoveDown,
+            _ => Action::Noop,
+        }
     }
 
     fn handle_key(&mut self, key: KeyEvent) -> Action {

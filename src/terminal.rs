@@ -1,7 +1,10 @@
-use std::{io, time::Duration};
+use std::{
+    io,
+    time::{Duration, Instant},
+};
 
 use crossterm::{
-    event::{self, Event as CrosstermEvent, KeyEventKind},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event as CrosstermEvent, KeyEventKind},
     execute,
     terminal::{
         BeginSynchronizedUpdate, EndSynchronizedUpdate, EnterAlternateScreen, LeaveAlternateScreen,
@@ -22,7 +25,7 @@ pub fn run(app: &mut App) -> io::Result<()> {
 
 fn init_terminal() -> io::Result<DefaultTerminal> {
     enable_raw_mode()?;
-    execute!(io::stdout(), EnterAlternateScreen)?;
+    execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(io::stdout());
     ratatui::Terminal::with_options(
         backend,
@@ -32,20 +35,34 @@ fn init_terminal() -> io::Result<DefaultTerminal> {
     )
 }
 
+// Mouse wheels/trackpads can emit events faster than once per frame. Drawing on
+// every event makes the redraw count scale with input rate instead of frame rate.
+// Capping draws to this cadence keeps state updates immediate while decoupling
+// how often we actually repaint.
+const FRAME_BUDGET: Duration = Duration::from_millis(16);
+
 fn run_loop(terminal: &mut DefaultTerminal, app: &mut App) -> io::Result<()> {
     let mut needs_draw = true;
+    let mut last_draw = Instant::now();
 
     while !app.should_quit() {
         if app.poll_workers() {
             needs_draw = true;
         }
 
-        if needs_draw {
+        if needs_draw && last_draw.elapsed() >= FRAME_BUDGET {
             draw(terminal, app)?;
             needs_draw = false;
+            last_draw = Instant::now();
         }
 
-        if event::poll(Duration::from_millis(50))? {
+        let poll_timeout = if needs_draw {
+            FRAME_BUDGET.saturating_sub(last_draw.elapsed())
+        } else {
+            Duration::from_millis(50)
+        };
+
+        if event::poll(poll_timeout)? {
             match event::read()? {
                 CrosstermEvent::Resize(w, h) => {
                     // Drain queued resize events and keep only the last size,
@@ -62,9 +79,15 @@ fn run_loop(terminal: &mut DefaultTerminal, app: &mut App) -> io::Result<()> {
                     // reflowing and marten repainting.
                     draw(terminal, app)?;
                     needs_draw = false;
+                    last_draw = Instant::now();
                 }
                 CrosstermEvent::Key(key) if key.kind == KeyEventKind::Press => {
                     let action = app.handle_event(Event::Key(key));
+                    app.update(action);
+                    needs_draw = true;
+                }
+                CrosstermEvent::Mouse(mouse) => {
+                    let action = app.handle_event(Event::Mouse(mouse));
                     app.update(action);
                     needs_draw = true;
                 }
@@ -87,6 +110,10 @@ fn draw(terminal: &mut DefaultTerminal, app: &mut App) -> io::Result<()> {
 
 fn restore_terminal(mut terminal: DefaultTerminal) -> io::Result<()> {
     disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
+    execute!(
+        terminal.backend_mut(),
+        DisableMouseCapture,
+        LeaveAlternateScreen
+    )?;
     Ok(())
 }
