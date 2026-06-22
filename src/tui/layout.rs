@@ -12,7 +12,7 @@ pub fn home(area: Rect) -> Home {
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(1),
+            Constraint::Length(2),
             Constraint::Min(0),
             Constraint::Length(2),
         ])

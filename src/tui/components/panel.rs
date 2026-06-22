@@ -5,7 +5,7 @@ use ratatui::widgets::{Block, Borders};
 use crate::tui::theme::Theme;
 
 pub fn block(
-    title: Line<'static>,
+    title: Option<Line<'static>>,
     theme: Theme,
     borders: Borders,
     bg: Color,
@@ -17,9 +17,12 @@ pub fn block(
         theme.panel_border()
     };
 
-    Block::default()
-        .title(title)
+    let mut block = Block::default()
         .borders(borders)
         .border_style(border_style)
-        .style(Style::default().bg(bg))
+        .style(Style::default().bg(bg));
+    if let Some(title) = title {
+        block = block.title(title);
+    }
+    block
 }

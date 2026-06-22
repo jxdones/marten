@@ -5,10 +5,18 @@ use ratatui::{
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::Style,
     text::{Line, Span},
-    widgets::Paragraph,
+    widgets::{Block, Borders, Paragraph},
 };
 
 pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
+    let theme = app.theme();
+    let block = Block::default()
+        .borders(Borders::BOTTOM)
+        .border_style(theme.panel_border())
+        .style(Style::default().bg(theme.bg));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
     let layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([
@@ -17,11 +25,10 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
             Constraint::Percentage(55),
             Constraint::Length(1),
         ])
-        .split(area);
+        .split(inner);
 
     let left = layout[1];
     let right = layout[2];
-    let theme = app.theme();
 
     let left_line = app.repository_status().map_or_else(
         || Line::from(vec![Span::styled("no repository", theme.repo_name())]),
@@ -92,7 +99,6 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
 
     let bg_style = Style::default().bg(theme.bg);
 
-    frame.render_widget(Paragraph::new("").style(bg_style), area);
     frame.render_widget(Paragraph::new(left_line).style(bg_style), left);
     frame.render_widget(
         Paragraph::new(right_line)

@@ -27,10 +27,29 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
     top_bar::draw(frame, layout.top_bar, app);
     left_sidebar::draw(frame, layout.left_sidebar, app, focus);
 
-    app.set_diff_viewport_height(layout.diff.height.saturating_sub(2) as usize);
-    diff_panel::draw(frame, layout.diff, app, focus == Focus::Diff);
+    app.set_diff_viewport_height(layout.diff.height as usize);
+    let has_sidebar = layout.left_sidebar.width > 0;
+    diff_panel::draw(frame, layout.diff, app, focus == Focus::Diff, has_sidebar);
 
     shortcuts::draw(frame, layout.shortcuts, app);
+
+    if has_sidebar {
+        join_separator(frame, &layout);
+    }
+}
+
+fn join_separator(frame: &mut Frame, layout: &layout::Home) {
+    let x = layout.diff.x;
+    let top = layout.top_bar.y + layout.top_bar.height - 1;
+    let bottom = layout.shortcuts.y;
+    let buffer = frame.buffer_mut();
+
+    if let Some(cell) = buffer.cell_mut((x, top)) {
+        cell.set_symbol("┬");
+    }
+    if let Some(cell) = buffer.cell_mut((x, bottom)) {
+        cell.set_symbol("┴");
+    }
 }
 
 fn draw_too_small(frame: &mut Frame, area: Rect, theme: Theme) {

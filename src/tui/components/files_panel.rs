@@ -1,4 +1,4 @@
-use ratatui::style::{Modifier, Style};
+use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Borders, List, ListItem, ListState};
 use ratatui::{Frame, layout::Rect};
@@ -13,18 +13,7 @@ use crate::tui::components::panel;
 
 pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
     let theme = app.theme();
-    let block = panel::block(
-        Line::from(vec![Span::styled(
-            " files",
-            Style::default()
-                .fg(theme.accent)
-                .add_modifier(Modifier::BOLD),
-        )]),
-        theme,
-        Borders::NONE,
-        theme.sidebar_bg,
-        is_focused,
-    );
+    let block = panel::block(None, theme, Borders::NONE, theme.sidebar_bg, is_focused);
 
     app.ensure_rows();
     let selected_index = app.files_state().selected;
@@ -67,10 +56,15 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
                     } else {
                         segs.last().copied().unwrap_or(dir_name).to_string()
                     };
+                    let dir_style = if is_focused {
+                        theme.accent()
+                    } else {
+                        theme.muted()
+                    };
                     items.push(ListItem::new(Line::from(vec![
                         Span::raw(path_depth),
-                        Span::styled(symbol, theme.muted()),
-                        Span::styled(label, theme.muted()),
+                        Span::styled(symbol, dir_style),
+                        Span::styled(label, dir_style),
                     ])));
                 }
                 TreeRow::File(idx, depth) => {
@@ -116,9 +110,14 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
     let mut list_state = ListState::default();
     list_state.select(selected_row);
 
+    let select_bg = if is_focused {
+        theme.select_hi
+    } else {
+        theme.select
+    };
     let list = List::new(items)
         .block(block)
-        .highlight_style(Style::default().bg(theme.select));
+        .highlight_style(Style::default().bg(select_bg));
 
     frame.render_stateful_widget(list, area, &mut list_state);
 }
