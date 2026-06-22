@@ -86,12 +86,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
                     let path = entry.path.split('/').next_back().unwrap_or(&entry.path);
                     let path_depth = "  ".repeat(*depth);
 
-                    let insertions = humanize_stat('+', entry.insertions);
-                    let deletions = humanize_stat('-', entry.deletions);
-                    let stats = format!("{insertions}{deletions}");
-
-                    let fixed_width =
-                        path_depth.len() + BORDER_WIDTH + STATUS_LETTER_WIDTH + stats.len();
+                    let fixed_width = path_depth.len() + BORDER_WIDTH + STATUS_LETTER_WIDTH;
                     let max_path_width = (area.width as usize).saturating_sub(fixed_width);
 
                     let display_path = if path.chars().count() > max_path_width {
@@ -108,21 +103,10 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
                         path.to_string()
                     };
 
-                    let padding_width = (area.width as usize)
-                        .saturating_sub(path_depth.len())
-                        .saturating_sub(BORDER_WIDTH)
-                        .saturating_sub(display_path.chars().count())
-                        .saturating_sub(STATUS_LETTER_WIDTH)
-                        .saturating_sub(stats.len());
-                    let stats_padding = " ".repeat(padding_width);
-
                     items.push(ListItem::new(Line::from(vec![
                         Span::raw(path_depth),
                         status_letter,
                         Span::styled(display_path, theme.text_primary()),
-                        Span::raw(stats_padding),
-                        Span::styled(insertions, theme.staged()),
-                        Span::styled(deletions, theme.unstaged()),
                     ])));
                 }
             }
@@ -141,12 +125,4 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
 
 const fn get_selected_row(_rows: &[TreeRow], selected: Option<usize>) -> Option<usize> {
     selected
-}
-
-fn humanize_stat(prefix: char, n: usize) -> String {
-    if n >= 1000 {
-        format!("{prefix}{}K ", n / 1000)
-    } else {
-        format!("{prefix}{n} ")
-    }
 }

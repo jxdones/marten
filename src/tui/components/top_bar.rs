@@ -1,4 +1,5 @@
-use crate::{app::App, git::repository::Head, state::Focus};
+use crate::app::App;
+use crate::git::repository::Head;
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -87,8 +88,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
         },
     );
 
-    let mode = top_bar_mode(app);
-    let right_line = Line::from(Span::styled(mode, theme.text_primary()));
+    let right_line = diff_summary(app);
 
     let bg_style = Style::default().bg(theme.bg);
 
@@ -102,9 +102,23 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
     );
 }
 
-const fn top_bar_mode(app: &App) -> &'static str {
-    match app.focus() {
-        Focus::Files => "files",
-        Focus::Diff => "diff",
-    }
+fn diff_summary(app: &App) -> Line<'static> {
+    let theme = app.theme();
+    let files = app.files();
+
+    let insertions = files
+        .iter()
+        .map(|slot| slot.entry.insertions)
+        .sum::<usize>();
+    let deletions = files.iter().map(|slot| slot.entry.deletions).sum::<usize>();
+    let file_label = if files.len() == 1 { "file" } else { "files" };
+
+    Line::from(vec![
+        Span::styled(format!("+{insertions}"), theme.success()),
+        Span::styled(" ", theme.muted()),
+        Span::styled(format!("-{deletions}"), theme.unstaged()),
+        Span::styled("  ·  ", theme.muted()),
+        Span::styled(files.len().to_string(), theme.text_primary()),
+        Span::styled(format!(" {file_label}"), theme.muted()),
+    ])
 }
