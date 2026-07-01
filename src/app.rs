@@ -21,6 +21,7 @@ pub struct App {
     repo: Repository,
     repository_status: Option<repository::RepositoryStatus>,
     should_quit: bool,
+    show_sidebar: bool,
     files: FilesPanel,
     diff: DiffPanel,
     store: DiffStore,
@@ -65,6 +66,8 @@ impl App {
             Focus::Files
         };
 
+        let show_sidebar = width > 120;
+
         Self {
             screen: Screen::Home,
             focus,
@@ -74,6 +77,7 @@ impl App {
             theme: theme::DEFAULT,
             repo,
             should_quit: false,
+            show_sidebar,
             repository_status,
         }
     }
@@ -96,6 +100,10 @@ impl App {
 
     pub const fn should_quit(&self) -> bool {
         self.should_quit
+    }
+
+    pub const fn show_sidebar(&self) -> bool {
+        self.show_sidebar
     }
 
     pub const fn repository_status(&self) -> Option<&repository::RepositoryStatus> {
@@ -168,6 +176,7 @@ impl App {
             store,
             repo,
             repository_status,
+            show_sidebar,
             should_quit,
             ..
         } = self;
@@ -192,6 +201,16 @@ impl App {
             Action::Refresh => {
                 *repository_status = repository::status(repo).ok();
                 diff.reload(files, store, repo);
+            }
+            Action::ToggleSidebar => {
+                *show_sidebar = !*show_sidebar;
+
+                if *focus == Focus::Files {
+                    *focus = Focus::Diff;
+                } else {
+                    *focus = Focus::Files;
+                }
+                return;
             }
             _ => {
                 let selection_changed = files.update(action, *focus, store);
@@ -259,6 +278,7 @@ impl App {
             KeyCode::Char('l') if self.focus == Focus::Diff => Action::ToggleDiffLineNumbers,
             KeyCode::Char('v') => Action::ToggleViewMode,
             KeyCode::Char('r') => Action::Refresh,
+            KeyCode::Char('s') => Action::ToggleSidebar,
             KeyCode::Char('g') if self.focus == Focus::Files => Action::GoToFirst,
             KeyCode::Char('G') if self.focus == Focus::Files => Action::GoToLast,
             KeyCode::Enter if self.focus == Focus::Diff && self.diff.is_too_large() => {

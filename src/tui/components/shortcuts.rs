@@ -43,6 +43,7 @@ fn shortcuts(app: &App) -> Vec<(&'static str, &'static str)> {
         ("tab", "focus"),
         ("n", "next file"),
         ("p", "previous file"),
+        ("s", "toggle sidebar"),
         ("r", "reload"),
     ];
 

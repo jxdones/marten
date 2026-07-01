@@ -21,7 +21,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
         return;
     }
 
-    let layout = layout::home(area);
+    let layout = layout::home(area, app.show_sidebar());
     let focus = app.focus();
 
     top_bar::draw(frame, layout.top_bar, app);

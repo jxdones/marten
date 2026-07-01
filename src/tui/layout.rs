@@ -8,7 +8,7 @@ pub struct Home {
     pub shortcuts: Rect,
 }
 
-pub fn home(area: Rect) -> Home {
+pub fn home(area: Rect, has_sidebar: bool) -> Home {
     let rows = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -18,13 +18,13 @@ pub fn home(area: Rect) -> Home {
         ])
         .split(area);
 
-    let sidebar_width = if area.width <= 120 {
+    let sidebar_width = if area.width <= 120 || !has_sidebar {
         Constraint::Percentage(0)
     } else {
         Constraint::Percentage(20)
     };
 
-    let diff_width = if area.width <= 120 {
+    let diff_width = if area.width <= 120 || !has_sidebar {
         Constraint::Percentage(100)
     } else {
         Constraint::Percentage(80)

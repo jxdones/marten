@@ -20,4 +20,5 @@ pub enum Action {
     ForceLoadDiff,
     NextFile,
     PreviousFile,
+    ToggleSidebar,
 }
