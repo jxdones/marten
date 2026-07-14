@@ -29,5 +29,10 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
-    Show { oid: String },
+    /// Show the changes introduced by a revision
+    Show {
+        /// Revision whose changes to show (e.g. SHA, branch, tag, or HEAD~2)
+        #[arg(value_name = "REVISION")]
+        oid: String,
+    },
 }
