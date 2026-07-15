@@ -122,6 +122,25 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
     frame.render_stateful_widget(list, area, &mut list_state);
 }
 
-const fn get_selected_row(_rows: &[TreeRow], selected: Option<usize>) -> Option<usize> {
-    selected
+fn get_selected_row(rows: &[TreeRow], selected: Option<usize>) -> Option<usize> {
+    selected.filter(|index| *index < rows.len())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::get_selected_row;
+    use crate::state::TreeRow;
+
+    #[test]
+    fn empty_tree_does_not_select_the_status_message() {
+        assert_eq!(get_selected_row(&[], Some(0)), None);
+    }
+
+    #[test]
+    fn selection_is_limited_to_tree_rows() {
+        let rows = [TreeRow::File(0, 0)];
+
+        assert_eq!(get_selected_row(&rows, Some(0)), Some(0));
+        assert_eq!(get_selected_row(&rows, Some(1)), None);
+    }
 }

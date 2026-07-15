@@ -6,7 +6,11 @@ pub struct Files {
 
 impl Files {
     pub const fn select_first(&mut self) {
-        self.selected = Some(0);
+        self.selected = if self.tree_row_count == 0 {
+            None
+        } else {
+            Some(0)
+        };
     }
 
     pub const fn select_last(&mut self) {
@@ -42,5 +46,34 @@ impl Files {
             None => self.selected = Some(0),
             Some(i) => self.selected = Some((i + self.tree_row_count - 1) % self.tree_row_count),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Files;
+
+    #[test]
+    fn select_first_clears_selection_when_there_are_no_rows() {
+        let mut files = Files {
+            selected: Some(0),
+            tree_row_count: 0,
+        };
+
+        files.select_first();
+
+        assert_eq!(files.selected, None);
+    }
+
+    #[test]
+    fn select_first_selects_the_first_available_row() {
+        let mut files = Files {
+            selected: None,
+            tree_row_count: 2,
+        };
+
+        files.select_first();
+
+        assert_eq!(files.selected, Some(0));
     }
 }
