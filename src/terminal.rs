@@ -14,9 +14,9 @@ use crossterm::{
 
 use ratatui::{DefaultTerminal, TerminalOptions, Viewport, prelude::CrosstermBackend};
 
-use crate::{app::App, event::Event, tui};
+use crate::{app::App, error::AppResult, event::Event, tui};
 
-pub fn run(app: &mut App) -> io::Result<()> {
+pub fn run(app: &mut App) -> AppResult<()> {
     let mut terminal = init_terminal()?;
     let result = run_loop(&mut terminal, app);
     restore_terminal(terminal)?;
@@ -41,7 +41,7 @@ fn init_terminal() -> io::Result<DefaultTerminal> {
 // how often we actually repaint.
 const FRAME_BUDGET: Duration = Duration::from_millis(16);
 
-fn run_loop(terminal: &mut DefaultTerminal, app: &mut App) -> io::Result<()> {
+fn run_loop(terminal: &mut DefaultTerminal, app: &mut App) -> AppResult<()> {
     let mut needs_draw = true;
     let mut last_draw = Instant::now();
 
@@ -74,7 +74,7 @@ fn run_loop(terminal: &mut DefaultTerminal, app: &mut App) -> io::Result<()> {
                         }
                     }
                     let action = app.handle_event(Event::Resize(last.0, last.1));
-                    app.update(action);
+                    app.update(action)?;
                     // Paint immediately so there's no gap between the terminal
                     // reflowing and marten repainting.
                     draw(terminal, app)?;
@@ -83,12 +83,12 @@ fn run_loop(terminal: &mut DefaultTerminal, app: &mut App) -> io::Result<()> {
                 }
                 CrosstermEvent::Key(key) if key.kind == KeyEventKind::Press => {
                     let action = app.handle_event(Event::Key(key));
-                    app.update(action);
+                    app.update(action)?;
                     needs_draw = true;
                 }
                 CrosstermEvent::Mouse(mouse) => {
                     let action = app.handle_event(Event::Mouse(mouse));
-                    app.update(action);
+                    app.update(action)?;
                     needs_draw = true;
                 }
                 _ => {}

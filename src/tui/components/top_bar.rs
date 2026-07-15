@@ -1,5 +1,6 @@
 use crate::app::App;
-use crate::git::repository::Head;
+use crate::git::repository::{DiffSource, Head, RepositoryStatus, RevisionData};
+use crate::tui::theme::Theme;
 use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
@@ -30,70 +31,12 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
     let left = layout[1];
     let right = layout[2];
 
-    let left_line = app.repository_status().map_or_else(
-        || Line::from(vec![Span::styled("no repository", theme.repo_name())]),
-        |status| {
-            let (branch_label, branch_style) = match &status.head {
-                Head::Branch(name) => (name.clone(), theme.branch_name()),
-                Head::Detached(commit) => (format!("{commit} (detached)"), theme.danger()),
-                Head::Unknown => ("unknown".to_string(), theme.muted()),
-            };
-
-            let mut spans = vec![
-                Span::styled(status.name.as_str(), theme.repo_name()),
-                Span::styled("  ·  ", Style::default()),
-                Span::styled(branch_label, branch_style),
-            ];
-
-            if status.changes.staged > 0 {
-                spans.push(Span::styled(
-                    format!(" +{}", status.changes.staged),
-                    theme.staged(),
-                ));
-            }
-
-            if status.changes.unstaged > 0 {
-                spans.push(Span::styled(
-                    format!(" ~{}", status.changes.unstaged),
-                    theme.unstaged(),
-                ));
-            }
-
-            if status.changes.untracked > 0 {
-                spans.push(Span::styled(
-                    format!(" ?{}", status.changes.untracked),
-                    theme.untracked(),
-                ));
-            }
-
-            if status.changes.conflicted > 0 {
-                spans.push(Span::styled(
-                    format!(" !{}", status.changes.conflicted),
-                    theme.conflict(),
-                ));
-            }
-
-            let ahead_style = if status.ahead > 0 {
-                theme.success()
-            } else {
-                theme.muted()
-            };
-
-            let behind_style = if status.behind > 0 {
-                theme.danger()
-            } else {
-                theme.muted()
-            };
-
-            spans.extend([
-                Span::styled("  ·  ", Style::default()),
-                Span::styled(format!("↑{}", status.ahead), ahead_style),
-                Span::styled(format!(" ↓{}", status.behind), behind_style),
-            ]);
-
-            Line::from(spans)
-        },
-    );
+    let left_line = match app.diff_source() {
+        DiffSource::Worktree => worktree_summary(app.repository_status(), theme),
+        DiffSource::Revision(revision) => {
+            revision_summary(app.repository_status(), revision, theme)
+        }
+    };
 
     let right_line = diff_summary(app);
 
@@ -106,6 +49,94 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
             .alignment(Alignment::Right),
         right,
     );
+}
+
+fn worktree_summary(status: Option<&RepositoryStatus>, theme: Theme) -> Line<'static> {
+    let Some(status) = status else {
+        return Line::from(Span::styled("no repository", theme.repo_name()));
+    };
+
+    let (branch_label, branch_style) = match &status.head {
+        Head::Branch(name) => (name.clone(), theme.branch_name()),
+        Head::Detached(commit) => (format!("{commit} (detached)"), theme.danger()),
+        Head::Unknown => ("unknown".to_string(), theme.muted()),
+    };
+
+    let mut spans = vec![
+        Span::styled(status.name.clone(), theme.repo_name()),
+        Span::styled("  ·  ", Style::default()),
+        Span::styled(branch_label, branch_style),
+    ];
+
+    if status.changes.staged > 0 {
+        spans.push(Span::styled(
+            format!(" +{}", status.changes.staged),
+            theme.staged(),
+        ));
+    }
+
+    if status.changes.unstaged > 0 {
+        spans.push(Span::styled(
+            format!(" ~{}", status.changes.unstaged),
+            theme.unstaged(),
+        ));
+    }
+
+    if status.changes.untracked > 0 {
+        spans.push(Span::styled(
+            format!(" ?{}", status.changes.untracked),
+            theme.untracked(),
+        ));
+    }
+
+    if status.changes.conflicted > 0 {
+        spans.push(Span::styled(
+            format!(" !{}", status.changes.conflicted),
+            theme.conflict(),
+        ));
+    }
+
+    let ahead_style = if status.ahead > 0 {
+        theme.success()
+    } else {
+        theme.muted()
+    };
+
+    let behind_style = if status.behind > 0 {
+        theme.danger()
+    } else {
+        theme.muted()
+    };
+
+    spans.extend([
+        Span::styled("  ·  ", Style::default()),
+        Span::styled(format!("↑{}", status.ahead), ahead_style),
+        Span::styled(format!(" ↓{}", status.behind), behind_style),
+    ]);
+
+    Line::from(spans)
+}
+
+fn revision_summary(
+    status: Option<&RepositoryStatus>,
+    revision: &RevisionData,
+    theme: Theme,
+) -> Line<'static> {
+    let repository_name =
+        status.map_or_else(|| "no repository".to_string(), |status| status.name.clone());
+    let subject = if revision.subject.is_empty() {
+        "(no subject)".to_string()
+    } else {
+        revision.subject.clone()
+    };
+
+    Line::from(vec![
+        Span::styled(repository_name, theme.repo_name()),
+        Span::styled("  ·  ", Style::default()),
+        Span::styled(revision.short_oid.clone(), theme.branch_name()),
+        Span::styled("  ·  ", Style::default()),
+        Span::styled(subject, theme.muted()),
+    ])
 }
 
 fn diff_summary(app: &App) -> Line<'static> {

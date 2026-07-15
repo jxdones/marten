@@ -1,11 +1,12 @@
 use clap::Parser;
 
-use crate::{app::App, cli::Cli};
+use crate::{app::App, cli::Cli, error::AppResult};
 
 mod action;
 mod app;
 mod cli;
 mod diff_panel;
+mod error;
 mod event;
 mod files_panel;
 mod git;
@@ -16,8 +17,15 @@ mod syntax;
 mod terminal;
 mod tui;
 
-fn main() -> std::io::Result<()> {
+fn main() {
+    if let Err(error) = run() {
+        eprintln!("marten: {error}");
+        std::process::exit(1);
+    }
+}
+
+fn run() -> AppResult<()> {
     let cli = Cli::parse();
-    let mut app = App::new(cli.command);
+    let mut app = App::new(cli.command)?;
     terminal::run(&mut app)
 }

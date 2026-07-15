@@ -1,7 +1,9 @@
 use std::{collections::HashMap, fs, path::Path};
 
-use crate::git::GitResult;
-use git2::{self, Diff, DiffOptions, Patch, Reference, Repository, Status, StatusOptions};
+use crate::error::{AppError, AppResult};
+use git2::{
+    self, Diff, DiffOptions, ErrorCode, Oid, Patch, Reference, Repository, Status, StatusOptions,
+};
 
 const DEFAULT_HEAD: &str = "HEAD";
 const SHORT_COMMIT_LEN: usize = 7;
@@ -76,6 +78,19 @@ pub struct DiffSection {
     pub hunks: Vec<DiffHunk>,
 }
 
+#[derive(Debug, Clone)]
+pub enum DiffSource {
+    Worktree,
+    Revision(RevisionData),
+}
+
+#[derive(Debug, Clone)]
+pub struct RevisionData {
+    pub oid: git2::Oid,
+    pub short_oid: String,
+    pub subject: String,
+}
+
 impl FileStatus {
     pub const fn label(self) -> &'static str {
         match self {
@@ -88,7 +103,7 @@ impl FileStatus {
     }
 }
 
-pub fn status(repo: &Repository) -> GitResult<RepositoryStatus> {
+pub fn status(repo: &Repository) -> AppResult<RepositoryStatus> {
     let name = repository_name(repo);
     let (head, ahead, behind) = head_status(repo)?;
     let changes = change_counts(repo)?;
@@ -102,7 +117,7 @@ pub fn status(repo: &Repository) -> GitResult<RepositoryStatus> {
     })
 }
 
-pub fn files(repo: &Repository) -> GitResult<Vec<FileEntry>> {
+pub fn files(repo: &Repository) -> AppResult<Vec<FileEntry>> {
     let staged_diff = if let Ok(head) = repo.head() {
         // repo has at least one commit
         let tree = head.peel_to_commit()?.tree()?;
@@ -177,8 +192,41 @@ pub fn files(repo: &Repository) -> GitResult<Vec<FileEntry>> {
     Ok(entries)
 }
 
-pub fn files_from_commit(repo: &Repository, commit_hash: &str) -> GitResult<Vec<FileEntry>> {
-    let commit = repo.revparse_single(commit_hash)?.peel_to_commit()?;
+pub fn resolve_revision(repo: &Repository, input: &str) -> AppResult<RevisionData> {
+    let object = repo.revparse_single(input).map_err(|source| {
+        if source.code() == ErrorCode::NotFound {
+            AppError::RevisionNotFound {
+                revision: input.to_string(),
+                source,
+            }
+        } else {
+            AppError::git("resolve revision", source)
+        }
+    })?;
+    let commit = object
+        .peel_to_commit()
+        .map_err(|source| AppError::RevisionNotCommit {
+            revision: input.to_string(),
+            source,
+        })?;
+    let oid = commit.id();
+
+    Ok(RevisionData {
+        oid,
+        short_oid: oid.to_string().chars().take(SHORT_COMMIT_LEN).collect(),
+        subject: commit.summary().unwrap_or_default().to_string(),
+    })
+}
+
+pub fn files_for_source(repo: &Repository, source: &DiffSource) -> AppResult<Vec<FileEntry>> {
+    match source {
+        DiffSource::Worktree => files(repo),
+        DiffSource::Revision(revision) => files_from_commit(repo, revision.oid),
+    }
+}
+
+pub fn files_from_commit(repo: &Repository, oid: Oid) -> AppResult<Vec<FileEntry>> {
+    let commit = repo.find_commit(oid)?;
 
     let old_tree = if commit.parent_count() > 0 {
         Some(commit.parent(0)?.tree()?)
@@ -211,7 +259,7 @@ pub fn files_from_commit(repo: &Repository, commit_hash: &str) -> GitResult<Vec<
     Ok(entries)
 }
 
-pub fn file_diff_line_count(repo: &Repository, path: &str, status: FileStatus) -> GitResult<usize> {
+pub fn file_diff_line_count(repo: &Repository, path: &str, status: FileStatus) -> AppResult<usize> {
     if status == FileStatus::Untracked {
         return Ok(untracked_file_content(repo, path)?.lines().count());
     }
@@ -250,7 +298,7 @@ pub fn file_diff(
     repo: &Repository,
     path: &str,
     status: FileStatus,
-) -> GitResult<Option<Vec<DiffSection>>> {
+) -> AppResult<Option<Vec<DiffSection>>> {
     match status {
         FileStatus::Staged => {
             let Some(hunks) = staged_file_diff(repo, path)? else {
@@ -303,10 +351,10 @@ pub fn file_diff(
 
 pub fn files_diff_from_commit(
     repo: &Repository,
-    commit_hash: &str,
+    oid: Oid,
     path: &str,
-) -> GitResult<Option<Vec<DiffSection>>> {
-    let commit = repo.revparse_single(commit_hash)?.peel_to_commit()?;
+) -> AppResult<Option<Vec<DiffSection>>> {
+    let commit = repo.find_commit(oid)?;
 
     let old_tree = if commit.parent_count() > 0 {
         Some(commit.parent(0)?.tree()?)
@@ -330,7 +378,19 @@ pub fn files_diff_from_commit(
     }]))
 }
 
-fn diff_hunks(diff: Diff<'_>) -> GitResult<Option<Vec<DiffHunk>>> {
+pub fn file_diff_for_source(
+    repo: &Repository,
+    source: &DiffSource,
+    path: &str,
+    status: FileStatus,
+) -> AppResult<Option<Vec<DiffSection>>> {
+    match source {
+        DiffSource::Worktree => file_diff(repo, path, status),
+        DiffSource::Revision(revision) => files_diff_from_commit(repo, revision.oid, path),
+    }
+}
+
+fn diff_hunks(diff: Diff<'_>) -> AppResult<Option<Vec<DiffHunk>>> {
     let Some(patch) = Patch::from_diff(&diff, 0)? else {
         return Ok(Some(vec![]));
     };
@@ -372,7 +432,7 @@ fn diff_hunks(diff: Diff<'_>) -> GitResult<Option<Vec<DiffHunk>>> {
     Ok(Some(hunks))
 }
 
-fn staged_file_diff(repo: &Repository, path: &str) -> GitResult<Option<Vec<DiffHunk>>> {
+fn staged_file_diff(repo: &Repository, path: &str) -> AppResult<Option<Vec<DiffHunk>>> {
     let head = repo.head()?;
     let mut opts = DiffOptions::new();
     opts.pathspec(path);
@@ -385,7 +445,7 @@ fn staged_file_diff(repo: &Repository, path: &str) -> GitResult<Option<Vec<DiffH
     Ok(hunks)
 }
 
-fn unstaged_file_diff(repo: &Repository, path: &str) -> GitResult<Option<Vec<DiffHunk>>> {
+fn unstaged_file_diff(repo: &Repository, path: &str) -> AppResult<Option<Vec<DiffHunk>>> {
     let mut opts = DiffOptions::new();
     opts.pathspec(path);
 
@@ -394,7 +454,7 @@ fn unstaged_file_diff(repo: &Repository, path: &str) -> GitResult<Option<Vec<Dif
     Ok(hunks)
 }
 
-fn untracked_file_diff(repo: &Repository, path: &str) -> GitResult<Option<Vec<DiffHunk>>> {
+fn untracked_file_diff(repo: &Repository, path: &str) -> AppResult<Option<Vec<DiffHunk>>> {
     let file_path = repo.workdir().unwrap_or_else(|| Path::new(".")).join(path);
     let bytes = fs::read(&file_path)?;
     if bytes.contains(&0u8) {
@@ -421,17 +481,17 @@ fn untracked_file_diff(repo: &Repository, path: &str) -> GitResult<Option<Vec<Di
     }]))
 }
 
-fn untracked_line_count(repo: &Repository, path: &str) -> GitResult<usize> {
+fn untracked_line_count(repo: &Repository, path: &str) -> AppResult<usize> {
     Ok(untracked_file_content(repo, path)?.lines().count())
 }
 
-fn untracked_file_content(repo: &Repository, path: &str) -> GitResult<String> {
+fn untracked_file_content(repo: &Repository, path: &str) -> AppResult<String> {
     let path = repo.workdir().unwrap_or_else(|| Path::new(".")).join(path);
     let bytes = fs::read(path)?;
     Ok(String::from_utf8_lossy(&bytes).to_string())
 }
 
-fn head_status(repo: &Repository) -> GitResult<(Head, usize, usize)> {
+fn head_status(repo: &Repository) -> AppResult<(Head, usize, usize)> {
     let head = match repo.head() {
         Ok(head) => head,
         Err(error) if is_unknown_head_error(&error) => {
@@ -481,7 +541,7 @@ fn ahead_behind(
     head: &Reference,
     branch: &str,
     detached: bool,
-) -> GitResult<(usize, usize)> {
+) -> AppResult<(usize, usize)> {
     if detached {
         return Ok((0, 0));
     }
@@ -502,7 +562,7 @@ fn ahead_behind(
     }
 }
 
-fn change_counts(repo: &Repository) -> GitResult<ChangeCounts> {
+fn change_counts(repo: &Repository) -> AppResult<ChangeCounts> {
     let mut opts = StatusOptions::new();
     opts.include_untracked(true).recurse_untracked_dirs(true);
 

@@ -2,14 +2,15 @@ use std::collections::HashSet;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use crossterm::{execute, terminal::SetTitle};
-use git2::Repository;
+use git2::{ErrorCode, Repository};
 
 use crate::action::Action;
 use crate::cli::Command;
 use crate::diff_panel::DiffPanel;
+use crate::error::{AppError, AppResult};
 use crate::event::Event;
 use crate::files_panel::FilesPanel;
-use crate::git::repository::{self, DiffHunk};
+use crate::git::repository::{self, DiffHunk, DiffSource};
 use crate::state::{ContinuousDiff, Diff, FileSlot, Files, Focus, ReviewState, Screen, TreeRow};
 use crate::store::DiffStore;
 use crate::tui::theme::{self, Theme};
@@ -19,44 +20,62 @@ pub struct App {
     focus: Focus,
     theme: Theme,
     repo: Repository,
-    repository_status: Option<repository::RepositoryStatus>,
+
     should_quit: bool,
     show_sidebar: bool,
+
     files: FilesPanel,
     diff: DiffPanel,
+
     store: DiffStore,
+    repository_status: Option<repository::RepositoryStatus>,
+    diff_source: DiffSource,
 }
 
 impl App {
-    pub fn new(command: Option<Command>) -> Self {
-        execute!(std::io::stdout(), SetTitle("marten")).ok();
-        let repo = Repository::discover(".").expect("not a git repo");
-        Self::init(repo, command)
+    pub fn new(command: Option<Command>) -> AppResult<Self> {
+        execute!(std::io::stdout(), SetTitle("marten"))?;
+        let repo = Repository::discover(".").map_err(|source| {
+            if source.code() == ErrorCode::NotFound {
+                AppError::NotRepository { source }
+            } else {
+                AppError::git("open repository", source)
+            }
+        })?;
+
+        let diff_source = match &command {
+            Some(Command::Show { oid }) => {
+                let revision = repository::resolve_revision(&repo, oid)?;
+                DiffSource::Revision(revision)
+            }
+            None => DiffSource::Worktree,
+        };
+
+        Self::init(repo, diff_source)
     }
 
-    fn init(repo: Repository, command: Option<Command>) -> Self {
-        let repository_status = repository::status(&repo).ok();
-        let entries = match &command {
-            Some(Command::Show { oid }) => repository::files_from_commit(&repo, oid)
-                .ok()
-                .unwrap_or_default(),
-            _ => repository::files(&repo).ok().unwrap_or_default(),
+    fn init(repo: Repository, diff_source: DiffSource) -> AppResult<Self> {
+        let repository_status = Some(
+            repository::status(&repo)
+                .map_err(|error| error.with_operation("read repository status"))?,
+        );
+        let operation = match diff_source {
+            DiffSource::Worktree => "load working-tree changes",
+            DiffSource::Revision(_) => "load revision changes",
         };
+        let entries = repository::files_for_source(&repo, &diff_source)
+            .map_err(|error| error.with_operation(operation))?;
 
         let mut store = DiffStore::new(entries);
         store.continuous_diff.rebuild_index();
-        let commit_hash = match &command {
-            Some(Command::Show { oid }) => Some(oid.clone()),
-            _ => None,
-        };
-        store.spawn_workers(commit_hash);
+        store.spawn_workers(&diff_source);
 
         let mut files = FilesPanel::new();
         files.ensure_rows(&store);
         files.select_first();
 
         let mut diff = DiffPanel::new();
-        diff.refresh(&mut files, &mut store, &repo);
+        diff.refresh(&mut files, &mut store, &repo, &diff_source);
 
         let (width, _) = crossterm::terminal::size().unwrap_or((0, 0));
 
@@ -68,7 +87,7 @@ impl App {
 
         let show_sidebar = width > 120;
 
-        Self {
+        Ok(Self {
             screen: Screen::Home,
             focus,
             files,
@@ -79,7 +98,8 @@ impl App {
             should_quit: false,
             show_sidebar,
             repository_status,
-        }
+            diff_source,
+        })
     }
 
     pub const fn screen(&self) -> Screen {
@@ -108,6 +128,10 @@ impl App {
 
     pub const fn repository_status(&self) -> Option<&repository::RepositoryStatus> {
         self.repository_status.as_ref()
+    }
+
+    pub const fn diff_source(&self) -> &DiffSource {
+        &self.diff_source
     }
 
     pub fn files(&self) -> &[FileSlot] {
@@ -168,7 +192,7 @@ impl App {
         }
     }
 
-    pub fn update(&mut self, action: Action) {
+    pub fn update(&mut self, action: Action) -> AppResult<()> {
         let App {
             focus,
             files,
@@ -176,6 +200,7 @@ impl App {
             store,
             repo,
             repository_status,
+            diff_source,
             show_sidebar,
             should_quit,
             ..
@@ -184,23 +209,26 @@ impl App {
         match action {
             Action::Quit => {
                 *should_quit = true;
-                return;
+                return Ok(());
             }
             Action::NextFocus => {
                 *focus = focus.next();
-                return;
+                return Ok(());
             }
             Action::PreviousFocus => {
                 *focus = focus.previous();
-                return;
+                return Ok(());
             }
             Action::FocusPanel(f) => {
                 *focus = f;
-                return;
+                return Ok(());
             }
             Action::Refresh => {
-                *repository_status = repository::status(repo).ok();
-                diff.reload(files, store, repo);
+                *repository_status = Some(
+                    repository::status(repo)
+                        .map_err(|error| error.with_operation("refresh repository status"))?,
+                );
+                diff.reload(files, store, repo, diff_source)?;
             }
             Action::ToggleSidebar => {
                 *show_sidebar = !*show_sidebar;
@@ -210,11 +238,19 @@ impl App {
                 } else {
                     *focus = Focus::Files;
                 }
-                return;
+                return Ok(());
             }
             _ => {
                 let selection_changed = files.update(action, *focus, store);
-                diff.update(action, *focus, selection_changed, files, store, repo);
+                diff.update(
+                    action,
+                    *focus,
+                    selection_changed,
+                    files,
+                    store,
+                    repo,
+                    diff_source,
+                );
             }
         }
 
@@ -226,6 +262,8 @@ impl App {
             store.continuous_diff.index_dirty = false;
             diff.sync_continuous_scroll_to_file(file_anchor, store);
         }
+
+        Ok(())
     }
 
     pub fn poll_workers(&mut self) -> bool {
@@ -322,7 +360,7 @@ mod tests {
         fs::create_dir_all(file_path.parent().unwrap()).unwrap();
         fs::write(&file_path, "fn main() {}\n").unwrap();
 
-        let mut app = App::init(repo, None);
+        let mut app = App::init(repo, DiffSource::Worktree).unwrap();
         assert_eq!(app.store.continuous_diff.files.len(), 1);
         assert_eq!(app.store.continuous_diff.files[0].entry.path, "src/main.rs");
         assert!(

@@ -1,8 +1,9 @@
 use git2::Repository;
 
 use crate::action::Action;
+use crate::error::AppResult;
 use crate::files_panel::FilesPanel;
-use crate::git::repository::{self, DiffHunk, FileEntry};
+use crate::git::repository::{self, DiffHunk, DiffSource, FileEntry};
 use crate::state::line_index::IndexRow;
 use crate::state::review::ReviewState;
 use crate::state::{Diff, DiffLoadState, FileKey, Focus, LineIndex, ViewMode};
@@ -33,9 +34,10 @@ impl DiffPanel {
         files: &mut FilesPanel,
         store: &mut DiffStore,
         repo: &Repository,
+        diff_source: &DiffSource,
     ) {
         if selection_changed {
-            self.refresh(files, store, repo);
+            self.refresh(files, store, repo, diff_source);
             if self.review.mode == ViewMode::Continuous {
                 self.jump_to_selected_file(files, store);
             }
@@ -77,19 +79,30 @@ impl DiffPanel {
             },
             Action::ForceLoadDiff => {
                 self.state.too_large = None;
-                self.refresh(files, store, repo);
+                self.refresh(files, store, repo, diff_source);
             }
             _ => {}
         }
     }
 
-    pub fn reload(&mut self, files: &mut FilesPanel, store: &mut DiffStore, repo: &Repository) {
+    pub fn reload(
+        &mut self,
+        files: &mut FilesPanel,
+        store: &mut DiffStore,
+        repo: &Repository,
+        diff_source: &DiffSource,
+    ) -> AppResult<()> {
         let selected_key = files.selected_file(store).map(|file| FileKey {
             path: file.path.clone(),
             status: file.status,
         });
 
-        let entries = repository::files(repo).unwrap_or_default();
+        let operation = match diff_source {
+            DiffSource::Worktree => "refresh working-tree changes",
+            DiffSource::Revision(_) => "refresh revision changes",
+        };
+        let entries = repository::files_for_source(repo, diff_source)
+            .map_err(|error| error.with_operation(operation))?;
 
         store.reload(entries);
         files.mark_dirty();
@@ -97,8 +110,11 @@ impl DiffPanel {
         let restored_file_idx = files.restore_selection(store, selected_key);
         self.sync_continuous_scroll_to_file(restored_file_idx, store);
         self.reset();
-        store.spawn_workers(None);
-        self.refresh(files, store, repo);
+
+        store.spawn_workers(diff_source);
+
+        self.refresh(files, store, repo, diff_source);
+        Ok(())
     }
 
     pub const fn state(&self) -> &Diff {
@@ -113,7 +129,13 @@ impl DiffPanel {
         self.state.too_large.is_some()
     }
 
-    pub fn refresh(&mut self, files: &mut FilesPanel, store: &mut DiffStore, repo: &Repository) {
+    pub fn refresh(
+        &mut self,
+        files: &mut FilesPanel,
+        store: &mut DiffStore,
+        repo: &Repository,
+        diff_source: &DiffSource,
+    ) {
         files.ensure_rows(store);
         let Some(file) = files.selected_file(store) else {
             self.current_key = None;
@@ -126,8 +148,13 @@ impl DiffPanel {
             status,
         };
 
+        let line_count = match diff_source {
+            DiffSource::Worktree => repository::file_diff_line_count(repo, &path, status).ok(),
+            DiffSource::Revision(_) => None,
+        };
+
         if self.state.too_large.is_none()
-            && let Ok(n) = repository::file_diff_line_count(repo, &path, status)
+            && let Some(n) = line_count
             && n > repository::DIFF_LINE_THRESHOLD
         {
             self.state.too_large = Some(n);
@@ -154,7 +181,9 @@ impl DiffPanel {
                 store.continuous_diff.files[slot_idx].load,
                 DiffLoadState::NotLoaded
             ) {
-                match repository::file_diff(repo, &path, status) {
+                let result = repository::file_diff_for_source(repo, diff_source, &path, status);
+
+                match result {
                     Ok(Some(sections)) => {
                         let hunks = sections.iter().flat_map(|s| s.hunks.clone()).collect();
                         let index = LineIndex::new(&sections);
