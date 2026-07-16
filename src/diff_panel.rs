@@ -17,6 +17,13 @@ pub struct DiffPanel {
     review: ReviewState,
 }
 
+pub struct DiffContext<'a> {
+    pub files: &'a mut FilesPanel,
+    pub store: &'a mut DiffStore,
+    pub repo: &'a Repository,
+    pub diff_source: &'a DiffSource,
+}
+
 impl DiffPanel {
     pub fn new() -> Self {
         Self {
@@ -31,43 +38,40 @@ impl DiffPanel {
         action: Action,
         focus: Focus,
         selection_changed: bool,
-        files: &mut FilesPanel,
-        store: &mut DiffStore,
-        repo: &Repository,
-        diff_source: &DiffSource,
+        diff_ctx: &mut DiffContext,
     ) {
         if selection_changed {
-            self.refresh(files, store, repo, diff_source);
+            self.refresh(diff_ctx);
             if self.review.mode == ViewMode::Continuous {
-                self.jump_to_selected_file(files, store);
+                self.jump_to_selected_file(diff_ctx.files, diff_ctx.store);
             }
         }
 
         match action {
             Action::MoveDown if focus == Focus::Diff => match self.review.mode {
                 ViewMode::Continuous => {
-                    self.continuous_scroll_down(store);
-                    self.sync_files_to_scroll(files, store);
+                    self.continuous_scroll_down(diff_ctx.store);
+                    self.sync_files_to_scroll(diff_ctx.files, diff_ctx.store);
                 }
                 ViewMode::SingleFile => self.scroll_down(),
             },
             Action::MoveUp if focus == Focus::Diff => match self.review.mode {
                 ViewMode::Continuous => {
                     self.continuous_scroll_up();
-                    self.sync_files_to_scroll(files, store);
+                    self.sync_files_to_scroll(diff_ctx.files, diff_ctx.store);
                 }
                 ViewMode::SingleFile => self.scroll_up(),
             },
             Action::NextHunk => {
-                self.select_next_hunk(store);
+                self.select_next_hunk(diff_ctx.store);
                 if self.review.mode == ViewMode::Continuous {
-                    self.sync_files_to_scroll(files, store);
+                    self.sync_files_to_scroll(diff_ctx.files, diff_ctx.store);
                 }
             }
             Action::PreviousHunk => {
-                self.select_previous_hunk(store);
+                self.select_previous_hunk(diff_ctx.store);
                 if self.review.mode == ViewMode::Continuous {
-                    self.sync_files_to_scroll(files, store);
+                    self.sync_files_to_scroll(diff_ctx.files, diff_ctx.store);
                 }
             }
             Action::ToggleDiffLineNumbers => {
@@ -79,41 +83,40 @@ impl DiffPanel {
             },
             Action::ForceLoadDiff => {
                 self.state.too_large = None;
-                self.refresh(files, store, repo, diff_source);
+                self.refresh(diff_ctx);
             }
             _ => {}
         }
     }
 
-    pub fn reload(
-        &mut self,
-        files: &mut FilesPanel,
-        store: &mut DiffStore,
-        repo: &Repository,
-        diff_source: &DiffSource,
-    ) -> AppResult<()> {
-        let selected_key = files.selected_file(store).map(|file| FileKey {
-            path: file.path.clone(),
-            status: file.status,
-        });
+    pub fn reload(&mut self, diff_ctx: &mut DiffContext) -> AppResult<()> {
+        let selected_key = diff_ctx
+            .files
+            .selected_file(diff_ctx.store)
+            .map(|file| FileKey {
+                path: file.path.clone(),
+                status: file.status,
+            });
 
-        let operation = match diff_source {
+        let operation = match diff_ctx.diff_source {
             DiffSource::Worktree => "refresh working-tree changes",
             DiffSource::Revision(_) => "refresh revision changes",
         };
-        let entries = repository::files_for_source(repo, diff_source)
+        let entries = repository::files_for_source(diff_ctx.repo, diff_ctx.diff_source)
             .map_err(|error| error.with_operation(operation))?;
 
-        store.reload(entries);
-        files.mark_dirty();
-        files.ensure_rows(store);
-        let restored_file_idx = files.restore_selection(store, selected_key);
-        self.sync_continuous_scroll_to_file(restored_file_idx, store);
+        diff_ctx.store.reload(entries);
+        diff_ctx.files.mark_dirty();
+        diff_ctx.files.ensure_rows(diff_ctx.store);
+        let restored_file_idx = diff_ctx
+            .files
+            .restore_selection(diff_ctx.store, selected_key);
+        self.sync_continuous_scroll_to_file(restored_file_idx, diff_ctx.store);
         self.reset();
 
-        store.spawn_workers(diff_source);
+        diff_ctx.store.spawn_workers(diff_ctx.diff_source);
 
-        self.refresh(files, store, repo, diff_source);
+        self.refresh(diff_ctx);
         Ok(())
     }
 
@@ -129,15 +132,9 @@ impl DiffPanel {
         self.state.too_large.is_some()
     }
 
-    pub fn refresh(
-        &mut self,
-        files: &mut FilesPanel,
-        store: &mut DiffStore,
-        repo: &Repository,
-        diff_source: &DiffSource,
-    ) {
-        files.ensure_rows(store);
-        let Some(file) = files.selected_file(store) else {
+    pub fn refresh(&mut self, diff_ctx: &mut DiffContext) {
+        diff_ctx.files.ensure_rows(diff_ctx.store);
+        let Some(file) = diff_ctx.files.selected_file(diff_ctx.store) else {
             self.current_key = None;
             return;
         };
@@ -148,8 +145,10 @@ impl DiffPanel {
             status,
         };
 
-        let line_count = match diff_source {
-            DiffSource::Worktree => repository::file_diff_line_count(repo, &path, status).ok(),
+        let line_count = match diff_ctx.diff_source {
+            DiffSource::Worktree => {
+                repository::file_diff_line_count(diff_ctx.repo, &path, status).ok()
+            }
             DiffSource::Revision(_) => None,
         };
 
@@ -162,59 +161,67 @@ impl DiffPanel {
             self.state.line_index = LineIndex::new(&[]);
             self.current_key = Some(cache_key.clone());
 
-            if let Some(&slot_idx) = store.continuous_diff.by_key.get(&cache_key)
+            if let Some(&slot_idx) = diff_ctx.store.continuous_diff.by_key.get(&cache_key)
                 && !matches!(
-                    store.continuous_diff.files[slot_idx].load,
+                    diff_ctx.store.continuous_diff.files[slot_idx].load,
                     DiffLoadState::Loaded { .. }
                 )
             {
-                store.continuous_diff.files[slot_idx].load = DiffLoadState::TooLarge { lines: n };
-                store.continuous_diff.index_dirty = true;
+                diff_ctx.store.continuous_diff.files[slot_idx].load =
+                    DiffLoadState::TooLarge { lines: n };
+                diff_ctx.store.continuous_diff.index_dirty = true;
             }
             return;
         }
 
         self.state.too_large = None;
 
-        if let Some(&slot_idx) = store.continuous_diff.by_key.get(&cache_key) {
+        if let Some(&slot_idx) = diff_ctx.store.continuous_diff.by_key.get(&cache_key) {
             if matches!(
-                store.continuous_diff.files[slot_idx].load,
+                diff_ctx.store.continuous_diff.files[slot_idx].load,
                 DiffLoadState::NotLoaded
             ) {
-                let result = repository::file_diff_for_source(repo, diff_source, &path, status);
+                let result = repository::file_diff_for_source(
+                    diff_ctx.repo,
+                    diff_ctx.diff_source,
+                    &path,
+                    status,
+                );
 
                 match result {
                     Ok(Some(sections)) => {
                         let hunks = sections.iter().flat_map(|s| s.hunks.clone()).collect();
                         let index = LineIndex::new(&sections);
-                        store.continuous_diff.files[slot_idx].load = DiffLoadState::Loaded {
-                            sections,
-                            hunks,
-                            index,
-                        };
+                        diff_ctx.store.continuous_diff.files[slot_idx].load =
+                            DiffLoadState::Loaded {
+                                sections,
+                                hunks,
+                                index,
+                            };
                     }
                     Ok(None) => {
-                        store.continuous_diff.files[slot_idx].load = DiffLoadState::Binary;
+                        diff_ctx.store.continuous_diff.files[slot_idx].load = DiffLoadState::Binary;
                     }
                     Err(_) => {}
                 }
             }
 
             let is_binary = matches!(
-                store.continuous_diff.files[slot_idx].load,
+                diff_ctx.store.continuous_diff.files[slot_idx].load,
                 DiffLoadState::Binary
             );
-            let (new_line_index, hunk_count) = match &store.continuous_diff.files[slot_idx].load {
-                DiffLoadState::Loaded {
-                    sections, hunks, ..
-                } => (LineIndex::new(sections), hunks.len()),
-                _ => (LineIndex::new(&[]), 0),
-            };
+            let (new_line_index, hunk_count) =
+                match &diff_ctx.store.continuous_diff.files[slot_idx].load {
+                    DiffLoadState::Loaded {
+                        sections, hunks, ..
+                    } => (LineIndex::new(sections), hunks.len()),
+                    _ => (LineIndex::new(&[]), 0),
+                };
 
             self.state.is_binary = is_binary;
             self.state.line_index = new_line_index;
             self.state.select_first_hunk(hunk_count);
-            store.continuous_diff.index_dirty = true;
+            diff_ctx.store.continuous_diff.index_dirty = true;
         }
 
         self.current_key = Some(cache_key);

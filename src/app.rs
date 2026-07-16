@@ -6,7 +6,7 @@ use git2::{ErrorCode, Repository};
 
 use crate::action::Action;
 use crate::cli::Command;
-use crate::diff_panel::DiffPanel;
+use crate::diff_panel::{DiffContext, DiffPanel};
 use crate::error::{AppError, AppResult};
 use crate::event::Event;
 use crate::files_panel::FilesPanel;
@@ -75,7 +75,12 @@ impl App {
         files.select_first();
 
         let mut diff = DiffPanel::new();
-        diff.refresh(&mut files, &mut store, &repo, &diff_source);
+        diff.refresh(&mut DiffContext {
+            files: &mut files,
+            store: &mut store,
+            repo: &repo,
+            diff_source: &diff_source,
+        });
 
         let (width, _) = crossterm::terminal::size().unwrap_or((0, 0));
 
@@ -228,7 +233,12 @@ impl App {
                     repository::status(repo)
                         .map_err(|error| error.with_operation("refresh repository status"))?,
                 );
-                diff.reload(files, store, repo, diff_source)?;
+                diff.reload(&mut DiffContext {
+                    files,
+                    store,
+                    repo,
+                    diff_source,
+                })?;
             }
             Action::ToggleSidebar => {
                 *show_sidebar = !*show_sidebar;
@@ -246,10 +256,12 @@ impl App {
                     action,
                     *focus,
                     selection_changed,
-                    files,
-                    store,
-                    repo,
-                    diff_source,
+                    &mut DiffContext {
+                        files,
+                        store,
+                        repo,
+                        diff_source,
+                    },
                 );
             }
         }
