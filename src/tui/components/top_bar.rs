@@ -3,11 +3,14 @@ use crate::git::repository::{DiffSource, Head, RepositoryStatus, RevisionData};
 use crate::tui::theme::Theme;
 use ratatui::{
     Frame,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Alignment, Constraint, Layout, Rect},
     style::Style,
     text::{Line, Span},
     widgets::{Block, Borders, Paragraph},
 };
+
+const HORIZONTAL_PADDING: u16 = 1;
+const SUMMARY_GAP: u16 = 2;
 
 pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
     let theme = app.theme();
@@ -18,27 +21,19 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let layout = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([
-            Constraint::Length(1),
-            Constraint::Percentage(45),
-            Constraint::Percentage(55),
-            Constraint::Length(1),
-        ])
-        .split(inner);
-
-    let left = layout[1];
-    let right = layout[2];
+    let right_line = diff_summary(app);
+    let right_width = u16::try_from(right_line.width()).unwrap_or(u16::MAX);
+    let (left, right) = content_areas(inner, right_width);
 
     let left_line = match app.diff_source() {
         DiffSource::Worktree => worktree_summary(app.repository_status(), theme),
-        DiffSource::Revision(revision) => {
-            revision_summary(app.repository_status(), revision, theme)
-        }
+        DiffSource::Revision(revision) => revision_summary(
+            app.repository_status(),
+            revision,
+            theme,
+            usize::from(left.width),
+        ),
     };
-
-    let right_line = diff_summary(app);
 
     let bg_style = Style::default().bg(theme.bg);
 
@@ -49,6 +44,19 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
             .alignment(Alignment::Right),
         right,
     );
+}
+
+fn content_areas(area: Rect, right_width: u16) -> (Rect, Rect) {
+    let layout = Layout::horizontal([
+        Constraint::Length(HORIZONTAL_PADDING),
+        Constraint::Fill(1),
+        Constraint::Length(SUMMARY_GAP),
+        Constraint::Length(right_width),
+        Constraint::Length(HORIZONTAL_PADDING),
+    ])
+    .split(area);
+
+    (layout[1], layout[3])
 }
 
 fn worktree_summary(status: Option<&RepositoryStatus>, theme: Theme) -> Line<'static> {
@@ -121,22 +129,55 @@ fn revision_summary(
     status: Option<&RepositoryStatus>,
     revision: &RevisionData,
     theme: Theme,
+    max_width: usize,
 ) -> Line<'static> {
     let repository_name =
         status.map_or_else(|| "no repository".to_string(), |status| status.name.clone());
     let subject = if revision.subject.is_empty() {
-        "(no subject)".to_string()
+        "(no subject)"
     } else {
-        revision.subject.clone()
+        &revision.subject
     };
 
-    Line::from(vec![
+    let prefix = vec![
         Span::styled(repository_name, theme.repo_name()),
         Span::styled("  ·  ", Style::default()),
         Span::styled(revision.short_oid.clone(), theme.branch_name()),
         Span::styled("  ·  ", Style::default()),
-        Span::styled(subject, theme.muted()),
-    ])
+    ];
+    let subject_width = max_width.saturating_sub(Line::from(prefix.clone()).width());
+    let subject = truncate_with_ellipsis(subject, subject_width);
+
+    Line::from(
+        prefix
+            .into_iter()
+            .chain([Span::styled(subject, theme.muted())])
+            .collect::<Vec<_>>(),
+    )
+}
+
+fn truncate_with_ellipsis(text: &str, max_width: usize) -> String {
+    if Line::raw(text).width() <= max_width {
+        return text.to_string();
+    }
+    if max_width == 0 {
+        return String::new();
+    }
+
+    let ellipsis = '…';
+    let content_width = max_width.saturating_sub(Line::raw(ellipsis.to_string()).width());
+    let mut truncated = String::new();
+
+    for character in text.chars() {
+        truncated.push(character);
+        if Line::raw(&truncated).width() > content_width {
+            truncated.pop();
+            break;
+        }
+    }
+
+    truncated.push(ellipsis);
+    truncated
 }
 
 fn diff_summary(app: &App) -> Line<'static> {
