@@ -1,4 +1,5 @@
 use crate::git::repository::{DiffSection, DiffSectionKind};
+use crate::state::DiffLayout;
 
 const HUNK_HEADER_ROWS: usize = 1;
 
@@ -14,11 +15,34 @@ pub struct LineIndex {
     pub hunk_starts: Vec<usize>,
     pub section_header_rows: Vec<(usize, DiffSectionKind)>,
     pub total_rows: usize,
+    comparison_hunk_starts: Vec<usize>,
+    comparison_section_header_rows: Vec<(usize, DiffSectionKind)>,
+    comparison_total_rows: usize,
 }
 
 impl LineIndex {
     pub fn new(sections: &[DiffSection]) -> Self {
         let total_hunks = sections.iter().map(|s| s.hunks.len()).sum();
+        let (hunk_starts, section_header_rows, total_rows) =
+            Self::build(sections, DiffLayout::Unified, total_hunks);
+        let (comparison_hunk_starts, comparison_section_header_rows, comparison_total_rows) =
+            Self::build(sections, DiffLayout::SideBySide, total_hunks);
+
+        Self {
+            hunk_starts,
+            section_header_rows,
+            total_rows,
+            comparison_hunk_starts,
+            comparison_section_header_rows,
+            comparison_total_rows,
+        }
+    }
+
+    fn build(
+        sections: &[DiffSection],
+        layout: DiffLayout,
+        total_hunks: usize,
+    ) -> (Vec<usize>, Vec<(usize, DiffSectionKind)>, usize) {
         let mut hunk_starts = Vec::with_capacity(total_hunks);
         let mut section_header_rows = Vec::new();
         let show_headers = sections.len() > 1;
@@ -31,39 +55,69 @@ impl LineIndex {
             }
             for hunk in &section.hunks {
                 hunk_starts.push(offset);
-                offset += HUNK_HEADER_ROWS + hunk.lines.len();
+                let row_count = match layout {
+                    DiffLayout::Unified => hunk.lines.len(),
+                    DiffLayout::SideBySide => hunk.comparison_rows.len(),
+                };
+                offset += HUNK_HEADER_ROWS + row_count;
             }
         }
 
-        Self {
-            hunk_starts,
-            section_header_rows,
-            total_rows: offset,
+        (hunk_starts, section_header_rows, offset)
+    }
+
+    pub const fn total_rows_for(&self, layout: DiffLayout) -> usize {
+        match layout {
+            DiffLayout::Unified => self.total_rows,
+            DiffLayout::SideBySide => self.comparison_total_rows,
         }
     }
 
+    pub fn hunk_starts_for(&self, layout: DiffLayout) -> &[usize] {
+        match layout {
+            DiffLayout::Unified => &self.hunk_starts,
+            DiffLayout::SideBySide => &self.comparison_hunk_starts,
+        }
+    }
+
+    #[cfg(test)]
     pub fn lookup(&self, global_row: usize) -> Option<IndexRow> {
-        if global_row >= self.total_rows {
+        self.lookup_for(global_row, DiffLayout::Unified)
+    }
+
+    pub fn lookup_for(&self, global_row: usize, layout: DiffLayout) -> Option<IndexRow> {
+        let (hunk_starts, section_header_rows, total_rows) = match layout {
+            DiffLayout::Unified => (
+                &self.hunk_starts,
+                &self.section_header_rows,
+                self.total_rows,
+            ),
+            DiffLayout::SideBySide => (
+                &self.comparison_hunk_starts,
+                &self.comparison_section_header_rows,
+                self.comparison_total_rows,
+            ),
+        };
+
+        if global_row >= total_rows {
             return None;
         }
 
-        if let Some(idx) = self
-            .section_header_rows
+        if let Some(idx) = section_header_rows
             .iter()
             .position(|&(row, _)| row == global_row)
         {
             return Some(IndexRow::SectionHeader(idx));
         }
 
-        if self.hunk_starts.is_empty() {
+        if hunk_starts.is_empty() {
             return None;
         }
 
-        let hunk_idx = self
-            .hunk_starts
+        let hunk_idx = hunk_starts
             .partition_point(|&s| s <= global_row)
             .checked_sub(1)?;
-        let offset = global_row - self.hunk_starts[hunk_idx];
+        let offset = global_row - hunk_starts[hunk_idx];
         if offset == 0 {
             Some(IndexRow::HunkHeader(hunk_idx))
         } else {

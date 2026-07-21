@@ -7,7 +7,7 @@ pub mod review;
 pub mod screen;
 pub mod tree;
 
-pub use diff::Diff;
+pub use diff::{Diff, DiffLayout};
 pub use files::Files;
 pub use focus::Focus;
 pub use line_index::LineIndex;

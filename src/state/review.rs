@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use crate::git::repository::{DiffHunk, DiffSection, DiffSectionKind, FileEntry, FileStatus};
-use crate::state::LineIndex;
+use crate::git::repository::{DiffHunk, DiffSectionKind, FileEntry, FileStatus};
 use crate::state::line_index::IndexRow;
+use crate::state::{DiffLayout, LineIndex};
 
 const HEADER_ROW: usize = 1;
 const CONTENT_ROW: usize = 1;
@@ -23,9 +23,6 @@ pub enum DiffLoadState {
         index: LineIndex,
     },
     Binary,
-    TooLarge {
-        lines: usize,
-    },
     Error(String),
 }
 
@@ -48,6 +45,7 @@ pub struct ContinuousDiff {
     pub index: ReviewIndex,
     pub index_dirty: bool,
     pub generation: u64,
+    pub layout: DiffLayout,
 }
 
 #[derive(Debug, Default)]
@@ -67,24 +65,21 @@ pub enum RenderedRow {
         file_idx: usize,
         hunk_idx: usize,
     },
-    DiffLine {
+    DiffRow {
         file_idx: usize,
         hunk_idx: usize,
-        line_idx: usize,
+        row_idx: usize,
     },
     Loading,
     Binary {
         file_idx: usize,
-    },
-    TooLarge {
-        lines: usize,
     },
     Error {
         msg: String,
     },
 }
 
-type DiffPayload = (Vec<DiffSection>, Vec<DiffHunk>, LineIndex);
+type DiffPayload = (Vec<DiffHunk>, LineIndex);
 
 #[derive(Debug)]
 pub struct WorkerResult {
@@ -95,7 +90,7 @@ pub struct WorkerResult {
 
 impl ReviewIndex {
     pub fn file_at_row(&self, global_row: usize) -> Option<(usize, usize)> {
-        if self.file_starts.is_empty() {
+        if self.file_starts.is_empty() || global_row >= self.total_rows {
             return None;
         }
         let file_idx = self
@@ -108,14 +103,13 @@ impl ReviewIndex {
 }
 
 impl FileSlot {
-    pub fn row_count(&self) -> usize {
+    pub fn row_count(&self, layout: DiffLayout) -> usize {
         match &self.load {
             DiffLoadState::Binary => HEADER_ROW,
-            DiffLoadState::NotLoaded
-            | DiffLoadState::Loading
-            | DiffLoadState::Error(_)
-            | DiffLoadState::TooLarge { .. } => CONTENT_ROW + HEADER_ROW,
-            DiffLoadState::Loaded { index, .. } => index.total_rows + HEADER_ROW,
+            DiffLoadState::NotLoaded | DiffLoadState::Loading | DiffLoadState::Error(_) => {
+                CONTENT_ROW + HEADER_ROW
+            }
+            DiffLoadState::Loaded { index, .. } => index.total_rows_for(layout) + HEADER_ROW,
         }
     }
 }
@@ -126,7 +120,7 @@ impl ContinuousDiff {
         let mut offset = 0;
         for file_slot in &self.files {
             file_starts.push(offset);
-            offset += file_slot.row_count();
+            offset += file_slot.row_count(self.layout);
         }
         self.index.file_starts = file_starts;
         self.index.total_rows = offset;
@@ -144,20 +138,30 @@ impl ContinuousDiff {
         } else {
             let diff_row = local_row - 1;
             match &self.files[file_idx].load {
-                DiffLoadState::Loaded { index, .. } => match index.lookup(diff_row)? {
-                    IndexRow::SectionHeader(section_idx) => {
-                        let kind = index.section_header_rows[section_idx].1;
-                        Some(RenderedRow::SectionHeader { kind })
+                DiffLoadState::Loaded { hunks, index } => {
+                    match index.lookup_for(diff_row, self.layout)? {
+                        IndexRow::SectionHeader(section_idx) => {
+                            let kind = index.section_header_rows[section_idx].1;
+                            Some(RenderedRow::SectionHeader { kind })
+                        }
+                        IndexRow::HunkHeader(hunk_idx) => {
+                            hunks.get(hunk_idx)?;
+                            Some(RenderedRow::HunkHeader { file_idx, hunk_idx })
+                        }
+                        IndexRow::DiffLine(hunk_idx, row_idx) => {
+                            let hunk = hunks.get(hunk_idx)?;
+                            let row_count = match self.layout {
+                                DiffLayout::Unified => hunk.lines.len(),
+                                DiffLayout::SideBySide => hunk.comparison_rows.len(),
+                            };
+                            (row_idx < row_count).then_some(RenderedRow::DiffRow {
+                                file_idx,
+                                hunk_idx,
+                                row_idx,
+                            })
+                        }
                     }
-                    IndexRow::HunkHeader(hunk_idx) => {
-                        Some(RenderedRow::HunkHeader { file_idx, hunk_idx })
-                    }
-                    IndexRow::DiffLine(hunk_idx, line_idx) => Some(RenderedRow::DiffLine {
-                        file_idx,
-                        hunk_idx,
-                        line_idx,
-                    }),
-                },
+                }
                 DiffLoadState::Loading | DiffLoadState::NotLoaded => Some(RenderedRow::Loading),
                 DiffLoadState::Binary => {
                     debug_assert!(
@@ -165,9 +169,6 @@ impl ContinuousDiff {
                         "binary slot has row_count=1, local_row>0 unreachable"
                     );
                     None
-                }
-                DiffLoadState::TooLarge { lines, .. } => {
-                    Some(RenderedRow::TooLarge { lines: *lines })
                 }
                 DiffLoadState::Error(msg) => Some(RenderedRow::Error { msg: msg.clone() }),
             }

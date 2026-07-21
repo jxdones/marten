@@ -7,7 +7,6 @@ use git2::{
 
 const DEFAULT_HEAD: &str = "HEAD";
 const SHORT_COMMIT_LEN: usize = 7;
-pub const DIFF_LINE_THRESHOLD: usize = 15_000;
 
 #[derive(Debug, Clone)]
 pub struct RepositoryStatus {
@@ -347,41 +346,6 @@ pub fn files_from_commit(repo: &Repository, oid: Oid) -> AppResult<Vec<FileEntry
     }
 
     Ok(entries)
-}
-
-pub fn file_diff_line_count(repo: &Repository, path: &str, status: FileStatus) -> AppResult<usize> {
-    if status == FileStatus::Untracked {
-        return Ok(untracked_file_content(repo, path)?.lines().count());
-    }
-
-    let head = repo.head()?;
-    let mut opts = DiffOptions::new();
-    opts.pathspec(path);
-
-    let diff = match status {
-        FileStatus::Staged | FileStatus::Partial => {
-            let head_commit = head.peel_to_commit()?;
-            let head_tree = head_commit.tree()?;
-            repo.diff_tree_to_index(Some(&head_tree), None, Some(&mut opts))?
-        }
-        FileStatus::Unstaged => repo.diff_index_to_workdir(None, Some(&mut opts))?,
-        _ => return Ok(0),
-    };
-
-    let mut count = 0;
-    diff.foreach(
-        &mut |_delta, _progress| true,
-        None,
-        None,
-        Some(&mut |_delta, _hunk, line| {
-            if [' ', '+', '-'].contains(&line.origin()) {
-                count += 1;
-            }
-            true
-        }),
-    )?;
-
-    Ok(count)
 }
 
 pub fn file_diff(
@@ -981,19 +945,5 @@ mod tests {
         assert_eq!(hunk.insertions, 2);
         assert_eq!(hunk.deletions, 0);
         assert!(hunk.lines.iter().all(|line| line.origin == '+'));
-    }
-
-    #[test]
-    fn file_diff_line_count_matches_visible_diff_lines() {
-        let (_dir, repo) = init_repo("line-count");
-        write_and_commit(&repo, "tracked.txt", "one\n", "init");
-        write_file(&repo, "tracked.txt", "one\ntwo\n");
-
-        let entries = files(&repo).unwrap();
-        let file = entry(&entries, "tracked.txt");
-        assert_eq!(file.status, FileStatus::Unstaged);
-
-        let line_count = file_diff_line_count(&repo, "tracked.txt", FileStatus::Unstaged).unwrap();
-        assert!(line_count >= 2);
     }
 }

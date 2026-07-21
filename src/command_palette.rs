@@ -71,6 +71,18 @@ pub fn command_groups() -> &'static [CommandGroup] {
                     keybind: "[",
                     action: Action::PreviousHunk,
                 },
+                CommandItem {
+                    label: "scroll diff left",
+                    description: "show earlier columns in the diff",
+                    keybind: "h / ←",
+                    action: Action::ScrollDiffLeft,
+                },
+                CommandItem {
+                    label: "scroll diff right",
+                    description: "show later columns in the diff",
+                    keybind: "l / →",
+                    action: Action::ScrollDiffRight,
+                },
             ],
         },
         CommandGroup {
@@ -85,8 +97,14 @@ pub fn command_groups() -> &'static [CommandGroup] {
                 CommandItem {
                     label: "toggle numbers",
                     description: "show or hide diff line numbers",
-                    keybind: "l",
+                    keybind: "L",
                     action: Action::ToggleDiffLineNumbers,
+                },
+                CommandItem {
+                    label: "toggle diff layout",
+                    description: "switch between unified and side-by-side",
+                    keybind: "v",
+                    action: Action::ToggleDiffLayout,
                 },
             ],
         },

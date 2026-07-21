@@ -15,7 +15,7 @@ use crate::{
 
 const MODAL_SIZE: modal::ModalSize = modal::ModalSize::new(
     modal::ResponsiveSize::new(90, 80).with_margin(2),
-    modal::ResponsiveSize::new(75, 16).with_margin(1),
+    modal::ResponsiveSize::new(75, 18).with_margin(1),
 );
 
 pub fn draw(frame: &mut Frame, area: Rect, app: &mut App) {

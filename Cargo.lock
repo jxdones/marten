@@ -1006,6 +1006,7 @@ dependencies = [
  "similar",
  "syntect",
  "tempfile",
+ "unicode-width",
 ]
 
 [[package]]

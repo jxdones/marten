@@ -3,12 +3,13 @@ use ratatui::style::{Modifier, Style, Stylize};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Block, Borders, Paragraph};
 use ratatui::{Frame, layout::Rect};
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::app::App;
 use crate::git::repository::{DiffHunk, DiffLine, DiffSectionKind, FileEntry, FileStatus};
 use crate::inline_diff::{self, Range};
 use crate::state::review::RenderedRow;
-use crate::state::{ContinuousDiff, DiffLoadState};
+use crate::state::{ContinuousDiff, DiffLayout, DiffLoadState};
 use crate::syntax;
 use crate::tui::theme::Theme;
 
@@ -37,11 +38,18 @@ impl HunkPosition {
 
 fn hunk_position(app: &App) -> HunkPosition {
     let continuous_diff = app.continuous_diff();
+    let layout = continuous_diff.layout;
     let scroll = app.review_state().continuous_scroll;
     match continuous_diff.lookup_row(scroll) {
         Some(RenderedRow::HunkHeader { file_idx, hunk_idx }) => {
             let (total, line_count) = match &continuous_diff.files[file_idx].load {
-                DiffLoadState::Loaded { hunks, .. } => (hunks.len(), hunks[hunk_idx].lines.len()),
+                DiffLoadState::Loaded { hunks, .. } => (
+                    hunks.len(),
+                    match layout {
+                        DiffLayout::Unified => hunks[hunk_idx].lines.len(),
+                        DiffLayout::SideBySide => hunks[hunk_idx].comparison_rows.len(),
+                    },
+                ),
                 _ => (0, 0),
             };
             HunkPosition {
@@ -52,20 +60,26 @@ fn hunk_position(app: &App) -> HunkPosition {
                 line_count,
             }
         }
-        Some(RenderedRow::DiffLine {
+        Some(RenderedRow::DiffRow {
             file_idx,
             hunk_idx,
-            line_idx,
+            row_idx,
         }) => {
             let (total, line_count) = match &continuous_diff.files[file_idx].load {
-                DiffLoadState::Loaded { hunks, .. } => (hunks.len(), hunks[hunk_idx].lines.len()),
+                DiffLoadState::Loaded { hunks, .. } => (
+                    hunks.len(),
+                    match layout {
+                        DiffLayout::Unified => hunks[hunk_idx].lines.len(),
+                        DiffLayout::SideBySide => hunks[hunk_idx].comparison_rows.len(),
+                    },
+                ),
                 _ => (0, 0),
             };
             HunkPosition {
                 file_idx: Some(file_idx),
                 selected_hunk: hunk_idx + 1,
                 hunk_count: total,
-                selected_line: line_idx,
+                selected_line: row_idx,
                 line_count,
             }
         }
@@ -100,7 +114,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App, is_focused: bool, has_side
     let continuous_diff = app.continuous_diff();
     let selected_hunk = match continuous_diff.lookup_row(scroll) {
         Some(RenderedRow::HunkHeader { file_idx, hunk_idx }) => Some((file_idx, hunk_idx)),
-        Some(RenderedRow::DiffLine {
+        Some(RenderedRow::DiffRow {
             file_idx, hunk_idx, ..
         }) => Some((file_idx, hunk_idx)),
         _ => None,
@@ -111,6 +125,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App, is_focused: bool, has_side
         continuous_diff,
         selected_hunk,
         app.diff_state().show_line_numbers,
+        app.diff_state().horizontal_scroll,
         theme,
         panel_width,
         position,
@@ -135,6 +150,7 @@ fn render_continuous_diff(
     continuous_diff: &ContinuousDiff,
     selected_hunk: Option<(usize, usize)>,
     show_line_numbers: bool,
+    horizontal_scroll: usize,
     theme: Theme,
     panel_width: usize,
     position: HunkPosition,
@@ -204,27 +220,43 @@ fn render_continuous_diff(
                         _ => vec![],
                     }
                 }
-                Some(RenderedRow::DiffLine {
+                Some(RenderedRow::DiffRow {
                     file_idx,
                     hunk_idx,
-                    line_idx,
+                    row_idx,
                 }) => {
                     let state = &continuous_diff.files[file_idx].load;
                     match state {
                         DiffLoadState::Loaded { hunks, .. } => {
-                            let line = &hunks[hunk_idx].lines[line_idx];
+                            let hunk = &hunks[hunk_idx];
                             let path = &continuous_diff.files[file_idx].entry.path;
                             let is_selected = selected_hunk == Some((file_idx, hunk_idx));
-                            let ranges = inline_ranges(&hunks[hunk_idx], line_idx);
-                            let diff = diff_line(
-                                row_width,
-                                line,
-                                Some(path),
-                                &ranges,
-                                is_selected,
-                                show_line_numbers,
-                                theme,
-                            );
+                            let diff = match continuous_diff.layout {
+                                DiffLayout::Unified => {
+                                    let line = &hunk.lines[row_idx];
+                                    let ranges = inline_ranges(hunk, row_idx);
+                                    diff_line(
+                                        row_width,
+                                        line,
+                                        path,
+                                        &ranges,
+                                        is_selected,
+                                        show_line_numbers,
+                                        horizontal_scroll,
+                                        theme,
+                                    )
+                                }
+                                DiffLayout::SideBySide => side_by_side_diff_line(
+                                    row_width,
+                                    hunk,
+                                    row_idx,
+                                    path,
+                                    is_selected,
+                                    show_line_numbers,
+                                    horizontal_scroll,
+                                    theme,
+                                ),
+                            };
                             vec![diff]
                         }
                         _ => vec![],
@@ -237,10 +269,6 @@ fn render_continuous_diff(
                     let entry = &continuous_diff.files[file_idx].entry;
                     vec![render_binary_header(row_width, entry, theme)]
                 }
-                Some(RenderedRow::TooLarge { lines, .. }) => vec![Line::from(Span::styled(
-                    format!("  File too large ({lines} lines) — press Enter to load"),
-                    theme.muted(),
-                ))],
                 Some(RenderedRow::Error { msg, .. }) => vec![Line::from(Span::styled(
                     format!(" Error: {msg}"),
                     theme.muted(),
@@ -449,13 +477,15 @@ fn hunk_header_line(
     .style(Style::default().bg(theme.hunk_header_bg))
 }
 
+#[allow(clippy::too_many_arguments)]
 fn diff_line(
     width: usize,
     line: &DiffLine,
-    path: Option<&str>,
+    path: &str,
     inline_ranges: &[Range],
     is_selected: bool,
     show_line_numbers: bool,
+    horizontal_scroll: usize,
     theme: Theme,
 ) -> Line<'static> {
     let base = match line.origin {
@@ -463,9 +493,7 @@ fn diff_line(
         '-' => theme.diff_del(),
         _ => theme.muted().bg(theme.bg),
     };
-    let line_style = base;
-    let content_style = base;
-    let content = line.content.trim_end().replace('\t', "    ");
+    let content = display_content(&line.content);
     let prefix = if show_line_numbers {
         let old_lineno = line_number(line.old_lineno);
         let new_lineno = line_number(line.new_lineno);
@@ -474,44 +502,210 @@ fn diff_line(
         format!("{} ", line.origin)
     };
 
-    let mut spans = vec![Span::styled(prefix, line_style)];
-    if let Some(path) = path {
-        if let Some(highlighted) = syntax::highlight_line(path, &content, content_style) {
-            spans.extend(style_content_spans(
-                highlighted,
-                inline_ranges,
-                line.origin,
-                false,
-                theme,
-            ));
-        } else {
-            spans.extend(style_content_spans(
-                vec![Span::styled(content, content_style)],
-                inline_ranges,
-                line.origin,
-                false,
-                theme,
-            ));
-        }
+    let highlighted = syntax::highlight_line(path, &content, base)
+        .unwrap_or_else(|| vec![Span::styled(content, base)]);
+    let content_spans = style_content_spans(highlighted, inline_ranges, line.origin, false, theme);
+    let mut spans = vec![Span::styled(prefix, base)];
+    spans.extend(skip_spans(content_spans, horizontal_scroll));
+
+    bordered_line(width, spans, base, border_style(line, is_selected, theme))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn side_by_side_diff_line(
+    width: usize,
+    hunk: &DiffHunk,
+    row_idx: usize,
+    path: &str,
+    is_selected: bool,
+    show_line_numbers: bool,
+    horizontal_scroll: usize,
+    theme: Theme,
+) -> Line<'static> {
+    let row = &hunk.comparison_rows[row_idx];
+    let old_line = row.old_line_idx.map(|idx| &hunk.lines[idx]);
+    let new_line = row.new_line_idx.map(|idx| &hunk.lines[idx]);
+    let (old_ranges, new_ranges) = comparison_inline_ranges(old_line, new_line);
+
+    let left_width = width / 2;
+    let right_width = width.saturating_sub(left_width);
+    let mut spans = vec![change_gutter(
+        old_line,
+        '-',
+        is_selected,
+        theme.del_gutter,
+        " ",
+        Style::default().bg(theme.bg),
+    )];
+    spans.extend(comparison_side_spans(
+        old_line,
+        true,
+        path,
+        &old_ranges,
+        show_line_numbers,
+        horizontal_scroll,
+        left_width.saturating_sub(1),
+        theme,
+    ));
+    spans.push(change_gutter(
+        new_line,
+        '+',
+        is_selected,
+        theme.add_gutter,
+        "│",
+        Style::default().fg(theme.hunk_header_bg),
+    ));
+    spans.extend(comparison_side_spans(
+        new_line,
+        false,
+        path,
+        &new_ranges,
+        show_line_numbers,
+        horizontal_scroll,
+        right_width.saturating_sub(1),
+        theme,
+    ));
+
+    Line::from(spans)
+}
+
+fn change_gutter(
+    line: Option<&DiffLine>,
+    origin: char,
+    is_selected: bool,
+    color: ratatui::style::Color,
+    fallback: &'static str,
+    fallback_style: Style,
+) -> Span<'static> {
+    if is_selected && line.is_some_and(|line| line.origin == origin) {
+        Span::styled("▌", Style::default().fg(color))
     } else {
-        spans.extend(style_content_spans(
-            vec![Span::styled(content, content_style)],
-            inline_ranges,
-            line.origin,
-            false,
-            theme,
-        ));
+        Span::styled(fallback, fallback_style)
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn comparison_side_spans(
+    line: Option<&DiffLine>,
+    old_side: bool,
+    path: &str,
+    inline_ranges: &[Range],
+    show_line_numbers: bool,
+    horizontal_scroll: usize,
+    width: usize,
+    theme: Theme,
+) -> Vec<Span<'static>> {
+    let Some(line) = line else {
+        return vec![Span::styled(
+            " ".repeat(width),
+            Style::default().bg(theme.bg),
+        )];
+    };
+    let style = match line.origin {
+        '+' => theme.diff_add(),
+        '-' => theme.diff_del(),
+        _ => theme.muted().bg(theme.bg),
+    };
+    let number = if old_side {
+        line.old_lineno
+    } else {
+        line.new_lineno
+    };
+    let prefix = if show_line_numbers {
+        format!("{} {} ", line_number(number), line.origin)
+    } else {
+        format!("{} ", line.origin)
+    };
+    let content = display_content(&line.content);
+    let highlighted = syntax::highlight_line(path, &content, style)
+        .unwrap_or_else(|| vec![Span::styled(content, style)]);
+    let content_spans = style_content_spans(highlighted, inline_ranges, line.origin, false, theme);
+    let mut spans = vec![Span::styled(prefix, style)];
+    spans.extend(skip_spans(content_spans, horizontal_scroll));
+    fit_spans(spans, width, style)
+}
+
+fn skip_spans(spans: Vec<Span<'static>>, mut amount: usize) -> Vec<Span<'static>> {
+    let mut scrolled = Vec::new();
+
+    for span in spans {
+        let span_width = text_width(&span.content);
+        if amount >= span_width {
+            amount -= span_width;
+            continue;
+        }
+
+        let mut content = String::new();
+        for ch in span.content.chars() {
+            let width = ch.width().unwrap_or(0);
+            if amount > 0 {
+                if amount >= width {
+                    amount -= width;
+                } else {
+                    amount = 0;
+                }
+                continue;
+            }
+            content.push(ch);
+        }
+        if !content.is_empty() {
+            scrolled.push(Span::styled(content, span.style));
+        }
     }
 
-    bordered_line(
-        width,
-        spans,
-        line_style,
-        border_style(line, is_selected, theme),
-    )
+    scrolled
+}
+
+fn comparison_inline_ranges(
+    old_line: Option<&DiffLine>,
+    new_line: Option<&DiffLine>,
+) -> (Vec<Range>, Vec<Range>) {
+    match (old_line, new_line) {
+        (Some(old_line), Some(new_line)) if old_line.origin == '-' && new_line.origin == '+' => {
+            inline_diff::changed_ranges(
+                &display_content(&old_line.content),
+                &display_content(&new_line.content),
+            )
+        }
+        _ => (Vec::new(), Vec::new()),
+    }
+}
+
+fn fit_spans(spans: Vec<Span<'static>>, width: usize, fill_style: Style) -> Vec<Span<'static>> {
+    let mut fitted = Vec::new();
+    let mut remaining = width;
+
+    for span in spans {
+        if remaining == 0 {
+            break;
+        }
+        let mut content = String::new();
+        let mut used = 0;
+        for ch in span.content.chars() {
+            let width = ch.width().unwrap_or(0);
+            if used + width > remaining {
+                break;
+            }
+            content.push(ch);
+            used += width;
+        }
+        if used > 0 {
+            fitted.push(Span::styled(content, span.style));
+            remaining = remaining.saturating_sub(used);
+        }
+    }
+
+    if remaining > 0 {
+        fitted.push(Span::styled(" ".repeat(remaining), fill_style));
+    }
+    fitted
 }
 
 fn inline_ranges(hunk: &DiffHunk, line_idx: usize) -> Vec<Range> {
+    if !matches!(hunk.lines[line_idx].origin, '+' | '-') {
+        return Vec::new();
+    }
+
     let Some((old_line_idx, new_line_idx)) = hunk.comparison_rows.iter().find_map(|row| {
         let (Some(old_line_idx), Some(new_line_idx)) = (row.old_line_idx, row.new_line_idx) else {
             return None;
@@ -530,8 +724,8 @@ fn inline_ranges(hunk: &DiffHunk, line_idx: usize) -> Vec<Range> {
     };
 
     let (old_ranges, new_ranges) = inline_diff::changed_ranges(
-        hunk.lines[old_line_idx].content.trim_end(),
-        hunk.lines[new_line_idx].content.trim_end(),
+        &display_content(&hunk.lines[old_line_idx].content),
+        &display_content(&hunk.lines[new_line_idx].content),
     );
     if line_idx == old_line_idx {
         old_ranges
@@ -669,7 +863,11 @@ fn file_status_symbol(status: FileStatus) -> &'static str {
 }
 
 fn text_width(text: &str) -> usize {
-    text.chars().count()
+    UnicodeWidthStr::width(text)
+}
+
+fn display_content(content: &str) -> String {
+    content.trim_end().replace('\t', "    ")
 }
 
 fn draw_empty_diff(frame: &mut Frame, area: Rect, theme: Theme) {

@@ -5,7 +5,8 @@ use git2::Repository;
 
 use crate::git::repository::{self, DiffHunk, DiffSource, FileEntry};
 use crate::state::{
-    ContinuousDiff, DiffLoadState, FileKey, FileSlot, LineIndex, ReviewIndex, WorkerResult,
+    ContinuousDiff, DiffLayout, DiffLoadState, FileKey, FileSlot, LineIndex, ReviewIndex,
+    WorkerResult,
 };
 
 pub struct DiffStore {
@@ -18,7 +19,7 @@ impl DiffStore {
     pub fn new(entries: Vec<FileEntry>) -> Self {
         let (tx, rx) = std::sync::mpsc::channel::<WorkerResult>();
         Self {
-            continuous_diff: build_continuous_diff(entries, 0),
+            continuous_diff: build_continuous_diff(entries, 0, DiffLayout::Unified),
             worker_tx: tx,
             worker_rx: rx,
         }
@@ -26,10 +27,11 @@ impl DiffStore {
 
     pub fn reload(&mut self, entries: Vec<FileEntry>) {
         let next_generation = self.continuous_diff.generation + 1;
+        let layout = self.continuous_diff.layout;
         let (tx, rx) = std::sync::mpsc::channel::<WorkerResult>();
         self.worker_tx = tx;
         self.worker_rx = rx;
-        self.continuous_diff = build_continuous_diff(entries, next_generation);
+        self.continuous_diff = build_continuous_diff(entries, next_generation, layout);
         self.continuous_diff.rebuild_index();
     }
 
@@ -41,7 +43,7 @@ impl DiffStore {
             }
             let slot = &mut self.continuous_diff.files[msg.file_idx];
             slot.load = match msg.result {
-                Ok(Some((_sections, hunks, index))) => DiffLoadState::Loaded { hunks, index },
+                Ok(Some((hunks, index))) => DiffLoadState::Loaded { hunks, index },
                 Ok(None) => DiffLoadState::Binary,
                 Err(e) => DiffLoadState::Error(e),
             };
@@ -83,10 +85,12 @@ impl DiffStore {
                         repository::file_diff_for_source(&repo, &diff_source, &path, status)
                             .map(|maybe_sections| {
                                 maybe_sections.map(|sections| {
-                                    let hunks: Vec<DiffHunk> =
-                                        sections.iter().flat_map(|s| s.hunks.clone()).collect();
                                     let index = LineIndex::new(&sections);
-                                    (sections, hunks, index)
+                                    let hunks: Vec<DiffHunk> = sections
+                                        .into_iter()
+                                        .flat_map(|section| section.hunks)
+                                        .collect();
+                                    (hunks, index)
                                 })
                             })
                             .map_err(|e| e.to_string());
@@ -120,7 +124,11 @@ fn tree_sort_key(path: &str) -> Vec<(u8, &str)> {
         .collect()
 }
 
-fn build_continuous_diff(mut entries: Vec<FileEntry>, generation: u64) -> ContinuousDiff {
+fn build_continuous_diff(
+    mut entries: Vec<FileEntry>,
+    generation: u64,
+    layout: DiffLayout,
+) -> ContinuousDiff {
     sort_entries(&mut entries);
 
     let mut file_slots = Vec::new();
@@ -144,5 +152,6 @@ fn build_continuous_diff(mut entries: Vec<FileEntry>, generation: u64) -> Contin
         index: ReviewIndex::default(),
         index_dirty: false,
         generation,
+        layout,
     }
 }

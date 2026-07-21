@@ -171,8 +171,11 @@ impl App {
         self.files.set_tree_row_count(len);
     }
 
-    pub fn set_diff_viewport_height(&mut self, height: usize) {
+    pub fn set_diff_viewport(&mut self, width: usize, height: usize) {
         self.diff.set_viewport_height(height);
+        let layout = self.diff.layout_for_width(width);
+        self.diff.set_layout(layout, &mut self.store);
+        self.diff.set_viewport_width(width, &self.store);
     }
 
     pub fn ensure_rows(&mut self) {
@@ -320,6 +323,9 @@ impl App {
             self.diff
                 .sync_continuous_scroll_to_file(file_anchor, &self.store);
         }
+        if changed {
+            self.diff.refresh_horizontal_scroll_bounds(&self.store);
+        }
         changed
     }
 
@@ -351,6 +357,12 @@ impl App {
             KeyCode::Char('1') => Action::FocusPanel(Focus::Files),
             KeyCode::Down | KeyCode::Char('j') => Action::MoveDown,
             KeyCode::Up | KeyCode::Char('k') => Action::MoveUp,
+            KeyCode::Left | KeyCode::Char('h') if self.focus == Focus::Diff => {
+                Action::ScrollDiffLeft
+            }
+            KeyCode::Right | KeyCode::Char('l') if self.focus == Focus::Diff => {
+                Action::ScrollDiffRight
+            }
             KeyCode::Char(']') => match self.focus {
                 Focus::Diff => Action::NextHunk,
                 Focus::Files => {
@@ -365,14 +377,12 @@ impl App {
             KeyCode::Char('[') if self.focus == Focus::Diff => Action::PreviousHunk,
             KeyCode::Char('n') => Action::NextFile,
             KeyCode::Char('p') => Action::PreviousFile,
-            KeyCode::Char('l') if self.focus == Focus::Diff => Action::ToggleDiffLineNumbers,
+            KeyCode::Char('L') if self.focus == Focus::Diff => Action::ToggleDiffLineNumbers,
+            KeyCode::Char('v') => Action::ToggleDiffLayout,
             KeyCode::Char('r') => Action::Refresh,
             KeyCode::Char('s') => Action::ToggleSidebar,
             KeyCode::Char('g') if self.focus == Focus::Files => Action::GoToFirst,
             KeyCode::Char('G') if self.focus == Focus::Files => Action::GoToLast,
-            KeyCode::Enter if self.focus == Focus::Diff && self.diff.is_too_large() => {
-                Action::ForceLoadDiff
-            }
             KeyCode::Char('?') => Action::ToggleCommandPalette,
             KeyCode::Enter | KeyCode::Char(' ') if self.focus == Focus::Files => {
                 Action::ToggleCollapsed

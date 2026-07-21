@@ -27,8 +27,12 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
     top_bar::draw(frame, layout.top_bar, app);
     left_sidebar::draw(frame, layout.left_sidebar, app, focus);
 
-    app.set_diff_viewport_height(layout.diff.height as usize);
     let has_sidebar = layout.left_sidebar.width > 0;
+    let border_width = usize::from(has_sidebar);
+    app.set_diff_viewport(
+        (layout.diff.width as usize).saturating_sub(border_width),
+        layout.diff.height as usize,
+    );
     diff_panel::draw(frame, layout.diff, app, focus == Focus::Diff, has_sidebar);
 
     shortcuts::draw(frame, layout.shortcuts, app);

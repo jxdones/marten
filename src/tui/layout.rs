@@ -28,13 +28,13 @@ pub fn home(area: Rect, has_sidebar: bool) -> Home {
     let sidebar_width = if area.width <= 120 || !has_sidebar {
         Constraint::Percentage(0)
     } else {
-        Constraint::Percentage(20)
+        Constraint::Percentage(15)
     };
 
     let diff_width = if area.width <= 120 || !has_sidebar {
         Constraint::Percentage(100)
     } else {
-        Constraint::Percentage(80)
+        Constraint::Percentage(85)
     };
 
     let cols = Layout::default()
