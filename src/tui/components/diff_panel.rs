@@ -5,13 +5,10 @@ use ratatui::widgets::{Block, Borders, Paragraph};
 use ratatui::{Frame, layout::Rect};
 
 use crate::app::App;
-use crate::git::repository::{
-    DIFF_LINE_THRESHOLD, DiffHunk, DiffLine, DiffSectionKind, FileEntry, FileStatus,
-};
+use crate::git::repository::{DiffHunk, DiffLine, DiffSectionKind, FileEntry, FileStatus};
 use crate::inline_diff::{self, Range};
-use crate::state::line_index::IndexRow;
 use crate::state::review::RenderedRow;
-use crate::state::{ContinuousDiff, DiffLoadState, LineIndex, ViewMode};
+use crate::state::{ContinuousDiff, DiffLoadState};
 use crate::syntax;
 use crate::tui::theme::Theme;
 
@@ -39,70 +36,46 @@ impl HunkPosition {
 }
 
 fn hunk_position(app: &App) -> HunkPosition {
-    match app.review_state().mode {
-        ViewMode::Continuous => {
-            let continuous_diff = app.continuous_diff();
-            let scroll = app.review_state().continuous_scroll;
-            match continuous_diff.lookup_row(scroll) {
-                Some(RenderedRow::HunkHeader { file_idx, hunk_idx }) => {
-                    let (total, line_count) = match &continuous_diff.files[file_idx].load {
-                        DiffLoadState::Loaded { hunks, .. } => {
-                            (hunks.len(), hunks[hunk_idx].lines.len())
-                        }
-                        _ => (0, 0),
-                    };
-                    HunkPosition {
-                        file_idx: Some(file_idx),
-                        selected_hunk: hunk_idx + 1,
-                        hunk_count: total,
-                        selected_line: 0,
-                        line_count,
-                    }
-                }
-                Some(RenderedRow::DiffLine {
-                    file_idx,
-                    hunk_idx,
-                    line_idx,
-                }) => {
-                    let (total, line_count) = match &continuous_diff.files[file_idx].load {
-                        DiffLoadState::Loaded { hunks, .. } => {
-                            (hunks.len(), hunks[hunk_idx].lines.len())
-                        }
-                        _ => (0, 0),
-                    };
-                    HunkPosition {
-                        file_idx: Some(file_idx),
-                        selected_hunk: hunk_idx + 1,
-                        hunk_count: total,
-                        selected_line: line_idx,
-                        line_count,
-                    }
-                }
-                _ => HunkPosition {
-                    file_idx: None,
-                    selected_hunk: 0,
-                    hunk_count: 0,
-                    selected_line: 0,
-                    line_count: 0,
-                },
-            }
-        }
-        ViewMode::SingleFile => {
-            let diff_state = app.diff_state();
-            let hunks = app.diff_hunks();
-            let selected_hunk = diff_state.selected_hunk.map_or(0, |idx| idx + 1);
-            let hunk_count = hunks.map_or(0, Vec::len);
-            let line_count = hunks
-                .and_then(|h| diff_state.selected_hunk.and_then(|idx| h.get(idx)))
-                .map_or(0, |hunk| hunk.lines.len());
+    let continuous_diff = app.continuous_diff();
+    let scroll = app.review_state().continuous_scroll;
+    match continuous_diff.lookup_row(scroll) {
+        Some(RenderedRow::HunkHeader { file_idx, hunk_idx }) => {
+            let (total, line_count) = match &continuous_diff.files[file_idx].load {
+                DiffLoadState::Loaded { hunks, .. } => (hunks.len(), hunks[hunk_idx].lines.len()),
+                _ => (0, 0),
+            };
             HunkPosition {
-                file_idx: None,
-                selected_hunk,
-                hunk_count,
-                selected_line: diff_state.selected_line,
+                file_idx: Some(file_idx),
+                selected_hunk: hunk_idx + 1,
+                hunk_count: total,
+                selected_line: 0,
                 line_count,
             }
         }
+        Some(RenderedRow::DiffLine {
+            file_idx,
+            hunk_idx,
+            line_idx,
+        }) => {
+            let (total, line_count) = match &continuous_diff.files[file_idx].load {
+                DiffLoadState::Loaded { hunks, .. } => (hunks.len(), hunks[hunk_idx].lines.len()),
+                _ => (0, 0),
+            };
+            HunkPosition {
+                file_idx: Some(file_idx),
+                selected_hunk: hunk_idx + 1,
+                hunk_count: total,
+                selected_line: line_idx,
+                line_count,
+            }
+        }
+        _ => HunkPosition {
+            file_idx: None,
+            selected_hunk: 0,
+            hunk_count: 0,
+            selected_line: 0,
+            line_count: 0,
+        },
     }
 }
 
@@ -123,38 +96,26 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App, is_focused: bool, has_side
     let panel_width = (area.width as usize).saturating_sub(border_width);
     let position = hunk_position(app);
 
-    let lines = match app.review_state().mode {
-        ViewMode::SingleFile => render_single_file(
-            app,
-            theme,
-            viewport_height,
-            panel_width,
-            position,
-            is_focused,
-        ),
-        ViewMode::Continuous => {
-            let scroll = app.review_state().continuous_scroll;
-            let continuous_diff = app.continuous_diff();
-            let selected_hunk = match continuous_diff.lookup_row(scroll) {
-                Some(RenderedRow::HunkHeader { file_idx, hunk_idx }) => Some((file_idx, hunk_idx)),
-                Some(RenderedRow::DiffLine {
-                    file_idx, hunk_idx, ..
-                }) => Some((file_idx, hunk_idx)),
-                _ => None,
-            };
-            render_continuous_diff(
-                scroll,
-                viewport_height,
-                continuous_diff,
-                selected_hunk,
-                app.diff_state().show_line_numbers,
-                theme,
-                panel_width,
-                position,
-                is_focused,
-            )
-        }
+    let scroll = app.review_state().continuous_scroll;
+    let continuous_diff = app.continuous_diff();
+    let selected_hunk = match continuous_diff.lookup_row(scroll) {
+        Some(RenderedRow::HunkHeader { file_idx, hunk_idx }) => Some((file_idx, hunk_idx)),
+        Some(RenderedRow::DiffLine {
+            file_idx, hunk_idx, ..
+        }) => Some((file_idx, hunk_idx)),
+        _ => None,
     };
+    let lines = render_continuous_diff(
+        scroll,
+        viewport_height,
+        continuous_diff,
+        selected_hunk,
+        app.diff_state().show_line_numbers,
+        theme,
+        panel_width,
+        position,
+        is_focused,
+    );
 
     if lines.is_empty() {
         let inner = block.inner(area);
@@ -165,74 +126,6 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App, is_focused: bool, has_side
 
     let paragraph = Paragraph::new(Text::from(lines)).block(block);
     frame.render_widget(paragraph, area);
-}
-
-fn render_single_file(
-    app: &App,
-    theme: Theme,
-    viewport_height: usize,
-    panel_width: usize,
-    position: HunkPosition,
-    is_focused: bool,
-) -> Vec<Line<'static>> {
-    let diff_state = app.diff_state();
-    let hunks = app.diff_hunks();
-    let file = app.selected_file();
-    let path = file.map(|file| file.path.as_str());
-
-    let mut lines = Vec::new();
-    if let Some(file) = file {
-        lines.push(render_file_header(
-            panel_width,
-            file,
-            theme,
-            position.active(),
-            is_focused,
-        ));
-    }
-
-    let body = if diff_state.is_binary {
-        vec![Line::from(Span::styled(
-            "Binary file — skipped",
-            theme.muted(),
-        ))]
-    } else if let Some(line_count) = diff_state.too_large {
-        vec![
-            Line::from(Span::styled(
-                "File too large to render automatically.",
-                theme.muted(),
-            )),
-            Line::from(Span::styled(
-                format!("{line_count} lines (threshold: {DIFF_LINE_THRESHOLD})"),
-                theme.muted(),
-            )),
-            Line::from(Span::styled("Press Enter to view.", theme.muted())),
-        ]
-    } else if let Some(hunks) = hunks {
-        if hunks.is_empty() {
-            vec![Line::from(Span::styled("no changes", theme.muted()))]
-        } else {
-            render_diff_lines(
-                diff_state.scroll_offset,
-                viewport_height,
-                hunks,
-                path,
-                &diff_state.line_index,
-                diff_state.selected_hunk,
-                diff_state.show_line_numbers,
-                theme,
-                panel_width,
-            )
-        }
-    } else {
-        vec![Line::from(Span::styled(
-            "no available diffs",
-            theme.muted(),
-        ))]
-    };
-
-    lines.extend(body);
-    lines
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -358,59 +251,6 @@ fn render_continuous_diff(
     );
 
     lines
-}
-
-#[allow(clippy::too_many_arguments)]
-fn render_diff_lines(
-    scroll_offset: usize,
-    viewport_height: usize,
-    hunks: &[DiffHunk],
-    path: Option<&str>,
-    line_index: &LineIndex,
-    selected_hunk: Option<usize>,
-    show_line_numbers: bool,
-    theme: Theme,
-    panel_width: usize,
-) -> Vec<Line<'static>> {
-    let row_width = panel_width;
-    let visible_rows = scroll_offset..scroll_offset + viewport_height;
-
-    visible_rows
-        .filter_map(|global_row| match line_index.lookup(global_row)? {
-            IndexRow::SectionHeader(section_idx) => {
-                let kind = line_index.section_header_rows[section_idx].1;
-                Some(section_header_line(row_width, kind, theme))
-            }
-            IndexRow::HunkHeader(hunk_idx) => {
-                let hunk = &hunks[hunk_idx];
-                let is_selected = Some(hunk_idx) == selected_hunk;
-                Some(hunk_header_line(
-                    row_width,
-                    hunk_idx,
-                    hunks.len(),
-                    hunk.header.trim_end(),
-                    (hunk.insertions, hunk.deletions),
-                    is_selected,
-                    theme,
-                ))
-            }
-            IndexRow::DiffLine(hunk_idx, line_idx) => {
-                let hunk = &hunks[hunk_idx];
-                let is_selected = Some(hunk_idx) == selected_hunk;
-                let line = &hunk.lines[line_idx];
-                let ranges = inline_ranges(hunk, line_idx, line.origin);
-                Some(diff_line(
-                    row_width,
-                    line,
-                    path,
-                    &ranges,
-                    is_selected,
-                    show_line_numbers,
-                    theme,
-                ))
-            }
-        })
-        .collect()
 }
 
 fn render_file_header(

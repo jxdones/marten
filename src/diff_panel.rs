@@ -3,17 +3,15 @@ use git2::Repository;
 use crate::action::Action;
 use crate::error::AppResult;
 use crate::files_panel::FilesPanel;
-use crate::git::repository::{self, DiffHunk, DiffSource, FileEntry};
-use crate::state::line_index::IndexRow;
+use crate::git::repository::{self, DiffSource, FileEntry};
 use crate::state::review::ReviewState;
-use crate::state::{Diff, DiffLoadState, FileKey, Focus, LineIndex, ViewMode};
+use crate::state::{Diff, DiffLoadState, FileKey, Focus, LineIndex};
 use crate::store::DiffStore;
 
 const SCROLL_STEP: usize = 1;
 
 pub struct DiffPanel {
     state: Diff,
-    current_key: Option<FileKey>,
     review: ReviewState,
 }
 
@@ -28,7 +26,6 @@ impl DiffPanel {
     pub fn new() -> Self {
         Self {
             state: Diff::default(),
-            current_key: None,
             review: ReviewState::default(),
         }
     }
@@ -42,45 +39,29 @@ impl DiffPanel {
     ) {
         if selection_changed {
             self.refresh(diff_ctx);
-            if self.review.mode == ViewMode::Continuous {
-                self.jump_to_selected_file(diff_ctx.files, diff_ctx.store);
-            }
+            self.jump_to_selected_file(diff_ctx.files, diff_ctx.store);
         }
 
         match action {
-            Action::MoveDown if focus == Focus::Diff => match self.review.mode {
-                ViewMode::Continuous => {
-                    self.continuous_scroll_down(diff_ctx.store);
-                    self.sync_files_to_scroll(diff_ctx.files, diff_ctx.store);
-                }
-                ViewMode::SingleFile => self.scroll_down(),
-            },
-            Action::MoveUp if focus == Focus::Diff => match self.review.mode {
-                ViewMode::Continuous => {
-                    self.continuous_scroll_up();
-                    self.sync_files_to_scroll(diff_ctx.files, diff_ctx.store);
-                }
-                ViewMode::SingleFile => self.scroll_up(),
-            },
+            Action::MoveDown if focus == Focus::Diff => {
+                self.continuous_scroll_down(diff_ctx.store);
+                self.sync_files_to_scroll(diff_ctx.files, diff_ctx.store);
+            }
+            Action::MoveUp if focus == Focus::Diff => {
+                self.continuous_scroll_up();
+                self.sync_files_to_scroll(diff_ctx.files, diff_ctx.store);
+            }
             Action::NextHunk => {
                 self.select_next_hunk(diff_ctx.store);
-                if self.review.mode == ViewMode::Continuous {
-                    self.sync_files_to_scroll(diff_ctx.files, diff_ctx.store);
-                }
+                self.sync_files_to_scroll(diff_ctx.files, diff_ctx.store);
             }
             Action::PreviousHunk => {
                 self.select_previous_hunk(diff_ctx.store);
-                if self.review.mode == ViewMode::Continuous {
-                    self.sync_files_to_scroll(diff_ctx.files, diff_ctx.store);
-                }
+                self.sync_files_to_scroll(diff_ctx.files, diff_ctx.store);
             }
             Action::ToggleDiffLineNumbers => {
                 self.state.toggle_line_numbers();
             }
-            Action::ToggleViewMode => match self.review.mode {
-                ViewMode::Continuous => self.review.mode = ViewMode::SingleFile,
-                ViewMode::SingleFile => self.review.mode = ViewMode::Continuous,
-            },
             Action::ForceLoadDiff => {
                 self.state.too_large = None;
                 self.refresh(diff_ctx);
@@ -135,7 +116,6 @@ impl DiffPanel {
     pub fn refresh(&mut self, diff_ctx: &mut DiffContext) {
         diff_ctx.files.ensure_rows(diff_ctx.store);
         let Some(file) = diff_ctx.files.selected_file(diff_ctx.store) else {
-            self.current_key = None;
             return;
         };
         let path = file.path.clone();
@@ -157,9 +137,6 @@ impl DiffPanel {
             && n > repository::DIFF_LINE_THRESHOLD
         {
             self.state.too_large = Some(n);
-            self.state.is_binary = false;
-            self.state.line_index = LineIndex::new(&[]);
-            self.current_key = Some(cache_key.clone());
 
             if let Some(&slot_idx) = diff_ctx.store.continuous_diff.by_key.get(&cache_key)
                 && !matches!(
@@ -193,11 +170,7 @@ impl DiffPanel {
                         let hunks = sections.iter().flat_map(|s| s.hunks.clone()).collect();
                         let index = LineIndex::new(&sections);
                         diff_ctx.store.continuous_diff.files[slot_idx].load =
-                            DiffLoadState::Loaded {
-                                sections,
-                                hunks,
-                                index,
-                            };
+                            DiffLoadState::Loaded { hunks, index };
                     }
                     Ok(None) => {
                         diff_ctx.store.continuous_diff.files[slot_idx].load = DiffLoadState::Binary;
@@ -206,26 +179,8 @@ impl DiffPanel {
                 }
             }
 
-            let is_binary = matches!(
-                diff_ctx.store.continuous_diff.files[slot_idx].load,
-                DiffLoadState::Binary
-            );
-            let (new_line_index, hunk_count) =
-                match &diff_ctx.store.continuous_diff.files[slot_idx].load {
-                    DiffLoadState::Loaded {
-                        sections, hunks, ..
-                    } => (LineIndex::new(sections), hunks.len()),
-                    _ => (LineIndex::new(&[]), 0),
-                };
-
-            self.state.is_binary = is_binary;
-            self.state.line_index = new_line_index;
-            self.state.select_first_hunk(hunk_count);
             diff_ctx.store.continuous_diff.index_dirty = true;
         }
-
-        self.current_key = Some(cache_key);
-        self.sync_scroll_to_hunk();
     }
 
     pub fn jump_to_selected_file(&mut self, files: &FilesPanel, store: &DiffStore) {
@@ -235,45 +190,11 @@ impl DiffPanel {
     }
 
     pub fn reset(&mut self) {
-        self.current_key = None;
         self.state.too_large = None;
-        self.state.line_index = LineIndex::new(&[]);
-        self.state.select_first_hunk(0);
-    }
-
-    pub fn diff_hunks<'a>(&self, store: &'a DiffStore) -> Option<&'a Vec<DiffHunk>> {
-        let key = self.current_key.as_ref()?;
-        let slot_idx = store.continuous_diff.by_key.get(key)?;
-        let slot = store.continuous_diff.files.get(*slot_idx)?;
-        match &slot.load {
-            DiffLoadState::Loaded { hunks, .. } => Some(hunks),
-            _ => None,
-        }
     }
 
     pub fn set_viewport_height(&mut self, height: usize) {
-        let clamped = height.max(1);
-        if clamped == self.state.viewport_height {
-            return;
-        }
         self.state.set_viewport_height(height);
-        let offset = self.state.scroll_offset.min(self.max_scroll_offset());
-        self.state.set_scroll_offset(offset);
-        self.sync_selection_to_scroll();
-    }
-
-    pub fn scroll_down(&mut self) {
-        let max_offset = self.max_scroll_offset();
-        let offset = (self.state.scroll_offset + SCROLL_STEP).min(max_offset);
-        self.state.set_scroll_offset(offset);
-        self.sync_selection_to_scroll();
-    }
-
-    pub fn scroll_up(&mut self) {
-        let offset = self.state.scroll_offset.saturating_sub(SCROLL_STEP);
-        self.state.set_scroll_offset(offset);
-        self.clamp_scroll();
-        self.sync_selection_to_scroll();
     }
 
     pub fn continuous_scroll_down(&mut self, store: &DiffStore) {
@@ -287,25 +208,11 @@ impl DiffPanel {
     }
 
     pub fn select_next_hunk(&mut self, store: &DiffStore) {
-        match self.review.mode {
-            ViewMode::Continuous => self.next_continuous_hunk(store),
-            ViewMode::SingleFile => {
-                let len = self.diff_hunks(store).map_or(0, Vec::len);
-                self.state.select_next_hunk(len);
-                self.sync_scroll_to_hunk();
-            }
-        }
+        self.next_continuous_hunk(store);
     }
 
     pub fn select_previous_hunk(&mut self, store: &DiffStore) {
-        match self.review.mode {
-            ViewMode::Continuous => self.prev_continuous_hunk(store),
-            ViewMode::SingleFile => {
-                let len = self.diff_hunks(store).map_or(0, Vec::len);
-                self.state.select_previous_hunk(len);
-                self.sync_scroll_to_hunk();
-            }
-        }
+        self.prev_continuous_hunk(store);
     }
 
     pub fn jump_to_file(&mut self, file: &FileEntry, store: &DiffStore) {
@@ -317,31 +224,6 @@ impl DiffPanel {
             return;
         };
         self.review.continuous_scroll = store.continuous_diff.index.file_starts[file_idx];
-    }
-
-    pub fn sync_scroll_to_hunk(&mut self) {
-        let offset = self
-            .state
-            .selected_hunk
-            .and_then(|hunk_idx| self.state.line_index.hunk_starts.get(hunk_idx).copied())
-            .unwrap_or(0);
-        self.clamp_scroll();
-        self.state.set_scroll_offset(offset);
-    }
-
-    pub fn sync_selection_to_scroll(&mut self) {
-        let row = self.state.line_index.lookup(self.state.scroll_offset);
-        match row {
-            Some(IndexRow::HunkHeader(hunk_idx)) => {
-                self.state.select_hunk_line(hunk_idx, 0);
-            }
-            Some(IndexRow::DiffLine(hunk_idx, line_idx)) => {
-                self.state.select_hunk_line(hunk_idx, line_idx);
-            }
-            _ => {
-                self.state.select_first_hunk(0);
-            }
-        }
     }
 
     pub fn sync_continuous_scroll_to_file(&mut self, file_idx: Option<usize>, store: &DiffStore) {
@@ -420,18 +302,6 @@ impl DiffPanel {
                 }
             })
             .collect()
-    }
-
-    fn clamp_scroll(&mut self) {
-        let max = self.max_scroll_offset();
-        self.state.scroll_offset = self.state.scroll_offset.min(max);
-    }
-
-    fn max_scroll_offset(&self) -> usize {
-        self.state
-            .line_index
-            .total_rows
-            .saturating_sub(self.state.viewport_height)
     }
 
     fn max_continuous_scroll_offset(&self, store: &DiffStore) -> usize {

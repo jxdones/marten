@@ -83,12 +83,6 @@ pub fn command_groups() -> &'static [CommandGroup] {
                     action: Action::ToggleSidebar,
                 },
                 CommandItem {
-                    label: "toggle view mode",
-                    description: "switch continuous / single-file view",
-                    keybind: "v",
-                    action: Action::ToggleViewMode,
-                },
-                CommandItem {
                     label: "toggle numbers",
                     description: "show or hide diff line numbers",
                     keybind: "l",

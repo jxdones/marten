@@ -41,11 +41,7 @@ impl DiffStore {
             }
             let slot = &mut self.continuous_diff.files[msg.file_idx];
             slot.load = match msg.result {
-                Ok(Some((sections, hunks, index))) => DiffLoadState::Loaded {
-                    sections,
-                    hunks,
-                    index,
-                },
+                Ok(Some((_sections, hunks, index))) => DiffLoadState::Loaded { hunks, index },
                 Ok(None) => DiffLoadState::Binary,
                 Err(e) => DiffLoadState::Error(e),
             };

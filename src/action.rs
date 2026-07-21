@@ -16,7 +16,6 @@ pub enum Action {
     GoToLast,
     FocusPanel(Focus),
     ToggleCollapsed,
-    ToggleViewMode,
     ForceLoadDiff,
     NextFile,
     PreviousFile,

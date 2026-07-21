@@ -11,7 +11,7 @@ use crate::diff_panel::{DiffContext, DiffPanel};
 use crate::error::{AppError, AppResult};
 use crate::event::Event;
 use crate::files_panel::FilesPanel;
-use crate::git::repository::{self, DiffHunk, DiffSource};
+use crate::git::repository::{self, DiffSource};
 use crate::state::{
     CommandPaletteState, ContinuousDiff, Diff, FileSlot, Files, Focus, Overlay, ReviewState,
     Screen, TreeRow,
@@ -159,16 +159,8 @@ impl App {
         &self.store.continuous_diff.files
     }
 
-    pub fn selected_file(&self) -> Option<&repository::FileEntry> {
-        self.files.selected_file(&self.store)
-    }
-
     pub const fn diff_state(&self) -> &Diff {
         self.diff.state()
-    }
-
-    pub fn diff_hunks(&self) -> Option<&Vec<DiffHunk>> {
-        self.diff.diff_hunks(&self.store)
     }
 
     pub const fn collapsed_files(&self) -> &HashSet<String> {
@@ -374,7 +366,6 @@ impl App {
             KeyCode::Char('n') => Action::NextFile,
             KeyCode::Char('p') => Action::PreviousFile,
             KeyCode::Char('l') if self.focus == Focus::Diff => Action::ToggleDiffLineNumbers,
-            KeyCode::Char('v') => Action::ToggleViewMode,
             KeyCode::Char('r') => Action::Refresh,
             KeyCode::Char('s') => Action::ToggleSidebar,
             KeyCode::Char('g') if self.focus == Focus::Files => Action::GoToFirst,

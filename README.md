@@ -46,7 +46,6 @@ marten show HEAD~1
 | `enter` / `space` | Collapse or expand a directory while the files panel is focused |
 | `[` / `]` | Move between diff hunks |
 | `l` | Toggle diff line numbers while the diff is focused |
-| `v` | Toggle continuous and single-file views |
 | `s` | Toggle the files sidebar |
 | `r` | Reload repository state and diffs |
 | `?` | Open the command palette |

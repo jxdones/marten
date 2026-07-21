@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use crate::git::repository::{DiffHunk, DiffSection, DiffSectionKind, FileEntry, FileStatus};
+use crate::state::LineIndex;
 use crate::state::line_index::IndexRow;
-use crate::state::{LineIndex, ViewMode};
 
 const HEADER_ROW: usize = 1;
 const CONTENT_ROW: usize = 1;
@@ -19,7 +19,6 @@ pub enum DiffLoadState {
     #[allow(dead_code)]
     Loading,
     Loaded {
-        sections: Vec<DiffSection>,
         hunks: Vec<DiffHunk>,
         index: LineIndex,
     },
@@ -53,7 +52,6 @@ pub struct ContinuousDiff {
 
 #[derive(Debug, Default)]
 pub struct ReviewState {
-    pub mode: ViewMode,
     pub continuous_scroll: usize,
 }
 

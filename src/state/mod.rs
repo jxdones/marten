@@ -6,7 +6,6 @@ pub mod overlay;
 pub mod review;
 pub mod screen;
 pub mod tree;
-pub mod view_mode;
 
 pub use diff::Diff;
 pub use files::Files;
@@ -18,4 +17,3 @@ pub use review::{
 };
 pub use screen::Screen;
 pub use tree::TreeRow;
-pub use view_mode::ViewMode;
