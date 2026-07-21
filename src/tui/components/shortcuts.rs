@@ -39,31 +39,18 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
 }
 
 fn shortcuts(app: &App) -> Vec<(&'static str, &'static str)> {
-    let mut shortcuts = vec![
-        ("tab", "focus"),
-        ("n", "next file"),
-        ("p", "previous file"),
-        ("s", "toggle sidebar"),
-        ("r", "reload"),
-    ];
+    let mut shortcuts = vec![("tab", "focus")];
 
     match app.focus() {
         Focus::Files => {
-            shortcuts.extend([
-                ("j/k", "navigate"),
-                ("g/G", "first/last"),
-                ("]", "go to hunk"),
-            ]);
+            shortcuts.push(("j/k", "navigate"));
         }
         Focus::Diff => {
-            let line_number_label = if app.diff_state().show_line_numbers {
-                "hide lines"
-            } else {
-                "show lines"
-            };
-            shortcuts.extend([("j/k", "scroll"), ("[/]", "hunk"), ("l", line_number_label)]);
+            shortcuts.extend([("j/k", "scroll"), ("[/]", "hunk")]);
         }
     }
+
+    shortcuts.push(("?", "commands"));
 
     shortcuts
 }

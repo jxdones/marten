@@ -1,5 +1,12 @@
 use ratatui::layout::{Constraint, Direction, Layout, Rect};
 
+pub const MIN_TERMINAL_WIDTH: u16 = 80;
+pub const MIN_TERMINAL_HEIGHT: u16 = 24;
+
+pub const fn terminal_is_too_small(area: Rect) -> bool {
+    area.width < MIN_TERMINAL_WIDTH || area.height < MIN_TERMINAL_HEIGHT
+}
+
 #[derive(Debug, Clone)]
 pub struct Home {
     pub top_bar: Rect,

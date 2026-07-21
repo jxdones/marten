@@ -6,12 +6,16 @@ use git2::{ErrorCode, Repository};
 
 use crate::action::Action;
 use crate::cli::Command;
+use crate::command_palette;
 use crate::diff_panel::{DiffContext, DiffPanel};
 use crate::error::{AppError, AppResult};
 use crate::event::Event;
 use crate::files_panel::FilesPanel;
 use crate::git::repository::{self, DiffHunk, DiffSource};
-use crate::state::{ContinuousDiff, Diff, FileSlot, Files, Focus, ReviewState, Screen, TreeRow};
+use crate::state::{
+    CommandPaletteState, ContinuousDiff, Diff, FileSlot, Files, Focus, Overlay, ReviewState,
+    Screen, TreeRow,
+};
 use crate::store::DiffStore;
 use crate::tui::theme::{self, Theme};
 
@@ -30,6 +34,8 @@ pub struct App {
     store: DiffStore,
     repository_status: Option<repository::RepositoryStatus>,
     diff_source: DiffSource,
+
+    overlay: Overlay,
 }
 
 impl App {
@@ -91,6 +97,7 @@ impl App {
         };
 
         let show_sidebar = width > 120;
+        let overlay = Overlay::None;
 
         Ok(Self {
             screen: Screen::Home,
@@ -104,6 +111,7 @@ impl App {
             show_sidebar,
             repository_status,
             diff_source,
+            overlay,
         })
     }
 
@@ -129,6 +137,14 @@ impl App {
 
     pub const fn show_sidebar(&self) -> bool {
         self.show_sidebar
+    }
+
+    pub const fn overlay(&self) -> &Overlay {
+        &self.overlay
+    }
+
+    pub fn dismiss_overlay(&mut self) {
+        self.overlay = Overlay::None;
     }
 
     pub const fn repository_status(&self) -> Option<&repository::RepositoryStatus> {
@@ -198,6 +214,16 @@ impl App {
     }
 
     pub fn update(&mut self, action: Action) -> AppResult<()> {
+        if action == Action::RunSelectedCommand {
+            let selected_action = command_palette::selected_action(&self.overlay);
+            self.overlay = Overlay::None;
+
+            return match selected_action {
+                Some(action) => self.update(action),
+                None => Ok(()),
+            };
+        }
+
         let App {
             focus,
             files,
@@ -208,6 +234,7 @@ impl App {
             diff_source,
             show_sidebar,
             should_quit,
+            overlay,
             ..
         } = self;
 
@@ -248,6 +275,17 @@ impl App {
                 } else {
                     *focus = Focus::Files;
                 }
+                return Ok(());
+            }
+            Action::ToggleCommandPalette => {
+                *overlay = match overlay {
+                    Overlay::None => Overlay::CommandPalette(CommandPaletteState::default()),
+                    Overlay::CommandPalette(_) => Overlay::None,
+                };
+                return Ok(());
+            }
+            Action::MoveDown | Action::MoveUp if matches!(overlay, Overlay::CommandPalette(_)) => {
+                command_palette::update(overlay, action);
                 return Ok(());
             }
             _ => {
@@ -302,6 +340,16 @@ impl App {
     }
 
     fn handle_key(&mut self, key: KeyEvent) -> Action {
+        if matches!(self.overlay, Overlay::CommandPalette(_)) {
+            return match key.code {
+                KeyCode::Down | KeyCode::Char('j') => Action::MoveDown,
+                KeyCode::Up | KeyCode::Char('k') => Action::MoveUp,
+                KeyCode::Enter => Action::RunSelectedCommand,
+                KeyCode::Esc | KeyCode::Char('q') => Action::ToggleCommandPalette,
+                _ => Action::Noop,
+            };
+        }
+
         match key.code {
             KeyCode::Char('q') => Action::Quit,
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => Action::Quit,
@@ -334,6 +382,7 @@ impl App {
             KeyCode::Enter if self.focus == Focus::Diff && self.diff.is_too_large() => {
                 Action::ForceLoadDiff
             }
+            KeyCode::Char('?') => Action::ToggleCommandPalette,
             KeyCode::Enter | KeyCode::Char(' ') if self.focus == Focus::Files => {
                 Action::ToggleCollapsed
             }

@@ -25,4 +25,6 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     match app.screen() {
         Screen::Home => screens::home::draw(frame, area, app),
     }
+
+    components::command_palette::draw(frame, area, app);
 }

@@ -21,4 +21,6 @@ pub enum Action {
     NextFile,
     PreviousFile,
     ToggleSidebar,
+    ToggleCommandPalette,
+    RunSelectedCommand,
 }

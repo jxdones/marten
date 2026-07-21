@@ -5,6 +5,7 @@ use crate::{app::App, cli::Cli, error::AppResult};
 mod action;
 mod app;
 mod cli;
+mod command_palette;
 mod diff_panel;
 mod error;
 mod event;

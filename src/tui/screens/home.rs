@@ -16,7 +16,7 @@ use crate::{
 };
 
 pub fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
-    if area.width < 80 || area.height < 24 {
+    if layout::terminal_is_too_small(area) {
         draw_too_small(frame, area, app.theme());
         return;
     }
@@ -53,13 +53,13 @@ fn join_separator(frame: &mut Frame, layout: &layout::Home) {
 }
 
 fn draw_too_small(frame: &mut Frame, area: Rect, theme: Theme) {
-    let width_status_color = if area.width >= 80 {
+    let width_status_color = if area.width >= layout::MIN_TERMINAL_WIDTH {
         theme.success()
     } else {
         theme.danger()
     };
 
-    let height_status_color = if area.height >= 24 {
+    let height_status_color = if area.height >= layout::MIN_TERMINAL_HEIGHT {
         theme.success()
     } else {
         theme.danger()
