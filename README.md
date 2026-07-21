@@ -2,7 +2,7 @@
   <p>
     <h2>marten</h2>
   </p>
-  <p>A fast terminal workspace for reviewing local Git changes before they become a PR/MR.</p>
+  <p>A terminal diff viewer for reviewing your work before it becomes a commit or pull request.</p>
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)
@@ -10,86 +10,61 @@
 ![Status](https://img.shields.io/badge/status-early%20development-yellow.svg)
 </div>
 
-## What is marten?
-
-marten is a Rust Git TUI for reviewing your own work without leaving the terminal.
-
-It opens inside a Git repository and gives you a focused view of your working tree, changed files, and diffs so you can inspect your changes before committing, pushing, or opening a pull/merge request.
-
-marten is currently focused on local working-tree review. Remote PR/MR review, additional Git views, and review-oriented workflows are planned.
-
-## What it does
-
-marten currently supports:
-
-- changed files grouped by status in a collapsible tree
-- insertion/deletion counts per file
-- staged, unstaged, partial, untracked, and conflicted file states
-- continuous review mode where all files flow as one scrollable document, sidebar selection follows scroll position
-- single-file mode where sidebar selection controls which file is shown
-- diff hunks for the selected file
-- hunk navigation and diff scrolling
-- optional diff line numbers
-- repository, branch, ahead/behind, and change counts in the top bar
-- repository refresh without leaving the TUI
-
-## Why?
-
-Code review often starts before a PR or MR exists. marten is meant for that moment when you want to quickly
-inspect your own changes, move through files and hunks, and catch obvious mistakes while staying in your terminal.
-
 ## Install
 
+Marten requires Rust 1.85 or newer.
+
 ```bash
+git clone https://github.com/jxdones/marten.git
+cd marten
 make install
 ```
 
-Requires Rust 1.85 or newer.
-
-## Run locally
-
-```bash
-make run
-```
-
-Run `marten` from inside a Git repository.
+Run it from inside a Git repository:
 
 ```bash
 marten
 ```
+
+To inspect the changes introduced by a revision:
+
+```bash
+marten show HEAD~1
+```
+
+`show` accepts a commit, branch, tag, or other Git revision.
 
 ## Keybindings
 
 | Key | Action |
 | --- | --- |
 | `tab` / `shift+tab` | Move focus between panels |
-| `0` | Focus diff |
-| `1` | Focus files |
+| `0` / `1` | Focus the diff or files panel |
 | `j` / `k` | Navigate files or scroll the diff |
-| `g` / `G` | Jump to first or last file |
-| `enter` / `space` | Collapse or expand the selected directory |
+| `n` / `p` | Select the next or previous changed file |
+| `g` / `G` | Select the first or last file while the files panel is focused |
+| `enter` / `space` | Collapse or expand a directory while the files panel is focused |
 | `[` / `]` | Move between diff hunks |
-| `l` | Toggle diff line numbers |
-| `v` | Toggle between continuous and single-file review mode |
-| `r` | Refresh repository state |
+| `l` | Toggle diff line numbers while the diff is focused |
+| `v` | Toggle continuous and single-file views |
+| `s` | Toggle the files sidebar |
+| `r` | Reload repository state and diffs |
+| `?` | Open the command palette |
 | `q` / `ctrl+c` | Quit |
 
 ## Development
 
-To see all the available options, run `make help`.
-
 ```bash
-make build
-make run-release
+make run
 make check
 make test
 make lint
-make fmt
 make ci
-make ci-full
 ```
 
-For UI testing with local untracked files:
+Run `make help` for the complete list of targets.
+
+To create a temporary repository with sample changes for UI work:
 
 ```bash
 make dev-files
@@ -98,4 +73,4 @@ make clean-dev-files
 
 ## License
 
-MIT
+[MIT](LICENSE)
