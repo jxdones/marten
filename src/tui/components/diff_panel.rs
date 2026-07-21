@@ -215,7 +215,7 @@ fn render_continuous_diff(
                             let line = &hunks[hunk_idx].lines[line_idx];
                             let path = &continuous_diff.files[file_idx].entry.path;
                             let is_selected = selected_hunk == Some((file_idx, hunk_idx));
-                            let ranges = inline_ranges(&hunks[hunk_idx], line_idx, line.origin);
+                            let ranges = inline_ranges(&hunks[hunk_idx], line_idx);
                             let diff = diff_line(
                                 row_width,
                                 line,
@@ -511,41 +511,32 @@ fn diff_line(
     )
 }
 
-fn inline_ranges(hunk: &DiffHunk, line_idx: usize, origin: char) -> Vec<Range> {
-    match origin {
-        '-' => {
-            let Some(next_line) = hunk.lines.get(line_idx + 1) else {
-                return Vec::new();
-            };
-            if next_line.origin != '+' {
-                return Vec::new();
-            }
+fn inline_ranges(hunk: &DiffHunk, line_idx: usize) -> Vec<Range> {
+    let Some((old_line_idx, new_line_idx)) = hunk.comparison_rows.iter().find_map(|row| {
+        let (Some(old_line_idx), Some(new_line_idx)) = (row.old_line_idx, row.new_line_idx) else {
+            return None;
+        };
 
-            let (old_ranges, _) = inline_diff::changed_ranges(
-                hunk.lines[line_idx].content.trim_end(),
-                next_line.content.trim_end(),
-            );
-            old_ranges
+        if (old_line_idx == line_idx || new_line_idx == line_idx)
+            && hunk.lines[old_line_idx].origin == '-'
+            && hunk.lines[new_line_idx].origin == '+'
+        {
+            Some((old_line_idx, new_line_idx))
+        } else {
+            None
         }
-        '+' => {
-            if line_idx == 0 {
-                return Vec::new();
-            }
+    }) else {
+        return Vec::new();
+    };
 
-            let Some(previous_line) = hunk.lines.get(line_idx - 1) else {
-                return Vec::new();
-            };
-            if previous_line.origin != '-' {
-                return Vec::new();
-            }
-
-            let (_, new_ranges) = inline_diff::changed_ranges(
-                previous_line.content.trim_end(),
-                hunk.lines[line_idx].content.trim_end(),
-            );
-            new_ranges
-        }
-        _ => Vec::new(),
+    let (old_ranges, new_ranges) = inline_diff::changed_ranges(
+        hunk.lines[old_line_idx].content.trim_end(),
+        hunk.lines[new_line_idx].content.trim_end(),
+    );
+    if line_idx == old_line_idx {
+        old_ranges
+    } else {
+        new_ranges
     }
 }
 

@@ -62,8 +62,98 @@ pub struct DiffLine {
 pub struct DiffHunk {
     pub header: String,
     pub lines: Vec<DiffLine>,
+    pub comparison_rows: Vec<ComparisonRow>,
     pub insertions: usize,
     pub deletions: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ComparisonRow {
+    pub old_line_idx: Option<usize>,
+    pub new_line_idx: Option<usize>,
+}
+
+impl DiffHunk {
+    pub fn new(header: String, lines: Vec<DiffLine>) -> Self {
+        let (insertions, deletions) =
+            lines
+                .iter()
+                .fold((0, 0), |(insertions, deletions), line| match line.origin {
+                    '+' => (insertions + 1, deletions),
+                    '-' => (insertions, deletions + 1),
+                    _ => (insertions, deletions),
+                });
+        let comparison_rows = build_comparison_rows(&lines);
+
+        Self {
+            header,
+            lines,
+            comparison_rows,
+            insertions,
+            deletions,
+        }
+    }
+}
+
+fn build_comparison_rows(lines: &[DiffLine]) -> Vec<ComparisonRow> {
+    let mut rows = Vec::new();
+    let mut line_idx = 0;
+
+    while line_idx < lines.len() {
+        match lines[line_idx].origin {
+            ' ' => {
+                rows.push(ComparisonRow {
+                    old_line_idx: Some(line_idx),
+                    new_line_idx: Some(line_idx),
+                });
+                line_idx += 1;
+            }
+            '+' | '-' => {
+                let mut old_lines = Vec::new();
+                let mut new_lines = Vec::new();
+
+                while line_idx < lines.len() && matches!(lines[line_idx].origin, '+' | '-') {
+                    if lines[line_idx].origin == '-' {
+                        old_lines.push(line_idx);
+                    } else {
+                        new_lines.push(line_idx);
+                    }
+                    line_idx += 1;
+                }
+
+                let row_count = old_lines.len().max(new_lines.len());
+                for row_idx in 0..row_count {
+                    rows.push(ComparisonRow {
+                        old_line_idx: old_lines.get(row_idx).copied(),
+                        new_line_idx: new_lines.get(row_idx).copied(),
+                    });
+                }
+            }
+            '<' => {
+                rows.push(ComparisonRow {
+                    old_line_idx: Some(line_idx),
+                    new_line_idx: None,
+                });
+                line_idx += 1;
+            }
+            '>' => {
+                rows.push(ComparisonRow {
+                    old_line_idx: None,
+                    new_line_idx: Some(line_idx),
+                });
+                line_idx += 1;
+            }
+            _ => {
+                rows.push(ComparisonRow {
+                    old_line_idx: Some(line_idx),
+                    new_line_idx: Some(line_idx),
+                });
+                line_idx += 1;
+            }
+        }
+    }
+
+    rows
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -413,20 +503,10 @@ fn diff_hunks(diff: Diff<'_>) -> AppResult<Option<Vec<DiffHunk>>> {
                 content: String::from_utf8_lossy(line.content()).to_string(),
             });
         }
-        let (insertions, deletions) =
-            diff_lines
-                .iter()
-                .fold((0, 0), |(insertion, deletion), line| match line.origin {
-                    '+' => (insertion + 1, deletion),
-                    '-' => (insertion, deletion + 1),
-                    _ => (insertion, deletion),
-                });
-        hunks.push(DiffHunk {
-            header: String::from_utf8_lossy(hunk.header()).to_string(),
-            lines: diff_lines,
-            insertions,
-            deletions,
-        });
+        hunks.push(DiffHunk::new(
+            String::from_utf8_lossy(hunk.header()).to_string(),
+            diff_lines,
+        ));
     }
 
     Ok(Some(hunks))
@@ -473,12 +553,10 @@ fn untracked_file_diff(repo: &Repository, path: &str) -> AppResult<Option<Vec<Di
         .collect::<Vec<_>>();
 
     let insertions = lines.len();
-    Ok(Some(vec![DiffHunk {
-        header: format!("@@ -0,0 +1,{insertions} @@ {path}"),
+    Ok(Some(vec![DiffHunk::new(
+        format!("@@ -0,0 +1,{insertions} @@ {path}"),
         lines,
-        insertions,
-        deletions: 0,
-    }]))
+    )]))
 }
 
 fn untracked_line_count(repo: &Repository, path: &str) -> AppResult<usize> {

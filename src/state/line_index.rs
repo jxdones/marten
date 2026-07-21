@@ -87,12 +87,10 @@ mod tests {
     }
 
     fn hunk_with_lines(count: usize) -> DiffHunk {
-        DiffHunk {
-            header: "@@ -1,1 +1,1 @@".to_string(),
-            lines: (0..count).map(|i| line(&format!("line {i}"))).collect(),
-            insertions: count,
-            deletions: 0,
-        }
+        DiffHunk::new(
+            "@@ -1,1 +1,1 @@".to_string(),
+            (0..count).map(|i| line(&format!("line {i}"))).collect(),
+        )
     }
 
     fn single_section(hunks: Vec<DiffHunk>) -> Vec<DiffSection> {
@@ -125,12 +123,7 @@ mod tests {
     fn single_hunk_no_lines() {
         const HEADER_COUNT: usize = 1;
 
-        let sections = single_section(vec![DiffHunk {
-            header: "@@ -1,1 +1,1 @@".to_string(),
-            lines: vec![],
-            insertions: 0,
-            deletions: 0,
-        }]);
+        let sections = single_section(vec![DiffHunk::new("@@ -1,1 +1,1 @@".to_string(), vec![])]);
         let index = LineIndex::new(&sections);
 
         assert_eq!(
