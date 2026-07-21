@@ -6,6 +6,7 @@ mod action;
 mod app;
 mod cli;
 mod command_palette;
+mod config;
 mod diff_panel;
 mod error;
 mod event;
@@ -27,6 +28,7 @@ fn main() {
 
 fn run() -> AppResult<()> {
     let cli = Cli::parse();
-    let mut app = App::new(cli.command)?;
+    let config = config::load()?;
+    let mut app = App::new(cli.command, &config)?;
     terminal::run(&mut app)
 }

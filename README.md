@@ -34,22 +34,19 @@ marten show HEAD~1
 
 `show` accepts a commit, branch, tag, or other Git revision.
 
-## Keybindings
+## Configuration
 
-| Key | Action |
-| --- | --- |
-| `tab` / `shift+tab` | Move focus between panels |
-| `0` / `1` | Focus the diff or files panel |
-| `j` / `k` | Navigate files or scroll the diff |
-| `n` / `p` | Select the next or previous changed file |
-| `g` / `G` | Select the first or last file while the files panel is focused |
-| `enter` / `space` | Collapse or expand a directory while the files panel is focused |
-| `[` / `]` | Move between diff hunks |
-| `l` | Toggle diff line numbers while the diff is focused |
-| `s` | Toggle the files sidebar |
-| `r` | Reload repository state and diffs |
-| `?` | Open the command palette |
-| `q` / `ctrl+c` | Quit |
+Marten reads its configuration from `~/.config/marten/config.toml` on macOS and Linux. The file is optional; when it is missing or empty, Marten uses its defaults.
+
+```toml
+[ui]
+theme = "marten"
+show_sidebar = true
+```
+
+`theme` currently supports `marten`. When the setting is omitted, Marten uses that theme by default.
+
+`show_sidebar` controls whether the sidebar is visible at startup. When omitted, Marten shows it automatically when the terminal is wider than 120 columns. The sidebar can still be toggled while Marten is running.
 
 ## Development
 

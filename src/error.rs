@@ -1,5 +1,8 @@
 #[derive(Debug)]
 pub enum AppError {
+    Config {
+        source: crate::config::ConfigError,
+    },
     NotRepository {
         source: git2::Error,
     },
@@ -55,9 +58,16 @@ impl From<std::io::Error> for AppError {
     }
 }
 
+impl From<crate::config::ConfigError> for AppError {
+    fn from(source: crate::config::ConfigError) -> Self {
+        Self::Config { source }
+    }
+}
+
 impl std::fmt::Display for AppError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Config { source } => write!(formatter, "{source}"),
             Self::NotRepository { .. } => {
                 write!(
                     formatter,
@@ -87,6 +97,7 @@ impl std::fmt::Display for AppError {
 impl std::error::Error for AppError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            Self::Config { source } => Some(source),
             Self::NotRepository { source }
             | Self::RevisionNotFound { source, .. }
             | Self::RevisionNotCommit { source, .. }

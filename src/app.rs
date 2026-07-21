@@ -7,6 +7,7 @@ use git2::{ErrorCode, Repository};
 use crate::action::Action;
 use crate::cli::Command;
 use crate::command_palette;
+use crate::config::Config;
 use crate::diff_panel::{DiffContext, DiffPanel};
 use crate::error::{AppError, AppResult};
 use crate::event::Event;
@@ -17,7 +18,7 @@ use crate::state::{
     Screen, TreeRow,
 };
 use crate::store::DiffStore;
-use crate::tui::theme::{self, Theme};
+use crate::tui::theme::Theme;
 
 pub struct App {
     screen: Screen,
@@ -39,7 +40,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(command: Option<Command>) -> AppResult<Self> {
+    pub fn new(command: Option<Command>, config: &Config) -> AppResult<Self> {
         execute!(std::io::stdout(), SetTitle("marten"))?;
         let repo = Repository::discover(".").map_err(|source| {
             if source.code() == ErrorCode::NotFound {
@@ -57,10 +58,10 @@ impl App {
             None => DiffSource::Worktree,
         };
 
-        Self::init(repo, diff_source)
+        Self::init(repo, diff_source, config)
     }
 
-    fn init(repo: Repository, diff_source: DiffSource) -> AppResult<Self> {
+    fn init(repo: Repository, diff_source: DiffSource, config: &Config) -> AppResult<Self> {
         let repository_status = Some(
             repository::status(&repo)
                 .map_err(|error| error.with_operation("read repository status"))?,
@@ -90,13 +91,13 @@ impl App {
 
         let (width, _) = crossterm::terminal::size().unwrap_or((0, 0));
 
-        let focus = if width <= 120 {
-            Focus::Diff
-        } else {
+        let show_sidebar = config.ui.show_sidebar(width);
+        let focus = if show_sidebar {
             Focus::Files
+        } else {
+            Focus::Diff
         };
 
-        let show_sidebar = width > 120;
         let overlay = Overlay::None;
 
         Ok(Self {
@@ -105,7 +106,7 @@ impl App {
             files,
             diff,
             store,
-            theme: theme::DEFAULT,
+            theme: config.ui.theme(),
             repo,
             should_quit: false,
             show_sidebar,
@@ -422,7 +423,7 @@ mod tests {
         fs::create_dir_all(file_path.parent().unwrap()).unwrap();
         fs::write(&file_path, "fn main() {}\n").unwrap();
 
-        let mut app = App::init(repo, DiffSource::Worktree).unwrap();
+        let mut app = App::init(repo, DiffSource::Worktree, &Config::default()).unwrap();
         assert_eq!(app.store.continuous_diff.files.len(), 1);
         assert_eq!(app.store.continuous_diff.files[0].entry.path, "src/main.rs");
         assert!(
