@@ -18,7 +18,7 @@ use crate::{
 
 const MODAL_SIZE: modal::ModalSize = modal::ModalSize::new(
     modal::ResponsiveSize::new(90, 54).with_margin(2),
-    modal::ResponsiveSize::new(80, 15).with_margin(1),
+    modal::ResponsiveSize::new(90, 15).with_margin(1),
 );
 
 pub fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
@@ -39,7 +39,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
 
     let [title_area, header_area, list_area, footer_area] = Layout::vertical([
         Constraint::Length(2),
-        Constraint::Length(2),
+        Constraint::Length(1),
         Constraint::Min(1),
         Constraint::Length(2),
     ])
@@ -53,9 +53,15 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
 
 fn draw_header(frame: &mut Frame, area: Rect, theme: Theme) {
     let header = Line::from(vec![
-        Span::styled("  Theme                ", theme.muted()),
-        Span::styled("Palette         ", theme.muted()),
-        Span::styled("Mode", theme.muted()),
+        Span::styled(
+            "  Theme                ",
+            theme.accent().add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            "Palette         ",
+            theme.accent().add_modifier(Modifier::BOLD),
+        ),
+        Span::styled("Mode", theme.accent().add_modifier(Modifier::BOLD)),
     ]);
 
     frame.render_widget(Paragraph::new(header), area);

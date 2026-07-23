@@ -61,7 +61,7 @@ fn draw_list(frame: &mut Frame, area: Rect, selected: usize, theme: Theme) {
     for group in groups {
         rows.push(ListItem::new(Line::from(Span::styled(
             format!("  {}", group.section.label()),
-            theme.muted().add_modifier(Modifier::BOLD),
+            theme.accent().add_modifier(Modifier::BOLD),
         ))));
 
         for item in group.items {
@@ -94,7 +94,7 @@ fn command_line(
     is_selected: bool,
     theme: Theme,
 ) -> Line<'static> {
-    const LEADING_WIDTH: usize = 2;
+    const LEADING_WIDTH: usize = 4;
     const TRAILING_WIDTH: usize = 1;
 
     let row_width = usize::from(row_width);
@@ -117,7 +117,7 @@ fn command_line(
         ),
         Span::styled(
             format!(" {:>width$} ", item.keybind, width = key_width),
-            Style::default().fg(theme.fg).bg(theme.file_header_bg),
+            Style::default().fg(theme.fg).add_modifier(Modifier::BOLD),
         ),
         Span::raw(" ".repeat(TRAILING_WIDTH)),
     ])
