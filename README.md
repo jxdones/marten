@@ -4,6 +4,10 @@
   </p>
   <p>A terminal diff viewer for reviewing your work before it becomes a commit or pull request.</p>
 
+  <p>
+    <img src="assets/marten.gif" alt="Marten demo" width="830"/>
+  </p>
+
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)
 [![Built With Ratatui](https://ratatui.rs/built-with-ratatui/badge.svg)](https://ratatui.rs/)

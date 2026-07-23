@@ -3,7 +3,7 @@
 APP := marten
 VERSION := 0.1.0
 
-.PHONY: help build run run-release play dev-files clean-dev-files check test fmt lint lint-strict audit ci ci-full release install clean tag
+.PHONY: help build run run-release play demo dev-files clean-dev-files check test fmt lint lint-strict audit ci ci-full release install clean tag
 
 help:
 	@printf "\n"
@@ -12,6 +12,7 @@ help:
 	@printf "  %-12s %s\n" "build" "Build the project (debug)."
 	@printf "  %-12s %s\n" "run" "Run the project (debug)."
 	@printf "  %-12s %s\n" "run-release" "Run the release binary."
+	@printf "  %-12s %s\n" "demo" "Generate the README demo GIF with VHS."
 	@printf "  %-12s %s\n" "dev-files" "Create a synthetic git repo at /tmp/libstr for UI testing."
 	@printf "  %-12s %s\n" "clean-dev-files" "Remove the test repo at /tmp/libstr."
 	@printf "  %-12s %s\n" "check" "Type-check and compile without linking."
@@ -40,6 +41,9 @@ run-release:
 		$(MAKE) release; \
 	fi
 	@./target/release/marten
+
+demo: dev-files
+	cd $(DEV_REPO) && env -u NO_COLOR COLORTERM=truecolor vhs $(CURDIR)/assets/demo.tape --output $(CURDIR)/assets/marten.gif
 
 DEV_REPO ?= /tmp/libstr
 
