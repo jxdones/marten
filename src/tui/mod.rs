@@ -7,6 +7,7 @@ use ratatui::Frame;
 use ratatui::style::Style;
 use ratatui::widgets::{Block, Borders};
 
+use crate::state::Overlay;
 use crate::{app::App, state::Screen};
 
 pub fn draw(frame: &mut Frame, app: &mut App) {
@@ -26,5 +27,13 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         Screen::Home => screens::home::draw(frame, area, app),
     }
 
-    components::command_palette::draw(frame, area, app);
+    match app.overlay() {
+        Overlay::CommandPalette(_) => {
+            components::command_palette::draw(frame, area, app);
+        }
+        Overlay::ThemeSelector(_) => {
+            components::theme_selector::draw(frame, area, app);
+        }
+        Overlay::None => {}
+    }
 }

@@ -1,7 +1,8 @@
 use ratatui::style::{Color, Modifier, Style};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Theme {
+    pub syntax_theme: &'static str,
     pub bg: Color,
     pub sidebar_bg: Color,
     pub line: Color,
@@ -32,7 +33,40 @@ pub struct Theme {
     pub conflict: Color,
 }
 
-pub const DEFAULT: Theme = Theme {
+pub struct ThemeEntry {
+    pub name: &'static str,
+    pub id: &'static str,
+    pub appearance: &'static str,
+    pub theme: Theme,
+}
+
+pub const THEMES: &[ThemeEntry] = &[
+    ThemeEntry {
+        name: "Marten",
+        id: "marten",
+        appearance: "dark",
+        theme: MARTEN_DARK,
+    },
+    ThemeEntry {
+        name: "Ermine",
+        id: "ermine",
+        appearance: "light",
+        theme: MARTEN_LIGHT,
+    },
+];
+
+pub fn entry_by_id(id: &str) -> Option<&'static ThemeEntry> {
+    THEMES.iter().find(|entry| entry.id == id)
+}
+
+pub fn default_entry() -> &'static ThemeEntry {
+    &THEMES[0]
+}
+
+// Original to Marten.
+pub const MARTEN_DARK: Theme = Theme {
+    syntax_theme: "base16-ocean.dark",
+
     bg: Color::Rgb(22, 17, 13),
     sidebar_bg: Color::Rgb(22, 17, 13),
     line: Color::Rgb(85, 68, 54),
@@ -61,6 +95,40 @@ pub const DEFAULT: Theme = Theme {
     unstaged: Color::Rgb(224, 139, 111),
     untracked: Color::Rgb(212, 163, 104),
     conflict: Color::Rgb(230, 88, 106),
+};
+
+// Original to Marten.
+pub const MARTEN_LIGHT: Theme = Theme {
+    syntax_theme: "base16-ocean.light",
+
+    bg: Color::Rgb(245, 239, 228),
+    sidebar_bg: Color::Rgb(245, 239, 228),
+    line: Color::Rgb(212, 198, 175),
+
+    fg: Color::Rgb(48, 38, 32),
+    dim: Color::Rgb(124, 107, 87),
+
+    accent: Color::Rgb(158, 101, 26),
+    select: Color::Rgb(244, 231, 196),
+    select_hi: Color::Rgb(235, 217, 168),
+
+    file_header_bg: Color::Rgb(243, 236, 223),
+    hunk_header_bg: Color::Rgb(231, 220, 199),
+
+    add_bg: Color::Rgb(233, 238, 211),
+    add_inline_bg: Color::Rgb(200, 218, 152),
+    add_fg: Color::Rgb(88, 112, 43),
+    add_gutter: Color::Rgb(122, 152, 60),
+    del_bg: Color::Rgb(251, 229, 220),
+    del_inline_bg: Color::Rgb(245, 197, 183),
+    del_fg: Color::Rgb(158, 62, 40),
+    del_gutter: Color::Rgb(190, 76, 52),
+
+    staged: Color::Rgb(88, 112, 43),
+    partial: Color::Rgb(166, 122, 28),
+    unstaged: Color::Rgb(158, 62, 40),
+    untracked: Color::Rgb(158, 101, 26),
+    conflict: Color::Rgb(178, 36, 74),
 };
 
 impl Theme {

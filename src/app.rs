@@ -6,8 +6,7 @@ use git2::{ErrorCode, Repository};
 
 use crate::action::Action;
 use crate::cli::Command;
-use crate::command_palette;
-use crate::config::Config;
+use crate::config::{self, Config};
 use crate::diff_panel::{DiffContext, DiffPanel};
 use crate::error::{AppError, AppResult};
 use crate::event::Event;
@@ -15,10 +14,11 @@ use crate::files_panel::FilesPanel;
 use crate::git::repository::{self, DiffSource};
 use crate::state::{
     CommandPaletteState, ContinuousDiff, Diff, FileSlot, Files, Focus, Overlay, ReviewState,
-    Screen, TreeRow,
+    Screen, ThemeSelectorState, TreeRow,
 };
 use crate::store::DiffStore;
-use crate::tui::theme::Theme;
+use crate::tui::theme::{THEMES, Theme};
+use crate::{command_palette, theme};
 
 pub struct App {
     screen: Screen,
@@ -222,6 +222,7 @@ impl App {
 
         let App {
             focus,
+            theme: active_theme,
             files,
             diff,
             store,
@@ -277,11 +278,59 @@ impl App {
                 *overlay = match overlay {
                     Overlay::None => Overlay::CommandPalette(CommandPaletteState::default()),
                     Overlay::CommandPalette(_) => Overlay::None,
+                    _ => Overlay::None,
                 };
+                return Ok(());
+            }
+            Action::ToggleThemeSelector => {
+                let original = match overlay {
+                    Overlay::ThemeSelector(state) => Some(state.original),
+                    _ => None,
+                };
+
+                if let Some(original) = original {
+                    if let Some(entry) = THEMES.get(original) {
+                        *active_theme = entry.theme;
+                    }
+
+                    *overlay = Overlay::None;
+                } else {
+                    let current = THEMES
+                        .iter()
+                        .position(|entry| entry.theme == *active_theme)
+                        .unwrap_or(0);
+
+                    *overlay = Overlay::ThemeSelector(ThemeSelectorState {
+                        selected: current,
+                        original: current,
+                    });
+                }
+
+                return Ok(());
+            }
+            Action::SelectTheme => {
+                let selected = match overlay {
+                    Overlay::ThemeSelector(state) => Some(state.selected),
+                    _ => None,
+                };
+                if let Some(entry) = selected.and_then(|index| THEMES.get(index)) {
+                    config::save_theme(entry)?;
+                }
+                *overlay = Overlay::None;
                 return Ok(());
             }
             Action::MoveDown | Action::MoveUp if matches!(overlay, Overlay::CommandPalette(_)) => {
                 command_palette::update(overlay, action);
+                return Ok(());
+            }
+            Action::MoveDown | Action::MoveUp if matches!(overlay, Overlay::ThemeSelector(_)) => {
+                theme::update(overlay, action);
+
+                if let Overlay::ThemeSelector(state) = overlay
+                    && let Some(entry) = THEMES.get(state.selected)
+                {
+                    *active_theme = entry.theme;
+                }
                 return Ok(());
             }
             _ => {
@@ -349,6 +398,16 @@ impl App {
             };
         }
 
+        if matches!(self.overlay, Overlay::ThemeSelector(_)) {
+            return match key.code {
+                KeyCode::Down | KeyCode::Char('j') => Action::MoveDown,
+                KeyCode::Up | KeyCode::Char('k') => Action::MoveUp,
+                KeyCode::Enter => Action::SelectTheme,
+                KeyCode::Esc | KeyCode::Char('q') => Action::ToggleThemeSelector,
+                _ => Action::Noop,
+            };
+        }
+
         match key.code {
             KeyCode::Char('q') => Action::Quit,
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => Action::Quit,
@@ -378,13 +437,14 @@ impl App {
             KeyCode::Char('[') if self.focus == Focus::Diff => Action::PreviousHunk,
             KeyCode::Char('n') => Action::NextFile,
             KeyCode::Char('p') => Action::PreviousFile,
-            KeyCode::Char('L') if self.focus == Focus::Diff => Action::ToggleDiffLineNumbers,
+            KeyCode::Char('L') => Action::ToggleDiffLineNumbers,
             KeyCode::Char('v') => Action::ToggleDiffLayout,
             KeyCode::Char('r') => Action::Refresh,
             KeyCode::Char('s') => Action::ToggleSidebar,
             KeyCode::Char('g') if self.focus == Focus::Files => Action::GoToFirst,
             KeyCode::Char('G') if self.focus == Focus::Files => Action::GoToLast,
             KeyCode::Char('?') => Action::ToggleCommandPalette,
+            KeyCode::Char('t') => Action::ToggleThemeSelector,
             KeyCode::Enter | KeyCode::Char(' ') if self.focus == Focus::Files => {
                 Action::ToggleCollapsed
             }

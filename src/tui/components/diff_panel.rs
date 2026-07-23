@@ -502,7 +502,7 @@ fn diff_line(
         format!("{} ", line.origin)
     };
 
-    let highlighted = syntax::highlight_line(path, &content, base)
+    let highlighted = syntax::highlight_line(path, &content, base, theme.syntax_theme)
         .unwrap_or_else(|| vec![Span::styled(content, base)]);
     let content_spans = style_content_spans(highlighted, inline_ranges, line.origin, false, theme);
     let mut spans = vec![Span::styled(prefix, base)];
@@ -614,7 +614,7 @@ fn comparison_side_spans(
         format!("{} ", line.origin)
     };
     let content = display_content(&line.content);
-    let highlighted = syntax::highlight_line(path, &content, style)
+    let highlighted = syntax::highlight_line(path, &content, style, theme.syntax_theme)
         .unwrap_or_else(|| vec![Span::styled(content, style)]);
     let content_spans = style_content_spans(highlighted, inline_ranges, line.origin, false, theme);
     let mut spans = vec![Span::styled(prefix, style)];

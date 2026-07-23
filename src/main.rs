@@ -17,6 +17,7 @@ mod state;
 mod store;
 mod syntax;
 mod terminal;
+mod theme;
 mod tui;
 
 fn main() {

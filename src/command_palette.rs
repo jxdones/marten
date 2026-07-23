@@ -18,6 +18,7 @@ pub enum Section {
     Navigation,
     View,
     General,
+    Settings,
 }
 
 impl Section {
@@ -26,6 +27,7 @@ impl Section {
             Self::Navigation => "Navigation",
             Self::View => "View",
             Self::General => "General",
+            Self::Settings => "Settings",
         }
     }
 }
@@ -124,6 +126,15 @@ pub fn command_groups() -> &'static [CommandGroup] {
                     action: Action::Quit,
                 },
             ],
+        },
+        CommandGroup {
+            section: Section::Settings,
+            items: &[CommandItem {
+                label: "change theme",
+                description: "preview and select a theme",
+                keybind: "t",
+                action: Action::ToggleThemeSelector,
+            }],
         },
     ]
 }

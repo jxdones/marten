@@ -44,7 +44,7 @@ theme = "marten"
 show_sidebar = true
 ```
 
-`theme` currently supports `marten`. When the setting is omitted, Marten uses that theme by default.
+`theme` supports `marten` (dark) and `ermine` (light). When the setting is omitted, Marten uses the dark theme by default. Choosing a theme from the in-app theme picker updates this setting.
 
 `show_sidebar` controls whether the sidebar is visible at startup. When omitted, Marten shows it automatically when the terminal is wider than 120 columns. The sidebar can still be toggled while Marten is running.
 

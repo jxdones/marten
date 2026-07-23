@@ -23,5 +23,7 @@ pub enum Action {
     PreviousFile,
     ToggleSidebar,
     ToggleCommandPalette,
+    ToggleThemeSelector,
     RunSelectedCommand,
+    SelectTheme,
 }

@@ -5,4 +5,5 @@ pub mod left_sidebar;
 pub mod modal;
 pub mod panel;
 pub mod shortcuts;
+pub mod theme_selector;
 pub mod top_bar;

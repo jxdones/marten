@@ -1,6 +1,6 @@
 use ratatui::{
     Frame,
-    layout::{Constraint, Layout, Rect},
+    layout::{Alignment, Constraint, Layout, Rect},
     style::{Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
@@ -15,13 +15,14 @@ use crate::{
 
 const MODAL_SIZE: modal::ModalSize = modal::ModalSize::new(
     modal::ResponsiveSize::new(90, 80).with_margin(2),
-    modal::ResponsiveSize::new(75, 18).with_margin(1),
+    modal::ResponsiveSize::new(85, 22).with_margin(1),
 );
 
 pub fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
     let selected = match app.overlay() {
         Overlay::CommandPalette(state) => state.selected,
         Overlay::None => return,
+        _ => return,
     };
     if layout::terminal_is_too_small(area) {
         app.dismiss_overlay();
@@ -29,19 +30,17 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
     }
 
     let theme = app.theme();
-    let modal = modal::Modal::new(
-        area,
-        theme,
-        modal::ModalConfig::new(MODAL_SIZE).title(Line::from(Span::styled(
-            " command palette ",
-            theme.accent(),
-        ))),
-    );
+    let modal = modal::Modal::new(area, theme, modal::ModalConfig::new(MODAL_SIZE));
     modal.render(frame);
 
-    let [list_area, footer_area] =
-        Layout::vertical([Constraint::Min(0), Constraint::Length(2)]).areas(modal.inner());
+    let [title_area, list_area, footer_area] = Layout::vertical([
+        Constraint::Length(2),
+        Constraint::Min(0),
+        Constraint::Length(2),
+    ])
+    .areas(modal.inner());
 
+    modal::draw_title_bar(frame, title_area, "command palette", theme);
     draw_list(frame, list_area, selected, theme);
     draw_footer(frame, footer_area, theme);
 }
@@ -61,7 +60,7 @@ fn draw_list(frame: &mut Frame, area: Rect, selected: usize, theme: Theme) {
 
     for group in groups {
         rows.push(ListItem::new(Line::from(Span::styled(
-            format!(" {}", group.section.label()),
+            format!("  {}", group.section.label()),
             theme.muted().add_modifier(Modifier::BOLD),
         ))));
 
@@ -160,21 +159,11 @@ fn draw_footer(frame: &mut Frame, area: Rect, theme: Theme) {
     let left = vec![
         Span::styled(" ↓↑/jk ", theme.accent()),
         Span::styled("select ", theme.muted()),
-        Span::styled("enter ", theme.accent()),
+        Span::styled("  enter ", theme.accent()),
         Span::styled("run", theme.muted()),
     ];
-    let right = vec![
-        Span::styled("esc/q ", theme.accent()),
-        Span::styled("dismiss ", theme.muted()),
-    ];
-    let right_width = u16::try_from(Line::from(right.clone()).width()).unwrap_or(inner.width);
-
-    let [left_area, right_area] = Layout::horizontal([
-        Constraint::Min(0),
-        Constraint::Length(right_width.min(inner.width)),
-    ])
-    .areas(inner);
-
-    frame.render_widget(Paragraph::new(Line::from(left)), left_area);
-    frame.render_widget(Paragraph::new(Line::from(right)), right_area);
+    frame.render_widget(
+        Paragraph::new(Line::from(left)).alignment(Alignment::Center),
+        inner,
+    );
 }

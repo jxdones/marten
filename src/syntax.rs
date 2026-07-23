@@ -6,15 +6,20 @@ use ratatui::{
 };
 use syntect::{
     easy::HighlightLines,
-    highlighting::{Style as SyntectStyle, Theme, ThemeSet},
+    highlighting::{Style as SyntectStyle, ThemeSet},
     parsing::SyntaxSet,
     util::LinesWithEndings,
 };
 
 static SYNTAX_SET: OnceLock<SyntaxSet> = OnceLock::new();
-static THEME: OnceLock<Theme> = OnceLock::new();
+static THEMES: OnceLock<ThemeSet> = OnceLock::new();
 
-pub fn highlight_line(path: &str, content: &str, base_style: Style) -> Option<Vec<Span<'static>>> {
+pub fn highlight_line(
+    path: &str,
+    content: &str,
+    base_style: Style,
+    theme_name: &str,
+) -> Option<Vec<Span<'static>>> {
     let syntax_set = SYNTAX_SET.get_or_init(SyntaxSet::load_defaults_newlines);
     let syntax = syntax_set
         .find_syntax_for_file(path)
@@ -22,15 +27,12 @@ pub fn highlight_line(path: &str, content: &str, base_style: Style) -> Option<Ve
         .flatten()
         .unwrap_or_else(|| syntax_set.find_syntax_plain_text());
 
-    let theme = THEME.get_or_init(|| {
-        ThemeSet::load_defaults()
-            .themes
-            .remove("base16-ocean.dark")
-            .unwrap_or_default()
-    });
+    let themes = THEMES.get_or_init(ThemeSet::load_defaults);
+    let theme = themes.themes.get(theme_name)?;
 
     let mut highlighter = HighlightLines::new(syntax, theme);
     let mut spans = Vec::new();
+
     for line in LinesWithEndings::from(content) {
         let highlighted = highlighter.highlight_line(line, syntax_set).ok()?;
         spans.extend(

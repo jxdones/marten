@@ -11,7 +11,7 @@ pub use diff::{Diff, DiffLayout};
 pub use files::Files;
 pub use focus::Focus;
 pub use line_index::LineIndex;
-pub use overlay::{CommandPaletteState, Overlay};
+pub use overlay::{CommandPaletteState, Overlay, ThemeSelectorState};
 pub use review::{
     ContinuousDiff, DiffLoadState, FileKey, FileSlot, ReviewIndex, ReviewState, WorkerResult,
 };

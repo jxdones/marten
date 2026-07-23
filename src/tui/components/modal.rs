@@ -1,9 +1,9 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Flex, Layout, Rect},
-    style::{Color, Style},
-    text::Line,
-    widgets::{Block, Borders, Clear},
+    style::{Color, Modifier, Style},
+    text::{Line, Span},
+    widgets::{Block, Borders, Clear, Paragraph},
 };
 
 use crate::tui::{components::panel, theme::Theme};
@@ -66,17 +66,11 @@ impl ModalSize {
 
 pub struct ModalConfig {
     size: ModalSize,
-    title: Option<Line<'static>>,
 }
 
 impl ModalConfig {
     pub const fn new(size: ModalSize) -> Self {
-        Self { size, title: None }
-    }
-
-    pub fn title(mut self, title: impl Into<Line<'static>>) -> Self {
-        self.title = Some(title.into());
-        self
+        Self { size }
     }
 }
 
@@ -84,7 +78,7 @@ impl Modal {
     pub fn new(screen: Rect, theme: Theme, config: ModalConfig) -> Self {
         let (width, height) = config.size.resolve(screen);
         let area = centered(screen, width, height);
-        let block = panel::block(config.title, theme, Borders::ALL, theme.bg, true);
+        let block = panel::block(None, theme, Borders::ALL, theme.bg, true);
         let inner = block.inner(area);
 
         Self {
@@ -108,6 +102,35 @@ impl Modal {
         frame.render_widget(Block::default().style(bg_style), self.area);
         frame.render_widget(self.block.clone(), self.area);
     }
+}
+
+pub fn draw_title_bar(frame: &mut Frame, area: Rect, title: &'static str, theme: Theme) {
+    let block = Block::default()
+        .borders(Borders::BOTTOM)
+        .border_style(theme.panel_border())
+        .style(Style::default().bg(theme.bg));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+
+    let close = vec![
+        Span::styled("esc/q ", theme.accent()),
+        Span::styled("close  ", theme.muted()),
+    ];
+    let close_width = u16::try_from(Line::from(close.clone()).width()).unwrap_or(inner.width);
+    let [title_area, close_area] = Layout::horizontal([
+        Constraint::Min(0),
+        Constraint::Length(close_width.min(inner.width)),
+    ])
+    .areas(inner);
+
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            format!("  {title}"),
+            theme.accent().add_modifier(Modifier::BOLD),
+        ))),
+        title_area,
+    );
+    frame.render_widget(Paragraph::new(Line::from(close)), close_area);
 }
 
 fn dim_background(frame: &mut Frame, area: Rect, overlay: Rect, bg: Color, fg: Color) {
