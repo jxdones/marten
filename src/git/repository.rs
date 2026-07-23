@@ -303,7 +303,7 @@ pub fn resolve_revision(repo: &Repository, input: &str) -> AppResult<RevisionDat
     Ok(RevisionData {
         oid,
         short_oid: oid.to_string().chars().take(SHORT_COMMIT_LEN).collect(),
-        subject: commit.summary().unwrap_or_default().to_string(),
+        subject: commit.summary()?.unwrap_or_default().to_string(),
     })
 }
 

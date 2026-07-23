@@ -596,10 +596,7 @@ fn comparison_side_spans(
     theme: Theme,
 ) -> Vec<Span<'static>> {
     let Some(line) = line else {
-        return vec![Span::styled(
-            " ".repeat(width),
-            Style::default().bg(theme.bg),
-        )];
+        return alignment_gap_spans(width, theme);
     };
     let style = match line.origin {
         '+' => theme.diff_add(),
@@ -623,6 +620,13 @@ fn comparison_side_spans(
     let mut spans = vec![Span::styled(prefix, style)];
     spans.extend(skip_spans(content_spans, horizontal_scroll));
     fit_spans(spans, width, style)
+}
+
+fn alignment_gap_spans(width: usize, theme: Theme) -> Vec<Span<'static>> {
+    vec![Span::styled(
+        "╱".repeat(width),
+        Style::default().fg(theme.line).bg(theme.bg),
+    )]
 }
 
 fn skip_spans(spans: Vec<Span<'static>>, mut amount: usize) -> Vec<Span<'static>> {
