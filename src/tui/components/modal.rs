@@ -112,10 +112,7 @@ pub fn draw_title_bar(frame: &mut Frame, area: Rect, title: &'static str, theme:
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let close = vec![
-        Span::styled("esc/q ", theme.accent()),
-        Span::styled("close  ", theme.muted()),
-    ];
+    let close = vec![Span::styled("esc ", theme.accent())];
     let close_width = u16::try_from(Line::from(close.clone()).width()).unwrap_or(inner.width);
     let [title_area, close_area] = Layout::horizontal([
         Constraint::Min(0),

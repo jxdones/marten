@@ -59,13 +59,13 @@ pub const THEMES: &[ThemeEntry] = &[
         name: "Marten",
         id: "marten",
         appearance: "dark",
-        theme: MARTEN_DARK,
+        theme: MARTEN,
     },
     ThemeEntry {
         name: "Ermine",
         id: "ermine",
         appearance: "light",
-        theme: MARTEN_LIGHT,
+        theme: ERMINE,
     },
     ThemeEntry {
         name: "Catppuccin",
@@ -138,9 +138,19 @@ pub fn default_entry() -> &'static ThemeEntry {
 }
 
 // Original to Marten.
-pub const MARTEN_DARK: Theme = Theme {
-    syntax_theme: "base16-ocean.dark",
-    syntax_palette: None,
+pub const MARTEN: Theme = Theme {
+    syntax_theme: "marten",
+    syntax_palette: Some(SyntaxPalette {
+        comment: Color::Rgb(154, 138, 110),
+        keyword: Color::Rgb(222, 138, 122),
+        function: Color::Rgb(212, 163, 104),
+        variable: Color::Rgb(239, 228, 210),
+        string: Color::Rgb(181, 201, 122),
+        number: Color::Rgb(224, 194, 78),
+        type_name: Color::Rgb(232, 203, 164),
+        operator: Color::Rgb(196, 179, 150),
+        punctuation: Color::Rgb(160, 141, 118),
+    }),
 
     bg: Color::Rgb(22, 17, 13),
     sidebar_bg: Color::Rgb(22, 17, 13),
@@ -173,9 +183,19 @@ pub const MARTEN_DARK: Theme = Theme {
 };
 
 // Original to Marten.
-pub const MARTEN_LIGHT: Theme = Theme {
-    syntax_theme: "base16-ocean.light",
-    syntax_palette: None,
+pub const ERMINE: Theme = Theme {
+    syntax_theme: "ermine",
+    syntax_palette: Some(SyntaxPalette {
+        comment: Color::Rgb(125, 109, 90),
+        keyword: Color::Rgb(168, 68, 58),
+        function: Color::Rgb(158, 101, 26),
+        variable: Color::Rgb(48, 38, 32),
+        string: Color::Rgb(88, 112, 43),
+        number: Color::Rgb(127, 106, 14),
+        type_name: Color::Rgb(126, 90, 40),
+        operator: Color::Rgb(107, 91, 73),
+        punctuation: Color::Rgb(124, 107, 87),
+    }),
 
     bg: Color::Rgb(245, 239, 228),
     sidebar_bg: Color::Rgb(245, 239, 228),
