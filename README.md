@@ -16,7 +16,25 @@
 
 ## Install
 
-Marten requires Rust 1.85 or newer.
+Install the latest release on macOS or Linux:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jxdones/marten/main/install.sh | sh
+```
+
+To install a specific version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jxdones/marten/main/install.sh | sh -s -- v0.1.0
+```
+
+The installer supports Intel and ARM64 systems. Set `BINDIR` to install somewhere other than `/usr/local/bin`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jxdones/marten/main/install.sh | BINDIR="$HOME/.local/bin" sh
+```
+
+To build from source, install Rust 1.85 or newer and run:
 
 ```bash
 git clone https://github.com/jxdones/marten.git

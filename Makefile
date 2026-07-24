@@ -3,7 +3,7 @@
 APP := marten
 VERSION := 0.1.0
 
-.PHONY: help build run run-release play demo dev-files clean-dev-files check test fmt lint lint-strict audit ci ci-full release install clean tag
+.PHONY: help build run run-release play demo dev-files clean-dev-files check test fmt fmt-check lint lint-strict audit ci ci-full release install clean tag
 
 help:
 	@printf "\n"
@@ -18,6 +18,7 @@ help:
 	@printf "  %-12s %s\n" "check" "Type-check and compile without linking."
 	@printf "  %-12s %s\n" "test" "Run tests."
 	@printf "  %-12s %s\n" "fmt" "Format Rust code."
+	@printf "  %-12s %s\n" "fmt-check" "Check Rust formatting without changing files."
 	@printf "  %-12s %s\n" "lint" "Run clippy and fail on warnings."
 	@printf "  %-12s %s\n" "lint-strict" "Run clippy with additional pedantic lints before committing."
 	@printf "  %-12s %s\n" "audit" "Run cargo audit."
@@ -62,6 +63,9 @@ test:
 fmt:
 	cargo fmt --all
 
+fmt-check:
+	cargo fmt --all -- --check
+
 lint:
 	cargo clippy --all-targets -- -D warnings
 
@@ -75,9 +79,9 @@ lint-strict:
 audit:
 	cargo audit
 
-ci: fmt lint test
+ci: fmt-check lint test
 
-ci-full: fmt lint test audit
+ci-full: fmt-check lint test audit
 
 release:
 	cargo build --release
