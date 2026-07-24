@@ -5,13 +5,13 @@
   <p>A terminal diff viewer for reviewing your work before it becomes a commit or pull request.</p>
 
   <p>
-    <img src="assets/marten.gif" alt="Marten demo" width="830"/>
+    <img src="https://raw.githubusercontent.com/jxdones/marten/main/assets/marten.gif" alt="Marten demo" width="830"/>
   </p>
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)
 [![Built With Ratatui](https://ratatui.rs/built-with-ratatui/badge.svg)](https://ratatui.rs/)
-![Status](https://img.shields.io/badge/status-early%20development-yellow.svg)
+[![Release](https://img.shields.io/github/v/release/jxdones/marten?display_name=release&logo=github)](https://github.com/jxdones/marten/releases)
 </div>
 
 ## Install
@@ -33,6 +33,18 @@ The installer supports Intel and ARM64 systems. Set `BINDIR` to install somewher
 ```bash
 curl -fsSL https://raw.githubusercontent.com/jxdones/marten/main/install.sh | BINDIR="$HOME/.local/bin" sh
 ```
+
+### Using Cargo
+
+Already have Rust 1.85 or newer? Install Marten directly from crates.io:
+
+```bash
+cargo install marten-diff --locked
+```
+
+The package is named `marten-diff`; once installed, launch it with `marten`. If you need a Rust toolchain, the recommended installer is [rustup](https://rustup.rs/).
+
+### From source
 
 To build from source, install Rust 1.85 or newer and run:
 

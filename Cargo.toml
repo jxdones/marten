@@ -1,10 +1,28 @@
 [package]
-name = "marten"
+name = "marten-diff"
 version = "0.1.0"
 authors = ["Jones Dias"]
-description = "A small Rust Git TUI for reviewing work without leaving the terminal."
-keywords = ["tui", "terminal", "git"]
+description = "A terminal diff viewer for reviewing your work before it becomes a commit or pull request."
+keywords = ["tui", "terminal", "git", "diff", "review"]
 edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+repository = "https://github.com/jxdones/marten"
+homepage = "https://github.com/jxdones/marten"
+readme = "README.md"
+categories = ["command-line-utilities", "development-tools"]
+include = [
+    "src/**",
+    "Cargo.toml",
+    "Cargo.lock",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+]
+
+[[bin]]
+name = "marten"
+path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
