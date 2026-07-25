@@ -14,6 +14,8 @@ pub enum Action {
     PreviousFocus,
     MoveDown,
     MoveUp,
+    PageDown,
+    PageUp,
     ScrollDiffLeft,
     ScrollDiffRight,
     ScrollDiff {

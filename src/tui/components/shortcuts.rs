@@ -48,6 +48,7 @@ fn shortcuts(app: &App) -> Vec<(&'static str, &'static str)> {
         Focus::Diff => {
             shortcuts.extend([
                 ("h/j/k/l", "scroll"),
+                ("pgup/pgdn", "page"),
                 ("[/]", "hunk"),
                 ("m", "mark reviewed"),
                 ("e", "edit hunk"),
