@@ -171,6 +171,22 @@ pub struct DiffSection {
 pub enum DiffSource {
     Worktree,
     Revision(RevisionData),
+    Range(RangeData),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RangeKind {
+    Direct,
+    MergeBase,
+}
+
+#[derive(Debug, Clone)]
+pub struct RangeData {
+    pub from_label: String,
+    pub to_label: String,
+    pub old_oid: Oid,
+    pub new_oid: Oid,
+    pub kind: RangeKind,
 }
 
 #[derive(Debug, Clone)]
@@ -307,27 +323,85 @@ pub fn resolve_revision(repo: &Repository, input: &str) -> AppResult<RevisionDat
     })
 }
 
+fn parse_range(input: &str) -> AppResult<(&str, &str, RangeKind)> {
+    let (from_input, to_input, kind) = if let Some((from, to)) = input.split_once("...") {
+        (from, to, RangeKind::MergeBase)
+    } else if let Some((from, to)) = input.split_once("..") {
+        (from, to, RangeKind::Direct)
+    } else {
+        return Err(AppError::InvalidRange {
+            range: input.to_string(),
+        });
+    };
+
+    if from_input.is_empty() || to_input.is_empty() {
+        return Err(AppError::InvalidRange {
+            range: input.to_string(),
+        });
+    }
+
+    Ok((from_input, to_input, kind))
+}
+
+pub fn resolve_range(repo: &Repository, input: &str) -> AppResult<RangeData> {
+    let (from_input, to_input, kind) = parse_range(input)?;
+    let from = resolve_revision(repo, from_input)?;
+    let to = resolve_revision(repo, to_input)?;
+
+    let old_oid = match kind {
+        RangeKind::Direct => from.oid,
+        RangeKind::MergeBase => repo
+            .merge_base(from.oid, to.oid)
+            .map_err(|error| AppError::git("find merge base", error))?,
+    };
+    let new_oid = to.oid;
+
+    Ok(RangeData {
+        from_label: from_input.to_string(),
+        to_label: to_input.to_string(),
+        old_oid,
+        new_oid,
+        kind,
+    })
+}
+
 pub fn files_for_source(repo: &Repository, source: &DiffSource) -> AppResult<Vec<FileEntry>> {
     match source {
         DiffSource::Worktree => files(repo),
         DiffSource::Revision(revision) => files_from_commit(repo, revision.oid),
+        DiffSource::Range(range) => files_between_commits(repo, Some(range.old_oid), range.new_oid),
     }
 }
 
 pub fn files_from_commit(repo: &Repository, oid: Oid) -> AppResult<Vec<FileEntry>> {
     let commit = repo.find_commit(oid)?;
 
-    let old_tree = if commit.parent_count() > 0 {
-        Some(commit.parent(0)?.tree()?)
+    let parent_oid = if commit.parent_count() > 0 {
+        Some(commit.parent_id(0)?)
     } else {
         None
     };
-    let current_tree = commit.tree()?;
-    let commit_diff = repo.diff_tree_to_tree(old_tree.as_ref(), Some(&current_tree), None)?;
-    let staged_map: HashMap<String, (usize, usize)> = diff_stats(&commit_diff)?;
+
+    files_between_commits(repo, parent_oid, oid)
+}
+
+fn files_between_commits(
+    repo: &Repository,
+    old_oid: Option<Oid>,
+    new_oid: Oid,
+) -> AppResult<Vec<FileEntry>> {
+    let old_tree = if let Some(oid) = old_oid {
+        Some(repo.find_commit(oid)?.tree()?)
+    } else {
+        None
+    };
+
+    let new_tree = repo.find_commit(new_oid)?.tree()?;
+    let diff = repo.diff_tree_to_tree(old_tree.as_ref(), Some(&new_tree), None)?;
+    let staged_map: HashMap<String, (usize, usize)> = diff_stats(&diff)?;
     let mut entries = Vec::new();
 
-    for delta in commit_diff.deltas() {
+    for delta in diff.deltas() {
         let path = delta
             .new_file()
             .path()
@@ -410,19 +484,32 @@ pub fn files_diff_from_commit(
 ) -> AppResult<Option<Vec<DiffSection>>> {
     let commit = repo.find_commit(oid)?;
 
-    let old_tree = if commit.parent_count() > 0 {
-        Some(commit.parent(0)?.tree()?)
+    let parent_oid = if commit.parent_count() > 0 {
+        Some(commit.parent_id(0)?)
     } else {
         None
     };
-    let current_tree = commit.tree()?;
+    file_diff_between_commits(repo, parent_oid, oid, path)
+}
+
+fn file_diff_between_commits(
+    repo: &Repository,
+    old_oid: Option<Oid>,
+    new_oid: Oid,
+    path: &str,
+) -> AppResult<Option<Vec<DiffSection>>> {
+    let old_tree = if let Some(oid) = old_oid {
+        Some(repo.find_commit(oid)?.tree()?)
+    } else {
+        None
+    };
+    let new_tree = repo.find_commit(new_oid)?.tree()?;
 
     let mut opts = DiffOptions::new();
     opts.pathspec(path);
-    let commit_diff =
-        repo.diff_tree_to_tree(old_tree.as_ref(), Some(&current_tree), Some(&mut opts))?;
+    let diff = repo.diff_tree_to_tree(old_tree.as_ref(), Some(&new_tree), Some(&mut opts))?;
 
-    let Some(hunks) = diff_hunks(commit_diff)? else {
+    let Some(hunks) = diff_hunks(diff)? else {
         return Ok(None);
     };
 
@@ -441,6 +528,9 @@ pub fn file_diff_for_source(
     match source {
         DiffSource::Worktree => file_diff(repo, path, status),
         DiffSource::Revision(revision) => files_diff_from_commit(repo, revision.oid, path),
+        DiffSource::Range(range) => {
+            file_diff_between_commits(repo, Some(range.old_oid), range.new_oid, path)
+        }
     }
 }
 

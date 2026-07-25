@@ -1,5 +1,7 @@
 use crate::app::App;
-use crate::git::repository::{DiffSource, Head, RepositoryStatus, RevisionData};
+use crate::git::repository::{
+    DiffSource, Head, RangeData, RangeKind, RepositoryStatus, RevisionData,
+};
 use crate::tui::theme::Theme;
 use ratatui::{
     Frame,
@@ -30,6 +32,12 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
         DiffSource::Revision(revision) => revision_summary(
             app.repository_status(),
             revision,
+            theme,
+            usize::from(left.width),
+        ),
+        DiffSource::Range(range) => range_summary(
+            app.repository_status(),
+            range,
             theme,
             usize::from(left.width),
         ),
@@ -152,6 +160,42 @@ fn revision_summary(
         prefix
             .into_iter()
             .chain([Span::styled(subject, theme.muted())])
+            .collect::<Vec<_>>(),
+    )
+}
+
+fn range_summary(
+    status: Option<&RepositoryStatus>,
+    range: &RangeData,
+    theme: Theme,
+    max_width: usize,
+) -> Line<'static> {
+    let repository_name =
+        status.map_or_else(|| "no repository".to_string(), |status| status.name.clone());
+    let prefix = vec![
+        Span::styled(repository_name, theme.repo_name()),
+        Span::styled("  ·  ", Style::default()),
+    ];
+    let separator = match range.kind {
+        RangeKind::Direct => " → ",
+        RangeKind::MergeBase => "...",
+    };
+    let range_width = max_width
+        .saturating_sub(Line::from(prefix.clone()).width())
+        .saturating_sub(Line::raw(separator).width());
+    let from_width = range_width / 2;
+    let to_width = range_width.saturating_sub(from_width);
+    let from = truncate_with_ellipsis(&range.from_label, from_width);
+    let to = truncate_with_ellipsis(&range.to_label, to_width);
+
+    Line::from(
+        prefix
+            .into_iter()
+            .chain([
+                Span::styled(from, theme.muted()),
+                Span::styled(separator, theme.muted()),
+                Span::styled(to, theme.branch_name()),
+            ])
             .collect::<Vec<_>>(),
     )
 }

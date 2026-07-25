@@ -54,6 +54,8 @@ cd marten
 make install
 ```
 
+## Usage
+
 Run it from inside a Git repository:
 
 ```bash
@@ -67,6 +69,14 @@ marten show HEAD~1
 ```
 
 `show` accepts a commit, branch, tag, or other Git revision.
+
+To inspect the changes between two revisions:
+
+```bash
+marten diff main..feature-branch
+```
+
+Use `FROM...TO` to diff against the merge base instead of `FROM` directly, mirroring `git diff`'s two- and three-dot syntax.
 
 ## Configuration
 

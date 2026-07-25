@@ -14,6 +14,9 @@ pub enum AppError {
         revision: String,
         source: git2::Error,
     },
+    InvalidRange {
+        range: String,
+    },
     Git {
         operation: &'static str,
         source: git2::Error,
@@ -84,6 +87,10 @@ impl std::fmt::Display for AppError {
                     "revision '{revision}' does not point to a commit"
                 )
             }
+            Self::InvalidRange { range } => write!(
+                formatter,
+                "invalid revision range '{range}' (expected FROM..TO or FROM...TO)"
+            ),
             Self::Git { operation, source } => {
                 write!(formatter, "could not {operation}: {}", source.message())
             }
@@ -102,6 +109,7 @@ impl std::error::Error for AppError {
             | Self::RevisionNotFound { source, .. }
             | Self::RevisionNotCommit { source, .. }
             | Self::Git { source, .. } => Some(source),
+            Self::InvalidRange { .. } => None,
             Self::Io { source, .. } => Some(source),
         }
     }

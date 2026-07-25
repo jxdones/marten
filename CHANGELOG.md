@@ -2,6 +2,12 @@
 
 All notable changes to Marten will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- Revision range diffing with `marten diff FROM..TO` (direct diff) and `marten diff FROM...TO` (merge-base diff).
+
 ## [0.1.0] - 2026-07-23
 
 Initial release.

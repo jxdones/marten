@@ -55,6 +55,10 @@ impl App {
                 let revision = repository::resolve_revision(&repo, oid)?;
                 DiffSource::Revision(revision)
             }
+            Some(Command::Diff { range }) => {
+                let range = repository::resolve_range(&repo, range)?;
+                DiffSource::Range(range)
+            }
             None => DiffSource::Worktree,
         };
 
@@ -69,6 +73,7 @@ impl App {
         let operation = match diff_source {
             DiffSource::Worktree => "load working-tree changes",
             DiffSource::Revision(_) => "load revision changes",
+            DiffSource::Range(_) => "load revision range",
         };
         let entries = repository::files_for_source(&repo, &diff_source)
             .map_err(|error| error.with_operation(operation))?;

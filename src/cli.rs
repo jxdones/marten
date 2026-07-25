@@ -35,4 +35,8 @@ pub enum Command {
         #[arg(value_name = "REVISION")]
         oid: String,
     },
+    Diff {
+        #[arg(value_name = "RANGE")]
+        range: String,
+    },
 }

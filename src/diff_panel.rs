@@ -95,6 +95,7 @@ impl DiffPanel {
         let operation = match diff_ctx.diff_source {
             DiffSource::Worktree => "refresh working-tree changes",
             DiffSource::Revision(_) => "refresh revision changes",
+            DiffSource::Range(_) => "refresh revision range",
         };
         let entries = repository::files_for_source(diff_ctx.repo, diff_ctx.diff_source)
             .map_err(|error| error.with_operation(operation))?;
