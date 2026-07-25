@@ -15,7 +15,7 @@ jobs:
     name: Check, Lint, Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -48,7 +48,7 @@ jobs:
             asset_os: darwin
             arch: arm64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
@@ -61,7 +61,7 @@ jobs:
           ARCHIVE="marten_${VERSION}_${{ matrix.asset_os }}_${{ matrix.arch }}.tar.gz"
           tar czf "$ARCHIVE" -C target/${{ matrix.target }}/release marten
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: marten-${{ matrix.asset_os }}-${{ matrix.arch }}
           path: marten_*.tar.gz
@@ -76,7 +76,7 @@ jobs:
       contents: write
     steps:
       - name: Download release artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: marten-*
           path: dist
