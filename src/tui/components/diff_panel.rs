@@ -301,7 +301,7 @@ fn render_file_header(
         .map(|span| text_width(&span.content))
         .sum();
     let stats = format!(
-        "+{} -{} {}",
+        "+{} -{} {} ",
         file.insertions,
         file.deletions,
         file.status.label().to_lowercase()
@@ -341,6 +341,7 @@ fn render_file_header(
         Span::styled(file.status.label().to_lowercase(), status_color.patch(bg))
             .add_modifier(Modifier::BOLD),
     );
+    spans.push(Span::styled(" ", bg));
 
     Line::from(spans).style(bg)
 }
@@ -411,7 +412,7 @@ fn render_binary_header(width: usize, file: &FileEntry, theme: Theme) -> Line<'s
     let path = format!(" {}", file.path);
     let tag = " binary";
     let padding = width.saturating_sub(
-        text_width(prefix) + text_width(status_symbol) + text_width(&path) + text_width(tag),
+        text_width(prefix) + text_width(status_symbol) + text_width(&path) + text_width(tag) + 1,
     );
     Line::from(vec![
         Span::styled(prefix, theme.muted().patch(bg)),
@@ -419,6 +420,7 @@ fn render_binary_header(width: usize, file: &FileEntry, theme: Theme) -> Line<'s
         Span::styled(path, theme.muted().patch(bg)),
         Span::styled(" ".repeat(padding), bg),
         Span::styled(tag, theme.muted().patch(bg)),
+        Span::styled(" ", bg),
     ])
     .style(bg)
 }
@@ -456,7 +458,7 @@ fn hunk_header_line(
     };
     let prefix = format!(" hunk {}/{} ", index + 1, total);
     let (insertions, deletions) = stats;
-    let stat_text = format!(" +{insertions} -{deletions}");
+    let stat_text = format!("+{insertions} -{deletions} ");
     let padding =
         width.saturating_sub(text_width(&prefix) + text_width(header) + text_width(&stat_text));
 
@@ -473,6 +475,7 @@ fn hunk_header_line(
             format!("-{deletions}"),
             Style::default().fg(theme.del_fg).bg(theme.hunk_header_bg),
         ),
+        Span::styled(" ", style),
     ])
     .style(Style::default().bg(theme.hunk_header_bg))
 }

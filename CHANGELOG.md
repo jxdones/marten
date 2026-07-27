@@ -8,6 +8,10 @@ All notable changes to Marten will be documented in this file.
 
 - Clarified `marten diff --help` with supported revision types, examples, and the difference between two-dot and three-dot comparisons.
 
+### Fixed
+
+- Ensured hunk header backgrounds fill the entire width of the diff panel.
+
 ## [0.1.1] - 2026-07-23
 
 ### Added
