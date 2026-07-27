@@ -29,13 +29,19 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Command {
-    /// Show the changes introduced by a revision
+    /// Show the changes introduced by a revision.
     Show {
-        /// Revision whose changes to show (e.g. SHA, branch, tag, or HEAD~2)
+        /// Revision whose changes to show (e.g. SHA, branch, tag, or HEAD~2).
         #[arg(value_name = "REVISION")]
         oid: String,
     },
+    /// Compare two Git revisions, such as commits, branches, or tags.
+    ///
+    /// Two dots compare the first revision directly with the second.
+    /// Three dots compare their common ancestor with the second revision.
+    #[command(verbatim_doc_comment)]
     Diff {
+        /// Revisions to compare, such as main..feature or main...feature.
         #[arg(value_name = "RANGE")]
         range: String,
     },

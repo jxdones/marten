@@ -4,6 +4,10 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Clarified `marten diff --help` with supported revision types, examples, and the difference between two-dot and three-dot comparisons.
+
 ## [0.1.1] - 2026-07-23
 
 ### Added
