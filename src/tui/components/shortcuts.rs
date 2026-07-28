@@ -63,7 +63,16 @@ fn shortcut_spans(shortcuts: Vec<(&'static str, &'static str)>, app: &App) -> Ve
         if idx > 0 {
             spans.push(Span::raw(" "));
         }
-        spans.push(Span::styled(format!(" {key} "), theme.accent()));
+        spans.push(Span::styled(" ", theme.accent()));
+        for ch in key.chars() {
+            let style = if ch == '/' {
+                theme.muted()
+            } else {
+                theme.accent()
+            };
+            spans.push(Span::styled(ch.to_string(), style));
+        }
+        spans.push(Span::styled(" ", theme.accent()));
         spans.push(Span::styled(format!("{label} "), theme.muted()));
     }
 

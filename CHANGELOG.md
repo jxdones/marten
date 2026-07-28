@@ -4,6 +4,12 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-07-28
+
+### Fixed
+
+- Dim the `/` separator in the `[/]` hunk shortcut hint so it doesn't read as a valid keystroke.
+
 ## [0.1.2] - 2026-07-28
 
 ### Added
