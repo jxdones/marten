@@ -11,6 +11,7 @@ use crate::state::{Diff, DiffLayout, DiffLoadState, FileKey, Focus, LineIndex};
 use crate::store::DiffStore;
 
 const SCROLL_STEP: usize = 1;
+const PAGE_SCROLL_CONTEXT: usize = 3;
 const HORIZONTAL_SCROLL_STEP: usize = 4;
 const GUTTER_WIDTH: usize = 1;
 
@@ -53,6 +54,14 @@ impl DiffPanel {
             }
             Action::MoveUp if focus == Focus::Diff => {
                 self.continuous_scroll_up();
+                self.sync_files_to_scroll(diff_ctx.files, diff_ctx.store);
+            }
+            Action::PageDown => {
+                self.continuous_scroll_page_down(diff_ctx.store);
+                self.sync_files_to_scroll(diff_ctx.files, diff_ctx.store);
+            }
+            Action::PageUp => {
+                self.continuous_scroll_page_up();
                 self.sync_files_to_scroll(diff_ctx.files, diff_ctx.store);
             }
             Action::ScrollDiffLeft => {
@@ -239,6 +248,22 @@ impl DiffPanel {
         self.review.continuous_scroll = self.review.continuous_scroll.saturating_sub(SCROLL_STEP);
     }
 
+    pub fn continuous_scroll_page_down(&mut self, store: &DiffStore) {
+        let max_offset = self.max_continuous_scroll_offset(store);
+        self.review.continuous_scroll = self
+            .review
+            .continuous_scroll
+            .saturating_add(self.page_scroll_amount())
+            .min(max_offset);
+    }
+
+    pub fn continuous_scroll_page_up(&mut self) {
+        self.review.continuous_scroll = self
+            .review
+            .continuous_scroll
+            .saturating_sub(self.page_scroll_amount());
+    }
+
     pub fn select_next_hunk(&mut self, store: &DiffStore) {
         self.next_continuous_hunk(store);
     }
@@ -342,6 +367,13 @@ impl DiffPanel {
             .index
             .total_rows
             .saturating_sub(self.state.viewport_height)
+    }
+
+    fn page_scroll_amount(&self) -> usize {
+        // Keep three overlapping lines visible between pages to preserve reading context.
+        self.state
+            .viewport_height
+            .saturating_sub(PAGE_SCROLL_CONTEXT)
     }
 
     fn max_horizontal_scroll(&self, store: &DiffStore) -> usize {
