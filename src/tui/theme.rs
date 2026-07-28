@@ -208,7 +208,7 @@ pub const ERMINE: Theme = Theme {
     select: Color::Rgb(244, 231, 196),
     select_hi: Color::Rgb(235, 217, 168),
 
-    file_header_bg: Color::Rgb(243, 236, 223),
+    file_header_bg: Color::Rgb(238, 230, 214),
     hunk_header_bg: Color::Rgb(231, 220, 199),
 
     add_bg: Color::Rgb(233, 238, 211),

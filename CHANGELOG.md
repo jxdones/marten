@@ -11,6 +11,7 @@ All notable changes to Marten will be documented in this file.
 ### Fixed
 
 - Ensured hunk header backgrounds fill the entire width of the diff panel.
+- Adjust file header color for ermine theme.
 
 ## [0.1.1] - 2026-07-23
 

@@ -319,7 +319,10 @@ fn render_file_header(
             .add_modifier(Modifier::BOLD),
         Span::styled(" ", bg),
     ];
-    let right_width: usize = right_spans.iter().map(|span| text_width(&span.content)).sum();
+    let right_width: usize = right_spans
+        .iter()
+        .map(|span| text_width(&span.content))
+        .sum();
 
     let padding = width.saturating_sub(
         text_width(collapse_symbol)
@@ -463,7 +466,10 @@ fn hunk_header_line(
         ),
         Span::styled(" ", style),
     ];
-    let right_width: usize = right_spans.iter().map(|span| text_width(&span.content)).sum();
+    let right_width: usize = right_spans
+        .iter()
+        .map(|span| text_width(&span.content))
+        .sum();
     let padding = width.saturating_sub(text_width(&prefix) + text_width(header) + right_width);
 
     let mut spans = vec![
