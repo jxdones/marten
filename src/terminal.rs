@@ -14,7 +14,14 @@ use crossterm::{
 
 use ratatui::{DefaultTerminal, TerminalOptions, Viewport, prelude::CrosstermBackend};
 
-use crate::{app::App, error::AppResult, event::Event, tui};
+use crate::{
+    action::Action,
+    app::App,
+    editor,
+    error::{AppError, AppResult},
+    event::Event,
+    tui,
+};
 
 pub fn run(app: &mut App) -> AppResult<()> {
     let mut terminal = init_terminal()?;
@@ -84,6 +91,22 @@ fn run_loop(terminal: &mut DefaultTerminal, app: &mut App) -> AppResult<()> {
                 CrosstermEvent::Key(key) if key.kind == KeyEventKind::Press => {
                     let action = app.handle_event(Event::Key(key));
                     app.update(action)?;
+
+                    if let Some((path, line)) = app.take_pending_editor() {
+                        disable_raw_mode()?;
+                        execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
+                        editor::command(&path, line as usize)
+                            .status()
+                            .map_err(|source| {
+                                AppError::from(source).with_operation("open editor")
+                            })?;
+
+                        execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture)?;
+                        enable_raw_mode()?;
+                        terminal.clear()?;
+                        app.update(Action::Refresh)?;
+                    }
+
                     needs_draw = true;
                 }
                 CrosstermEvent::Mouse(mouse) => {

@@ -4,6 +4,12 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-07-28
+
+### Added
+
+- Open the current diff line (or a hunk) in your editor with `e`, using `$VISUAL`/`$EDITOR` (falls back to `vi`).
+
 ### Changed
 
 - Clarified `marten diff --help` with supported revision types, examples, and the difference between two-dot and three-dot comparisons.

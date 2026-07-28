@@ -16,6 +16,7 @@ pub fn update(overlay: &mut Overlay, action: Action) {
 #[derive(Debug, Clone, Copy)]
 pub enum Section {
     Navigation,
+    Hunk,
     View,
     General,
     Settings,
@@ -25,6 +26,7 @@ impl Section {
     pub const fn label(self) -> &'static str {
         match self {
             Self::Navigation => "Navigation",
+            Self::Hunk => "Hunk",
             Self::View => "View",
             Self::General => "General",
             Self::Settings => "Settings",
@@ -86,6 +88,15 @@ pub fn command_groups() -> &'static [CommandGroup] {
                     action: Action::ScrollDiffRight,
                 },
             ],
+        },
+        CommandGroup {
+            section: Section::Hunk,
+            items: &[CommandItem {
+                label: "edit hunk",
+                description: "edit hunk on your editor",
+                keybind: "e",
+                action: Action::OpenEditor,
+            }],
         },
         CommandGroup {
             section: Section::View,

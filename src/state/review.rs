@@ -174,4 +174,38 @@ impl ContinuousDiff {
             }
         }
     }
+
+    pub fn selected_line(&self, scroll: usize) -> Option<(&str, u32)> {
+        let (file_idx, hunk_idx, row_idx) = match self.lookup_row(scroll)? {
+            RenderedRow::DiffRow {
+                file_idx,
+                hunk_idx,
+                row_idx,
+            } => (file_idx, hunk_idx, Some(row_idx)),
+            RenderedRow::HunkHeader { file_idx, hunk_idx } => (file_idx, hunk_idx, None),
+            _ => return None,
+        };
+
+        let DiffLoadState::Loaded { hunks, .. } = &self.files[file_idx].load else {
+            return None;
+        };
+
+        let hunk = hunks.get(hunk_idx)?;
+        let new_lineno = match row_idx {
+            Some(row_idx) => match self.layout {
+                DiffLayout::Unified => hunk.lines.get(row_idx)?.new_lineno?,
+                DiffLayout::SideBySide => {
+                    let idx = hunk.comparison_rows.get(row_idx)?.new_line_idx?;
+                    hunk.lines.get(idx)?.new_lineno?
+                }
+            },
+            None => hunk
+                .lines
+                .iter()
+                .find(|line| line.origin == '+')
+                .and_then(|line| line.new_lineno)?,
+        };
+
+        Some((self.files[file_idx].entry.path.as_str(), new_lineno))
+    }
 }

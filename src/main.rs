@@ -8,6 +8,7 @@ mod cli;
 mod command_palette;
 mod config;
 mod diff_panel;
+mod editor;
 mod error;
 mod event;
 mod files_panel;

@@ -26,4 +26,5 @@ pub enum Action {
     ToggleThemeSelector,
     RunSelectedCommand,
     SelectTheme,
+    OpenEditor,
 }

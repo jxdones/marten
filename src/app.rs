@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::path::PathBuf;
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use crossterm::{execute, terminal::SetTitle};
@@ -37,6 +38,8 @@ pub struct App {
     diff_source: DiffSource,
 
     overlay: Overlay,
+
+    pending_editor: Option<(PathBuf, u32)>,
 }
 
 impl App {
@@ -118,6 +121,7 @@ impl App {
             repository_status,
             diff_source,
             overlay,
+            pending_editor: None,
         })
     }
 
@@ -200,6 +204,10 @@ impl App {
         self.diff.review()
     }
 
+    pub fn take_pending_editor(&mut self) -> Option<(PathBuf, u32)> {
+        self.pending_editor.take()
+    }
+
     pub fn handle_event(&mut self, event: Event) -> Action {
         match event {
             Event::Key(key) => self.handle_key(key),
@@ -237,6 +245,7 @@ impl App {
             show_sidebar,
             should_quit,
             overlay,
+            pending_editor,
             ..
         } = self;
 
@@ -337,6 +346,12 @@ impl App {
                     *active_theme = entry.theme;
                 }
                 return Ok(());
+            }
+            Action::OpenEditor => {
+                let scroll = diff.review().continuous_scroll;
+                if let Some((path, line)) = store.continuous_diff.selected_line(scroll) {
+                    *pending_editor = Some((PathBuf::from(path), line));
+                }
             }
             _ => {
                 let selection_changed = files.update(action, *focus, store);
@@ -440,6 +455,7 @@ impl App {
                 }
             },
             KeyCode::Char('[') if self.focus == Focus::Diff => Action::PreviousHunk,
+            KeyCode::Char('e') if self.focus == Focus::Diff => Action::OpenEditor,
             KeyCode::Char('n') => Action::NextFile,
             KeyCode::Char('p') => Action::PreviousFile,
             KeyCode::Char('L') => Action::ToggleDiffLineNumbers,
