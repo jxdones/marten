@@ -300,19 +300,6 @@ fn render_file_header(
         .iter()
         .map(|span| text_width(&span.content))
         .sum();
-    let stats = format!(
-        "+{} -{} {} ",
-        file.insertions,
-        file.deletions,
-        file.status.label().to_lowercase()
-    );
-    let padding = width.saturating_sub(
-        text_width(collapse_symbol)
-            + text_width(status_symbol)
-            + text_width(&path)
-            + position_width
-            + text_width(&stats),
-    );
 
     let mut path_style = if is_focused {
         theme.accent().patch(bg)
@@ -323,25 +310,30 @@ fn render_file_header(
         path_style = path_style.add_modifier(Modifier::BOLD);
     }
 
+    let right_spans = vec![
+        Span::styled(format!("+{}", file.insertions), theme.success().patch(bg)),
+        Span::styled(" ", theme.muted().patch(bg)),
+        Span::styled(format!("-{}", file.deletions), theme.unstaged().patch(bg)),
+        Span::styled(" ", theme.muted().patch(bg)),
+        Span::styled(file.status.label().to_lowercase(), status_color.patch(bg))
+            .add_modifier(Modifier::BOLD),
+        Span::styled(" ", bg),
+    ];
+    let right_width: usize = right_spans.iter().map(|span| text_width(&span.content)).sum();
+
+    let padding = width.saturating_sub(
+        text_width(collapse_symbol)
+            + text_width(status_symbol)
+            + text_width(&path)
+            + position_width
+            + right_width,
+    );
+
     spans.push(Span::styled(status_symbol, status_color.patch(bg)));
     spans.push(Span::styled(path, path_style));
     spans.extend(position_spans);
     spans.push(Span::styled((" ").repeat(padding), bg));
-    spans.push(Span::styled(
-        format!("+{}", file.insertions),
-        theme.success().patch(bg),
-    ));
-    spans.push(Span::styled(" ", theme.muted().patch(bg)));
-    spans.push(Span::styled(
-        format!("-{}", file.deletions),
-        theme.unstaged().patch(bg),
-    ));
-    spans.push(Span::styled(" ", theme.muted().patch(bg)));
-    spans.push(
-        Span::styled(file.status.label().to_lowercase(), status_color.patch(bg))
-            .add_modifier(Modifier::BOLD),
-    );
-    spans.push(Span::styled(" ", bg));
+    spans.extend(right_spans);
 
     Line::from(spans).style(bg)
 }
@@ -458,14 +450,8 @@ fn hunk_header_line(
     };
     let prefix = format!(" hunk {}/{} ", index + 1, total);
     let (insertions, deletions) = stats;
-    let stat_text = format!("+{insertions} -{deletions} ");
-    let padding =
-        width.saturating_sub(text_width(&prefix) + text_width(header) + text_width(&stat_text));
 
-    Line::from(vec![
-        Span::styled(prefix, style),
-        Span::styled(header.to_string(), style),
-        Span::styled(" ".repeat(padding), style),
+    let right_spans = vec![
         Span::styled(
             format!("+{insertions}"),
             Style::default().fg(theme.add_fg).bg(theme.hunk_header_bg),
@@ -476,8 +462,18 @@ fn hunk_header_line(
             Style::default().fg(theme.del_fg).bg(theme.hunk_header_bg),
         ),
         Span::styled(" ", style),
-    ])
-    .style(Style::default().bg(theme.hunk_header_bg))
+    ];
+    let right_width: usize = right_spans.iter().map(|span| text_width(&span.content)).sum();
+    let padding = width.saturating_sub(text_width(&prefix) + text_width(header) + right_width);
+
+    let mut spans = vec![
+        Span::styled(prefix, style),
+        Span::styled(header.to_string(), style),
+        Span::styled(" ".repeat(padding), style),
+    ];
+    spans.extend(right_spans);
+
+    Line::from(spans).style(Style::default().bg(theme.hunk_header_bg))
 }
 
 #[allow(clippy::too_many_arguments)]
