@@ -454,7 +454,17 @@ impl App {
                     }
                 }
             },
-            KeyCode::Char('[') if self.focus == Focus::Diff => Action::PreviousHunk,
+            KeyCode::Char('[') => match self.focus {
+                Focus::Diff => Action::PreviousHunk,
+                Focus::Files => {
+                    if !self.files().is_empty() {
+                        self.focus = Focus::Diff;
+                        Action::PreviousHunk
+                    } else {
+                        Action::Noop
+                    }
+                }
+            },
             KeyCode::Char('e') if self.focus == Focus::Diff => Action::OpenEditor,
             KeyCode::Char('n') => Action::NextFile,
             KeyCode::Char('p') => Action::PreviousFile,

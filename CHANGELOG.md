@@ -4,6 +4,10 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Fix `[` call from the sidebar to go to the previous hunk.
+
 ## [0.1.3] - 2026-07-28
 
 ### Fixed
