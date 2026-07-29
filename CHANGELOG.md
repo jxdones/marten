@@ -7,6 +7,8 @@ All notable changes to Marten will be documented in this file.
 ### Fixed
 
 - Fix `[` call from the sidebar to go to the previous hunk.
+- Make mouse-wheel and trackpad scrolling target the diff under the pointer without changing keyboard focus.
+- Preserve queued keyboard and mouse input while coalescing terminal resize events.
 
 ## [0.1.3] - 2026-07-28
 

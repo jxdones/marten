@@ -1,7 +1,7 @@
 use git2::Repository;
 use unicode_width::UnicodeWidthChar;
 
-use crate::action::Action;
+use crate::action::{Action, ScrollDirection};
 use crate::error::AppResult;
 use crate::files_panel::FilesPanel;
 use crate::git::repository::{self, DiffSource, FileEntry};
@@ -78,6 +78,10 @@ impl DiffPanel {
                     .state
                     .toggle_layout_override(diff_ctx.store.continuous_diff.layout);
                 self.set_layout(layout, diff_ctx.store);
+            }
+            Action::ScrollDiff { direction, lines } => {
+                self.continuous_scroll_by(direction, lines, diff_ctx.store);
+                self.sync_files_to_scroll(diff_ctx.files, diff_ctx.store);
             }
             _ => {}
         }
@@ -237,6 +241,23 @@ impl DiffPanel {
 
     pub fn continuous_scroll_up(&mut self) {
         self.review.continuous_scroll = self.review.continuous_scroll.saturating_sub(SCROLL_STEP);
+    }
+
+    fn continuous_scroll_by(
+        &mut self,
+        direction: ScrollDirection,
+        lines: usize,
+        store: &DiffStore,
+    ) {
+        let distance = lines.saturating_mul(SCROLL_STEP);
+        self.review.continuous_scroll = match direction {
+            ScrollDirection::Down => self
+                .review
+                .continuous_scroll
+                .saturating_add(distance)
+                .min(self.max_continuous_scroll_offset(store)),
+            ScrollDirection::Up => self.review.continuous_scroll.saturating_sub(distance),
+        };
     }
 
     pub fn select_next_hunk(&mut self, store: &DiffStore) {

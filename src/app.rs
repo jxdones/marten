@@ -4,8 +4,9 @@ use std::path::PathBuf;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use crossterm::{execute, terminal::SetTitle};
 use git2::{ErrorCode, Repository};
+use ratatui::layout::{Position, Rect};
 
-use crate::action::Action;
+use crate::action::{Action, ScrollDirection};
 use crate::cli::Command;
 use crate::config::{self, Config};
 use crate::diff_panel::{DiffContext, DiffPanel};
@@ -18,6 +19,7 @@ use crate::state::{
     Screen, ThemeSelectorState, TreeRow,
 };
 use crate::store::DiffStore;
+use crate::tui::layout;
 use crate::tui::theme::{THEMES, Theme};
 use crate::{command_palette, theme};
 
@@ -40,6 +42,7 @@ pub struct App {
     overlay: Overlay,
 
     pending_editor: Option<(PathBuf, u32)>,
+    terminal_area: Rect,
 }
 
 impl App {
@@ -97,7 +100,7 @@ impl App {
             diff_source: &diff_source,
         });
 
-        let (width, _) = crossterm::terminal::size().unwrap_or((0, 0));
+        let (width, height) = crossterm::terminal::size().unwrap_or((0, 0));
 
         let show_sidebar = config.ui.show_sidebar(width);
         let focus = if show_sidebar {
@@ -122,6 +125,7 @@ impl App {
             diff_source,
             overlay,
             pending_editor: None,
+            terminal_area: Rect::new(0, 0, width, height),
         })
     }
 
@@ -208,11 +212,17 @@ impl App {
         self.pending_editor.take()
     }
 
+    pub fn set_terminal_area(&mut self, area: Rect) {
+        self.terminal_area = area;
+    }
+
     pub fn handle_event(&mut self, event: Event) -> Action {
         match event {
             Event::Key(key) => self.handle_key(key),
             Event::Mouse(mouse) => self.handle_mouse(mouse),
-            Event::Resize(width, _) => {
+            Event::Resize(width, height) => {
+                self.terminal_area = Rect::new(0, 0, width, height);
+
                 if width <= 120 && self.focus != Focus::Diff {
                     Action::FocusPanel(Focus::Diff)
                 } else {
@@ -400,10 +410,28 @@ impl App {
     }
 
     fn handle_mouse(&mut self, mouse: MouseEvent) -> Action {
-        match mouse.kind {
-            MouseEventKind::ScrollUp => Action::MoveUp,
-            MouseEventKind::ScrollDown => Action::MoveDown,
-            _ => Action::Noop,
+        if !matches!(self.overlay, Overlay::None)
+            || layout::terminal_is_too_small(self.terminal_area)
+        {
+            return Action::Noop;
+        }
+
+        let direction = match mouse.kind {
+            MouseEventKind::ScrollUp => ScrollDirection::Up,
+            MouseEventKind::ScrollDown => ScrollDirection::Down,
+            _ => return Action::Noop,
+        };
+
+        let layout = layout::home(self.terminal_area, self.show_sidebar);
+        let position = Position::new(mouse.column, mouse.row);
+
+        if !layout.diff.contains(position) {
+            return Action::Noop;
+        }
+
+        Action::ScrollDiff {
+            direction,
+            lines: 3,
         }
     }
 

@@ -51,6 +51,9 @@ const FRAME_BUDGET: Duration = Duration::from_millis(16);
 fn run_loop(terminal: &mut DefaultTerminal, app: &mut App) -> AppResult<()> {
     let mut needs_draw = true;
     let mut last_draw = Instant::now();
+    // Draining a resize burst requires reading one event past its end. Keep
+    // that event here so keyboard and mouse input are not discarded.
+    let mut pending_event = None;
 
     while !app.should_quit() {
         if app.poll_workers() {
@@ -69,15 +72,27 @@ fn run_loop(terminal: &mut DefaultTerminal, app: &mut App) -> AppResult<()> {
             Duration::from_millis(50)
         };
 
-        if event::poll(poll_timeout)? {
-            match event::read()? {
+        let next_event = if let Some(event) = pending_event.take() {
+            Some(event)
+        } else if event::poll(poll_timeout)? {
+            Some(event::read()?)
+        } else {
+            None
+        };
+
+        if let Some(next_event) = next_event {
+            match next_event {
                 CrosstermEvent::Resize(w, h) => {
                     // Drain queued resize events and keep only the last size,
                     // so a resize-drag becomes one redraw instead of N.
                     let mut last = (w, h);
-                    while event::poll(Duration::from_secs(0))? {
-                        if let CrosstermEvent::Resize(w, h) = event::read()? {
-                            last = (w, h);
+                    while event::poll(Duration::ZERO)? {
+                        match event::read()? {
+                            CrosstermEvent::Resize(w, h) => last = (w, h),
+                            other => {
+                                pending_event = Some(other);
+                                break;
+                            }
                         }
                     }
                     let action = app.handle_event(Event::Resize(last.0, last.1));

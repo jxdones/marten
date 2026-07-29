@@ -1,6 +1,12 @@
 use crate::state::Focus;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScrollDirection {
+    Up,
+    Down,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
     Noop,
     Quit,
@@ -10,6 +16,10 @@ pub enum Action {
     MoveUp,
     ScrollDiffLeft,
     ScrollDiffRight,
+    ScrollDiff {
+        direction: ScrollDirection,
+        lines: usize,
+    },
     NextHunk,
     PreviousHunk,
     ToggleDiffLineNumbers,

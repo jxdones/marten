@@ -12,6 +12,8 @@ use crate::{app::App, state::Screen};
 
 pub fn draw(frame: &mut Frame, app: &mut App) {
     let area = frame.area();
+    app.set_terminal_area(area);
+
     let theme = app.theme();
 
     // Clear the entire frame with the theme background so no terminal
