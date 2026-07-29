@@ -37,4 +37,5 @@ pub enum Action {
     RunSelectedCommand,
     SelectTheme,
     OpenEditor,
+    SelectTreeRow(usize),
 }

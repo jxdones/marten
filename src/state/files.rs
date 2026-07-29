@@ -2,6 +2,7 @@
 pub struct Files {
     pub selected: Option<usize>,
     pub tree_row_count: usize,
+    pub offset: usize,
 }
 
 impl Files {
@@ -58,6 +59,7 @@ mod tests {
         let mut files = Files {
             selected: Some(0),
             tree_row_count: 0,
+            offset: 0,
         };
 
         files.select_first();
@@ -70,6 +72,7 @@ mod tests {
         let mut files = Files {
             selected: None,
             tree_row_count: 2,
+            offset: 0,
         };
 
         files.select_first();

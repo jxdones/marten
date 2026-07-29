@@ -57,6 +57,11 @@ impl FilesPanel {
                 }
                 false
             }
+            Action::SelectTreeRow(index) => {
+                let previous = self.state.selected;
+                self.select_row(index);
+                self.state.selected != previous
+            }
             _ => false,
         }
     }
@@ -71,6 +76,10 @@ impl FilesPanel {
 
     pub fn set_tree_row_count(&mut self, len: usize) {
         self.state.tree_row_count = len;
+    }
+
+    pub fn set_offset(&mut self, offset: usize) {
+        self.state.offset = offset;
     }
 
     pub fn cached_rows(&self) -> &[TreeRow] {
@@ -104,6 +113,12 @@ impl FilesPanel {
 
     pub fn select_previous_row(&mut self) {
         self.state.select_previous();
+    }
+
+    pub fn select_row(&mut self, index: usize) {
+        if index < self.cached_rows.len() {
+            self.state.selected = Some(index);
+        }
     }
 
     pub fn select_next_file(&mut self) {

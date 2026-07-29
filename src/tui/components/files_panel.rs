@@ -17,6 +17,8 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
 
     app.ensure_rows();
     let selected_index = app.files_state().selected;
+    let list_offset = app.files_state().offset;
+
     app.set_tree_row_count(app.cached_rows().len());
     let files = app.files();
 
@@ -107,8 +109,9 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
         }
     }
 
-    let mut list_state = ListState::default();
-    list_state.select(selected_row);
+    let mut list_state = ListState::default()
+        .with_offset(list_offset)
+        .with_selected(selected_row);
 
     let select_bg = if is_focused {
         theme.select_hi
@@ -120,6 +123,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
         .highlight_style(Style::default().bg(select_bg));
 
     frame.render_stateful_widget(list, area, &mut list_state);
+    app.set_files_offset(list_state.offset());
 }
 
 fn get_selected_row(rows: &[TreeRow], selected: Option<usize>) -> Option<usize> {

@@ -4,6 +4,12 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-07-29
+
+### Added
+
+- Select files and directories in the sidebar with a left mouse click.
+
 ### Fixed
 
 - Fix `[` call from the sidebar to go to the previous hunk.

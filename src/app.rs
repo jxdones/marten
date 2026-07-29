@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::path::PathBuf;
 
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use crossterm::{execute, terminal::SetTitle};
 use git2::{ErrorCode, Repository};
 use ratatui::layout::{Position, Rect};
@@ -22,6 +22,8 @@ use crate::store::DiffStore;
 use crate::tui::layout;
 use crate::tui::theme::{THEMES, Theme};
 use crate::{command_palette, theme};
+
+const MOUSE_SCROLL_LINES: usize = 3;
 
 pub struct App {
     screen: Screen,
@@ -179,6 +181,10 @@ impl App {
 
     pub const fn collapsed_files(&self) -> &HashSet<String> {
         self.files.collapsed()
+    }
+
+    pub fn set_files_offset(&mut self, offset: usize) {
+        self.files.set_offset(offset);
     }
 
     pub fn set_tree_row_count(&mut self, len: usize) {
@@ -364,6 +370,10 @@ impl App {
                 }
             }
             _ => {
+                if matches!(action, Action::SelectTreeRow(_)) {
+                    *focus = Focus::Files;
+                }
+
                 let selection_changed = files.update(action, *focus, store);
                 diff.update(
                     action,
@@ -416,22 +426,33 @@ impl App {
             return Action::Noop;
         }
 
-        let direction = match mouse.kind {
-            MouseEventKind::ScrollUp => ScrollDirection::Up,
-            MouseEventKind::ScrollDown => ScrollDirection::Down,
-            _ => return Action::Noop,
-        };
-
-        let layout = layout::home(self.terminal_area, self.show_sidebar);
+        let main_screen = layout::home(self.terminal_area, self.show_sidebar);
         let position = Position::new(mouse.column, mouse.row);
 
-        if !layout.diff.contains(position) {
-            return Action::Noop;
-        }
+        match mouse.kind {
+            MouseEventKind::ScrollUp if main_screen.diff.contains(position) => Action::ScrollDiff {
+                direction: ScrollDirection::Up,
+                lines: MOUSE_SCROLL_LINES,
+            },
+            MouseEventKind::ScrollDown if main_screen.diff.contains(position) => {
+                Action::ScrollDiff {
+                    direction: ScrollDirection::Down,
+                    lines: MOUSE_SCROLL_LINES,
+                }
+            }
+            MouseEventKind::Down(MouseButton::Left)
+                if main_screen.left_sidebar.contains(position) =>
+            {
+                let visible_row = usize::from(mouse.row.saturating_sub(main_screen.left_sidebar.y));
+                let tree_row = self.files_state().offset.saturating_add(visible_row);
 
-        Action::ScrollDiff {
-            direction,
-            lines: 3,
+                if tree_row < self.cached_rows().len() {
+                    Action::SelectTreeRow(tree_row)
+                } else {
+                    Action::Noop
+                }
+            }
+            _ => Action::Noop,
         }
     }
 
