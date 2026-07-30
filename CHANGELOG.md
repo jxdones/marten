@@ -4,6 +4,10 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Hide the sidebar when the working tree has no changes.
+
 ## [0.1.4] - 2026-07-29
 
 ### Added
