@@ -36,6 +36,9 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         Overlay::ThemeSelector(_) => {
             components::theme_selector::draw(frame, area, app);
         }
+        Overlay::FileFinder(_) => {
+            components::file_finder::draw(frame, area, app);
+        }
         Overlay::None => {}
     }
 }

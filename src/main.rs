@@ -11,6 +11,7 @@ mod diff_panel;
 mod editor;
 mod error;
 mod event;
+mod file_finder;
 mod files_panel;
 mod git;
 mod inline_diff;

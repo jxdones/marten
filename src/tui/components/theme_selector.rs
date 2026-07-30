@@ -22,11 +22,12 @@ const MODAL_SIZE: modal::ModalSize = modal::ModalSize::new(
 );
 
 pub fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
-    let (selected, original) = match app.overlay() {
-        Overlay::ThemeSelector(state) => (state.selected, state.original),
-        Overlay::None => return,
-        Overlay::CommandPalette(_) => return,
+    let Overlay::ThemeSelector(state) = app.overlay() else {
+        return;
     };
+
+    let selected = state.selected;
+    let original = state.original;
 
     if layout::terminal_is_too_small(area) {
         app.dismiss_overlay();

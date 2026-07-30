@@ -34,8 +34,13 @@ pub enum Action {
     ToggleSidebar,
     ToggleCommandPalette,
     ToggleThemeSelector,
+    ToggleFileFinder,
+    SelectFileFinderResult,
     RunSelectedCommand,
     SelectTheme,
     OpenEditor,
     SelectTreeRow(usize),
+    FileFinderInput(char),
+    FileFinderBackspace,
+    FileFinderClear,
 }

@@ -15,13 +15,13 @@ use crate::event::Event;
 use crate::files_panel::FilesPanel;
 use crate::git::repository::{self, DiffSource};
 use crate::state::{
-    CommandPaletteState, ContinuousDiff, Diff, FileSlot, Files, Focus, Overlay, ReviewState,
-    Screen, ThemeSelectorState, TreeRow,
+    CommandPaletteState, ContinuousDiff, Diff, FileFinderState, FileSlot, Files, Focus, Overlay,
+    ReviewState, Screen, ThemeSelectorState, TreeRow,
 };
 use crate::store::DiffStore;
 use crate::tui::layout;
 use crate::tui::theme::{THEMES, Theme};
-use crate::{command_palette, theme};
+use crate::{command_palette, file_finder, theme};
 
 const MOUSE_SCROLL_LINES: usize = 3;
 
@@ -349,6 +349,37 @@ impl App {
                 *overlay = Overlay::None;
                 return Ok(());
             }
+            Action::ToggleFileFinder => {
+                *overlay = match overlay {
+                    Overlay::None => Overlay::FileFinder(FileFinderState::default()),
+                    Overlay::FileFinder(_) => Overlay::None,
+                    _ => Overlay::None,
+                };
+                return Ok(());
+            }
+            Action::SelectFileFinderResult => {
+                let Some(file_idx) =
+                    file_finder::selected_file_index(overlay, &store.continuous_diff.files)
+                else {
+                    return Ok(());
+                };
+
+                *overlay = Overlay::None;
+                files.select_file(store, file_idx);
+                diff.sync_continuous_scroll_to_file(Some(file_idx), store);
+                *focus = Focus::Diff;
+                return Ok(());
+            }
+            Action::FileFinderInput(_)
+            | Action::FileFinderBackspace
+            | Action::FileFinderClear
+            | Action::MoveDown
+            | Action::MoveUp
+                if matches!(overlay, Overlay::FileFinder(_)) =>
+            {
+                file_finder::update(overlay, action, &store.continuous_diff.files);
+                return Ok(());
+            }
             Action::MoveDown | Action::MoveUp if matches!(overlay, Overlay::CommandPalette(_)) => {
                 command_palette::update(overlay, action);
                 return Ok(());
@@ -477,9 +508,33 @@ impl App {
             };
         }
 
+        if matches!(self.overlay(), Overlay::FileFinder(_)) {
+            return match key.code {
+                KeyCode::Esc => Action::ToggleFileFinder,
+                KeyCode::Enter => Action::SelectFileFinderResult,
+                KeyCode::Down => Action::MoveDown,
+                KeyCode::Up => Action::MoveUp,
+                KeyCode::Backspace => Action::FileFinderBackspace,
+                KeyCode::Char('u') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                    Action::FileFinderClear
+                }
+                KeyCode::Char(character)
+                    if !key
+                        .modifiers
+                        .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
+                {
+                    Action::FileFinderInput(character)
+                }
+                _ => Action::Noop,
+            };
+        }
+
         match key.code {
             KeyCode::Char('q') => Action::Quit,
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => Action::Quit,
+            KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                Action::ToggleFileFinder
+            }
             KeyCode::Tab => Action::NextFocus,
             KeyCode::BackTab => Action::PreviousFocus,
             KeyCode::Char('0') => Action::FocusPanel(Focus::Diff),
@@ -515,8 +570,8 @@ impl App {
                 }
             },
             KeyCode::Char('e') if self.focus == Focus::Diff => Action::OpenEditor,
-            KeyCode::Char('n') => Action::NextFile,
-            KeyCode::Char('p') => Action::PreviousFile,
+            KeyCode::Char('n') if key.modifiers.is_empty() => Action::NextFile,
+            KeyCode::Char('p') if key.modifiers.is_empty() => Action::PreviousFile,
             KeyCode::Char('L') => Action::ToggleDiffLineNumbers,
             KeyCode::Char('v') => Action::ToggleDiffLayout,
             KeyCode::Char('r') => Action::Refresh,

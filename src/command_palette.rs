@@ -1,18 +1,6 @@
 use crate::action::Action;
 use crate::state::Overlay;
 
-pub fn update(overlay: &mut Overlay, action: Action) {
-    let Overlay::CommandPalette(state) = overlay else {
-        return;
-    };
-
-    match action {
-        Action::MoveDown => state.select_next(command_count()),
-        Action::MoveUp => state.select_previous(command_count()),
-        _ => {}
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 pub enum Section {
     Navigation,
@@ -46,11 +34,29 @@ pub struct CommandGroup {
     pub items: &'static [CommandItem],
 }
 
+pub fn update(overlay: &mut Overlay, action: Action) {
+    let Overlay::CommandPalette(state) = overlay else {
+        return;
+    };
+
+    match action {
+        Action::MoveDown => state.select_next(command_count()),
+        Action::MoveUp => state.select_previous(command_count()),
+        _ => {}
+    }
+}
+
 pub fn command_groups() -> &'static [CommandGroup] {
     &[
         CommandGroup {
             section: Section::Navigation,
             items: &[
+                CommandItem {
+                    label: "find file",
+                    description: "find and jump to a changed file",
+                    keybind: "ctrl+p",
+                    action: Action::ToggleFileFinder,
+                },
                 CommandItem {
                     label: "next file",
                     description: "select the next changed file",

@@ -4,6 +4,10 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Find and jump to changed files with `Ctrl+P`, with case-insensitive path filtering.
+
 ### Changed
 
 - Hide the sidebar when the working tree has no changes.

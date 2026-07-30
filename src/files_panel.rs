@@ -198,6 +198,14 @@ impl FilesPanel {
             return;
         };
 
+        self.select_file(store, file_idx);
+    }
+
+    pub fn select_file(&mut self, store: &DiffStore, file_idx: usize) {
+        if file_idx >= store.continuous_diff.files.len() {
+            return;
+        }
+
         if let Some(pos) = self
             .cached_rows
             .iter()

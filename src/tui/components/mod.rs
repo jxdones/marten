@@ -1,5 +1,6 @@
 pub mod command_palette;
 pub mod diff_panel;
+pub mod file_finder;
 pub mod files_panel;
 pub mod left_sidebar;
 pub mod modal;
