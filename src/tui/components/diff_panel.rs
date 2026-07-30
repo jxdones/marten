@@ -6,7 +6,9 @@ use ratatui::{Frame, layout::Rect};
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::app::App;
-use crate::git::repository::{DiffHunk, DiffLine, DiffSectionKind, FileEntry, FileStatus};
+use crate::git::repository::{
+    DiffHunk, DiffLine, DiffSectionKind, FileChange, FileEntry, FileStatus,
+};
 use crate::inline_diff::{self, Range};
 use crate::state::review::RenderedRow;
 use crate::state::{ContinuousDiff, DiffLayout, DiffLoadState};
@@ -292,8 +294,8 @@ fn render_file_header(
     let bg = Style::default().bg(theme.file_header_bg);
     let mut spans = vec![Span::styled(collapse_symbol, theme.muted().patch(bg))];
 
-    let status_color = file_status_color(file.status, theme);
-    let status_symbol = file_status_symbol(file.status);
+    let status_color = file_mark_color(file, theme);
+    let status_symbol = file_mark_symbol(file);
     let path = format!(" {}", file.path);
     let position_spans = position_spans(position, theme, bg, is_focused);
     let position_width: usize = position_spans
@@ -315,7 +317,7 @@ fn render_file_header(
         Span::styled(" ", theme.muted().patch(bg)),
         Span::styled(format!("-{}", file.deletions), theme.unstaged().patch(bg)),
         Span::styled(" ", theme.muted().patch(bg)),
-        Span::styled(file.status.label().to_lowercase(), status_color.patch(bg))
+        Span::styled(file_mark_label(file).to_lowercase(), status_color.patch(bg))
             .add_modifier(Modifier::BOLD),
         Span::styled(" ", bg),
     ];
@@ -401,8 +403,8 @@ fn counter_spans(
 
 fn render_binary_header(width: usize, file: &FileEntry, theme: Theme) -> Line<'static> {
     let bg = Style::default().bg(theme.file_header_bg);
-    let status_color = file_status_color(file.status, theme);
-    let status_symbol = file_status_symbol(file.status);
+    let status_color = file_mark_color(file, theme);
+    let status_symbol = file_mark_symbol(file);
     let prefix = "  ";
     let path = format!(" {}", file.path);
     let tag = " binary";
@@ -869,6 +871,32 @@ fn file_status_symbol(status: FileStatus) -> &'static str {
         FileStatus::Untracked => "U",
         FileStatus::Conflicted => "C",
     }
+}
+
+fn file_mark_color(file: &FileEntry, theme: Theme) -> Style {
+    match file.change {
+        Some(FileChange::Added) => theme.success(),
+        Some(FileChange::Modified | FileChange::TypeChanged) => theme.partial(),
+        Some(FileChange::Deleted) => theme.unstaged(),
+        Some(FileChange::Renamed) => theme.untracked(),
+        None => file_status_color(file.status, theme),
+    }
+}
+
+fn file_mark_symbol(file: &FileEntry) -> &'static str {
+    match file.change {
+        Some(FileChange::Added) => "A",
+        Some(FileChange::Modified) => "M",
+        Some(FileChange::Deleted) => "D",
+        Some(FileChange::Renamed) => "R",
+        Some(FileChange::TypeChanged) => "T",
+        None => file_status_symbol(file.status),
+    }
+}
+
+fn file_mark_label(file: &FileEntry) -> &'static str {
+    file.change
+        .map_or_else(|| file.status.label(), FileChange::label)
 }
 
 fn text_width(text: &str) -> usize {

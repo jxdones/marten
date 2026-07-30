@@ -36,6 +36,7 @@ pub enum Head {
 pub struct FileEntry {
     pub path: String,
     pub status: FileStatus,
+    pub change: Option<FileChange>,
     pub insertions: usize,
     pub deletions: usize,
 }
@@ -47,6 +48,27 @@ pub enum FileStatus {
     Unstaged,
     Untracked,
     Conflicted,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FileChange {
+    Added,
+    Modified,
+    Deleted,
+    Renamed,
+    TypeChanged,
+}
+
+impl FileChange {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Added => "ADDED",
+            Self::Modified => "MODIFIED",
+            Self::Deleted => "DELETED",
+            Self::Renamed => "RENAMED",
+            Self::TypeChanged => "TYPE CHANGED",
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -289,6 +311,7 @@ pub fn files(repo: &Repository) -> AppResult<Vec<FileEntry>> {
         entries.push(FileEntry {
             path,
             status: file_status,
+            change: None,
             insertions,
             deletions,
         });
@@ -397,7 +420,8 @@ fn files_between_commits(
     };
 
     let new_tree = repo.find_commit(new_oid)?.tree()?;
-    let diff = repo.diff_tree_to_tree(old_tree.as_ref(), Some(&new_tree), None)?;
+    let mut diff = repo.diff_tree_to_tree(old_tree.as_ref(), Some(&new_tree), None)?;
+    diff.find_similar(None)?;
     let staged_map: HashMap<String, (usize, usize)> = diff_stats(&diff)?;
     let mut entries = Vec::new();
 
@@ -414,6 +438,13 @@ fn files_between_commits(
         entries.push(FileEntry {
             path: path.to_string(),
             status: FileStatus::Staged,
+            change: Some(match delta.status() {
+                git2::Delta::Added | git2::Delta::Copied => FileChange::Added,
+                git2::Delta::Deleted => FileChange::Deleted,
+                git2::Delta::Renamed => FileChange::Renamed,
+                git2::Delta::Typechange => FileChange::TypeChanged,
+                _ => FileChange::Modified,
+            }),
             insertions,
             deletions,
         });

@@ -132,6 +132,7 @@ mod tests {
             entry: FileEntry {
                 path: path.to_string(),
                 status: FileStatus::Untracked,
+                change: None,
                 insertions: 0,
                 deletions: 0,
             },

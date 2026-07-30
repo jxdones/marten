@@ -7,7 +7,7 @@ const BORDER_WIDTH: usize = 2;
 const STATUS_LETTER_WIDTH: usize = 2;
 
 use crate::app::App;
-use crate::git::repository::FileStatus;
+use crate::git::repository::{FileChange, FileStatus};
 use crate::state::TreeRow;
 use crate::tui::components::panel;
 
@@ -71,12 +71,19 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
                 }
                 TreeRow::File(idx, depth) => {
                     let entry = &files[*idx].entry;
-                    let status_letter = match entry.status {
-                        FileStatus::Staged => Span::styled("S ", theme.staged()),
-                        FileStatus::Partial => Span::styled("P ", theme.partial()),
-                        FileStatus::Conflicted => Span::styled("! ", theme.conflict()),
-                        FileStatus::Unstaged => Span::styled("M ", theme.unstaged()),
-                        FileStatus::Untracked => Span::styled("U ", theme.untracked()),
+                    let status_letter = match entry.change {
+                        Some(FileChange::Added) => Span::styled("A ", theme.success()),
+                        Some(FileChange::Modified) => Span::styled("M ", theme.partial()),
+                        Some(FileChange::Deleted) => Span::styled("D ", theme.unstaged()),
+                        Some(FileChange::Renamed) => Span::styled("R ", theme.untracked()),
+                        Some(FileChange::TypeChanged) => Span::styled("T ", theme.partial()),
+                        None => match entry.status {
+                            FileStatus::Staged => Span::styled("S ", theme.staged()),
+                            FileStatus::Partial => Span::styled("P ", theme.partial()),
+                            FileStatus::Conflicted => Span::styled("! ", theme.conflict()),
+                            FileStatus::Unstaged => Span::styled("M ", theme.unstaged()),
+                            FileStatus::Untracked => Span::styled("U ", theme.untracked()),
+                        },
                     };
 
                     let path = entry.path.split('/').next_back().unwrap_or(&entry.path);

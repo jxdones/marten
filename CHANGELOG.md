@@ -7,6 +7,12 @@ All notable changes to Marten will be documented in this file.
 ### Changed
 
 - Hide the sidebar when the working tree has no changes.
+- Show file change types when inspecting revisions and revision ranges instead of staging-state marks:
+  - `A` - added
+  - `M` - modified
+  - `D` - deleted
+  - `R` - renamed
+  - `T` - file type changed
 
 ## [0.1.4] - 2026-07-29
 
