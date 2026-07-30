@@ -131,8 +131,10 @@ mod tests {
         FileSlot {
             entry: FileEntry {
                 path: path.to_string(),
+                previous_path: None,
                 status: FileStatus::Untracked,
                 change: None,
+                type_change: None,
                 insertions: 0,
                 deletions: 0,
             },

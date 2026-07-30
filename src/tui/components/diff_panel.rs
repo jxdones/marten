@@ -7,7 +7,7 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use crate::app::App;
 use crate::git::repository::{
-    DiffHunk, DiffLine, DiffSectionKind, FileChange, FileEntry, FileStatus,
+    DiffHunk, DiffLine, DiffSectionKind, FileChange, FileEntry, FileStatus, FileTypeChange,
 };
 use crate::inline_diff::{self, Range};
 use crate::state::review::RenderedRow;
@@ -290,13 +290,16 @@ fn render_file_header(
     position: Option<HunkPosition>,
     is_focused: bool,
 ) -> Line<'static> {
+    if let Some(type_change) = file.type_change {
+        return render_type_change_header(width, file, type_change, theme);
+    }
+
     let collapse_symbol = "▼ ";
     let bg = Style::default().bg(theme.file_header_bg);
     let mut spans = vec![Span::styled(collapse_symbol, theme.muted().patch(bg))];
 
     let status_color = file_mark_color(file, theme);
     let status_symbol = file_mark_symbol(file);
-    let path = format!(" {}", file.path);
     let position_spans = position_spans(position, theme, bg, is_focused);
     let position_width: usize = position_spans
         .iter()
@@ -312,20 +315,31 @@ fn render_file_header(
         path_style = path_style.add_modifier(Modifier::BOLD);
     }
 
-    let right_spans = vec![
+    let mut right_spans = vec![
         Span::styled(format!("+{}", file.insertions), theme.success().patch(bg)),
         Span::styled(" ", theme.muted().patch(bg)),
         Span::styled(format!("-{}", file.deletions), theme.unstaged().patch(bg)),
-        Span::styled(" ", theme.muted().patch(bg)),
-        Span::styled(file_mark_label(file).to_lowercase(), status_color.patch(bg))
-            .add_modifier(Modifier::BOLD),
-        Span::styled(" ", bg),
     ];
+    if file.previous_path.is_none() {
+        right_spans.extend([
+            Span::styled(" ", theme.muted().patch(bg)),
+            Span::styled(file_mark_label(file).to_lowercase(), status_color.patch(bg))
+                .add_modifier(Modifier::BOLD),
+        ]);
+    }
+    right_spans.push(Span::styled(" ", bg));
     let right_width: usize = right_spans
         .iter()
         .map(|span| text_width(&span.content))
         .sum();
-
+    let path_width = width.saturating_sub(
+        text_width(collapse_symbol) + text_width(status_symbol) + 1 + position_width + right_width,
+    );
+    let display_path = file.previous_path.as_deref().map_or_else(
+        || truncate_from_start(&file.path, path_width),
+        |previous_path| truncate_rename_paths(previous_path, &file.path, path_width),
+    );
+    let path = format!(" {display_path}");
     let padding = width.saturating_sub(
         text_width(collapse_symbol)
             + text_width(status_symbol)
@@ -341,6 +355,67 @@ fn render_file_header(
     spans.extend(right_spans);
 
     Line::from(spans).style(bg)
+}
+
+fn truncate_rename_paths(previous_path: &str, path: &str, max_width: usize) -> String {
+    const ARROW: &str = " → ";
+
+    let full = format!("{previous_path}{ARROW}{path}");
+    if text_width(&full) <= max_width {
+        return full;
+    }
+
+    let arrow_width = text_width(ARROW);
+    if max_width <= arrow_width {
+        return "→".to_string();
+    }
+
+    let available = max_width - arrow_width;
+    let mut previous_width = available / 2;
+    let mut path_width = available - previous_width;
+    let full_previous_width = text_width(previous_path);
+    let full_path_width = text_width(path);
+
+    if full_previous_width < previous_width {
+        path_width += previous_width - full_previous_width;
+        previous_width = full_previous_width;
+    } else if full_path_width < path_width {
+        previous_width += path_width - full_path_width;
+        path_width = full_path_width;
+    }
+
+    format!(
+        "{}{}{}",
+        truncate_from_start(previous_path, previous_width),
+        ARROW,
+        truncate_from_start(path, path_width)
+    )
+}
+
+fn truncate_from_start(text: &str, max_width: usize) -> String {
+    if text_width(text) <= max_width {
+        return text.to_string();
+    }
+    if max_width == 0 {
+        return String::new();
+    }
+    if max_width == 1 {
+        return "…".to_string();
+    }
+
+    let content_width = max_width - 1;
+    let mut width = 0;
+    let mut suffix = Vec::new();
+    for character in text.chars().rev() {
+        let character_width = character.width().unwrap_or(0);
+        if width + character_width > content_width {
+            break;
+        }
+        suffix.push(character);
+        width += character_width;
+    }
+    suffix.reverse();
+    format!("…{}", suffix.into_iter().collect::<String>())
 }
 
 fn position_spans(
@@ -402,14 +477,39 @@ fn counter_spans(
 }
 
 fn render_binary_header(width: usize, file: &FileEntry, theme: Theme) -> Line<'static> {
+    render_non_expandable_header(width, file, "binary", theme)
+}
+
+fn render_type_change_header(
+    width: usize,
+    file: &FileEntry,
+    type_change: FileTypeChange,
+    theme: Theme,
+) -> Line<'static> {
+    let label = format!("{} → {}", type_change.from.label(), type_change.to.label());
+    render_non_expandable_header(width, file, &label, theme)
+}
+
+fn render_non_expandable_header(
+    width: usize,
+    file: &FileEntry,
+    label: &str,
+    theme: Theme,
+) -> Line<'static> {
     let bg = Style::default().bg(theme.file_header_bg);
     let status_color = file_mark_color(file, theme);
     let status_symbol = file_mark_symbol(file);
     let prefix = "  ";
-    let path = format!(" {}", file.path);
-    let tag = " binary";
+    let tag = format!(" {label}");
+    let path_width = width
+        .saturating_sub(text_width(prefix) + text_width(status_symbol) + 1 + text_width(&tag) + 1);
+    let display_path = file.previous_path.as_deref().map_or_else(
+        || truncate_from_start(&file.path, path_width),
+        |previous_path| truncate_rename_paths(previous_path, &file.path, path_width),
+    );
+    let path = format!(" {display_path}");
     let padding = width.saturating_sub(
-        text_width(prefix) + text_width(status_symbol) + text_width(&path) + text_width(tag) + 1,
+        text_width(prefix) + text_width(status_symbol) + text_width(&path) + text_width(&tag) + 1,
     );
     Line::from(vec![
         Span::styled(prefix, theme.muted().patch(bg)),

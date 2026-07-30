@@ -2,7 +2,8 @@ use std::{collections::HashMap, fs, path::Path};
 
 use crate::error::{AppError, AppResult};
 use git2::{
-    self, Diff, DiffOptions, ErrorCode, Oid, Patch, Reference, Repository, Status, StatusOptions,
+    self, Diff, DiffFindOptions, DiffOptions, ErrorCode, Oid, Patch, Reference, Repository, Status,
+    StatusOptions,
 };
 
 const DEFAULT_HEAD: &str = "HEAD";
@@ -35,8 +36,10 @@ pub enum Head {
 #[derive(Debug, Clone)]
 pub struct FileEntry {
     pub path: String,
+    pub previous_path: Option<String>,
     pub status: FileStatus,
     pub change: Option<FileChange>,
+    pub type_change: Option<FileTypeChange>,
     pub insertions: usize,
     pub deletions: usize,
 }
@@ -59,6 +62,22 @@ pub enum FileChange {
     TypeChanged,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FileTypeChange {
+    pub from: FileKind,
+    pub to: FileKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FileKind {
+    File,
+    Executable,
+    Symlink,
+    Submodule,
+    Directory,
+    Unknown,
+}
+
 impl FileChange {
     pub const fn label(self) -> &'static str {
         match self {
@@ -67,6 +86,32 @@ impl FileChange {
             Self::Deleted => "DELETED",
             Self::Renamed => "RENAMED",
             Self::TypeChanged => "TYPE CHANGED",
+        }
+    }
+}
+
+impl FileKind {
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::File => "file",
+            Self::Executable => "executable file",
+            Self::Symlink => "symlink",
+            Self::Submodule => "submodule",
+            Self::Directory => "directory",
+            Self::Unknown => "unknown",
+        }
+    }
+}
+
+impl From<git2::FileMode> for FileKind {
+    fn from(mode: git2::FileMode) -> Self {
+        match mode {
+            git2::FileMode::Blob | git2::FileMode::BlobGroupWritable => Self::File,
+            git2::FileMode::BlobExecutable => Self::Executable,
+            git2::FileMode::Link => Self::Symlink,
+            git2::FileMode::Commit => Self::Submodule,
+            git2::FileMode::Tree => Self::Directory,
+            git2::FileMode::Unreadable => Self::Unknown,
         }
     }
 }
@@ -310,8 +355,10 @@ pub fn files(repo: &Repository) -> AppResult<Vec<FileEntry>> {
 
         entries.push(FileEntry {
             path,
+            previous_path: None,
             status: file_status,
             change: None,
+            type_change: None,
             insertions,
             deletions,
         });
@@ -420,8 +467,11 @@ fn files_between_commits(
     };
 
     let new_tree = repo.find_commit(new_oid)?.tree()?;
-    let mut diff = repo.diff_tree_to_tree(old_tree.as_ref(), Some(&new_tree), None)?;
-    diff.find_similar(None)?;
+    let mut diff_options = DiffOptions::new();
+    diff_options.include_typechange(true);
+    let mut diff =
+        repo.diff_tree_to_tree(old_tree.as_ref(), Some(&new_tree), Some(&mut diff_options))?;
+    find_renames(&mut diff)?;
     let staged_map: HashMap<String, (usize, usize)> = diff_stats(&diff)?;
     let mut entries = Vec::new();
 
@@ -435,16 +485,34 @@ fn files_between_commits(
 
         let (insertions, deletions) = staged_map.get(path).copied().unwrap_or((0, 0));
 
+        let change = match delta.status() {
+            git2::Delta::Added | git2::Delta::Copied => FileChange::Added,
+            git2::Delta::Deleted => FileChange::Deleted,
+            git2::Delta::Renamed => FileChange::Renamed,
+            git2::Delta::Typechange => FileChange::TypeChanged,
+            _ => FileChange::Modified,
+        };
+        let previous_path = if change == FileChange::Renamed {
+            delta
+                .old_file()
+                .path()
+                .and_then(|path| path.to_str())
+                .filter(|old_path| *old_path != path)
+                .map(str::to_string)
+        } else {
+            None
+        };
+        let type_change = (change == FileChange::TypeChanged).then(|| FileTypeChange {
+            from: delta.old_file().mode().into(),
+            to: delta.new_file().mode().into(),
+        });
+
         entries.push(FileEntry {
             path: path.to_string(),
+            previous_path,
             status: FileStatus::Staged,
-            change: Some(match delta.status() {
-                git2::Delta::Added | git2::Delta::Copied => FileChange::Added,
-                git2::Delta::Deleted => FileChange::Deleted,
-                git2::Delta::Renamed => FileChange::Renamed,
-                git2::Delta::Typechange => FileChange::TypeChanged,
-                _ => FileChange::Modified,
-            }),
+            change: Some(change),
+            type_change,
             insertions,
             deletions,
         });
@@ -512,6 +580,7 @@ pub fn files_diff_from_commit(
     repo: &Repository,
     oid: Oid,
     path: &str,
+    previous_path: Option<&str>,
 ) -> AppResult<Option<Vec<DiffSection>>> {
     let commit = repo.find_commit(oid)?;
 
@@ -520,7 +589,7 @@ pub fn files_diff_from_commit(
     } else {
         None
     };
-    file_diff_between_commits(repo, parent_oid, oid, path)
+    file_diff_between_commits(repo, parent_oid, oid, path, previous_path)
 }
 
 fn file_diff_between_commits(
@@ -528,6 +597,7 @@ fn file_diff_between_commits(
     old_oid: Option<Oid>,
     new_oid: Oid,
     path: &str,
+    previous_path: Option<&str>,
 ) -> AppResult<Option<Vec<DiffSection>>> {
     let old_tree = if let Some(oid) = old_oid {
         Some(repo.find_commit(oid)?.tree()?)
@@ -537,8 +607,12 @@ fn file_diff_between_commits(
     let new_tree = repo.find_commit(new_oid)?.tree()?;
 
     let mut opts = DiffOptions::new();
-    opts.pathspec(path);
-    let diff = repo.diff_tree_to_tree(old_tree.as_ref(), Some(&new_tree), Some(&mut opts))?;
+    opts.include_typechange(true).pathspec(path);
+    if let Some(previous_path) = previous_path {
+        opts.pathspec(previous_path);
+    }
+    let mut diff = repo.diff_tree_to_tree(old_tree.as_ref(), Some(&new_tree), Some(&mut opts))?;
+    find_renames(&mut diff)?;
 
     let Some(hunks) = diff_hunks(diff)? else {
         return Ok(None);
@@ -554,15 +628,29 @@ pub fn file_diff_for_source(
     repo: &Repository,
     source: &DiffSource,
     path: &str,
+    previous_path: Option<&str>,
     status: FileStatus,
 ) -> AppResult<Option<Vec<DiffSection>>> {
     match source {
         DiffSource::Worktree => file_diff(repo, path, status),
-        DiffSource::Revision(revision) => files_diff_from_commit(repo, revision.oid, path),
-        DiffSource::Range(range) => {
-            file_diff_between_commits(repo, Some(range.old_oid), range.new_oid, path)
+        DiffSource::Revision(revision) => {
+            files_diff_from_commit(repo, revision.oid, path, previous_path)
         }
+        DiffSource::Range(range) => file_diff_between_commits(
+            repo,
+            Some(range.old_oid),
+            range.new_oid,
+            path,
+            previous_path,
+        ),
     }
+}
+
+fn find_renames(diff: &mut Diff<'_>) -> AppResult<()> {
+    let mut options = DiffFindOptions::new();
+    options.renames(true);
+    diff.find_similar(Some(&mut options))?;
+    Ok(())
 }
 
 fn diff_hunks(diff: Diff<'_>) -> AppResult<Option<Vec<DiffHunk>>> {

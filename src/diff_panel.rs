@@ -133,6 +133,7 @@ impl DiffPanel {
             return;
         };
         let path = file.path.clone();
+        let previous_path = file.previous_path.clone();
         let status = file.status;
         let cache_key = FileKey {
             path: path.clone(),
@@ -148,6 +149,7 @@ impl DiffPanel {
                     diff_ctx.repo,
                     diff_ctx.diff_source,
                     &path,
+                    previous_path.as_deref(),
                     status,
                 );
 

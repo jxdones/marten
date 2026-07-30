@@ -13,6 +13,8 @@ All notable changes to Marten will be documented in this file.
   - `D` - deleted
   - `R` - renamed
   - `T` - file type changed
+- Show both the old and new paths for renamed files in diff headers.
+- Show the old and new file types for `T` entries (e.g: `file → symlink`).
 
 ## [0.1.4] - 2026-07-29
 

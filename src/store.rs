@@ -60,7 +60,14 @@ impl DiffStore {
             .files
             .iter()
             .enumerate()
-            .map(|(file_idx, file)| (file_idx, file.entry.path.clone(), file.entry.status))
+            .map(|(file_idx, file)| {
+                (
+                    file_idx,
+                    file.entry.path.clone(),
+                    file.entry.previous_path.clone(),
+                    file.entry.status,
+                )
+            })
             .collect();
         let queue = Arc::new(Mutex::new(jobs.into_iter()));
         let worker_count = std::thread::available_parallelism()
@@ -78,22 +85,27 @@ impl DiffStore {
                 };
                 loop {
                     let job = queue.lock().unwrap().next();
-                    let Some((file_idx, path, status)) = job else {
+                    let Some((file_idx, path, previous_path, status)) = job else {
                         break;
                     };
-                    let result =
-                        repository::file_diff_for_source(&repo, &diff_source, &path, status)
-                            .map(|maybe_sections| {
-                                maybe_sections.map(|sections| {
-                                    let index = LineIndex::new(&sections);
-                                    let hunks: Vec<DiffHunk> = sections
-                                        .into_iter()
-                                        .flat_map(|section| section.hunks)
-                                        .collect();
-                                    (hunks, index)
-                                })
-                            })
-                            .map_err(|e| e.to_string());
+                    let result = repository::file_diff_for_source(
+                        &repo,
+                        &diff_source,
+                        &path,
+                        previous_path.as_deref(),
+                        status,
+                    )
+                    .map(|maybe_sections| {
+                        maybe_sections.map(|sections| {
+                            let index = LineIndex::new(&sections);
+                            let hunks: Vec<DiffHunk> = sections
+                                .into_iter()
+                                .flat_map(|section| section.hunks)
+                                .collect();
+                            (hunks, index)
+                        })
+                    })
+                    .map_err(|e| e.to_string());
                     if tx
                         .send(WorkerResult {
                             generation,
