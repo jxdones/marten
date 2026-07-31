@@ -4,6 +4,10 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Update modals to have a rounded border. 
+
 ## [0.1.5] - 2026-07-30
 
 ### Added

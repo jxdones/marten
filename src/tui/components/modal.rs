@@ -78,7 +78,7 @@ impl Modal {
     pub fn new(screen: Rect, theme: Theme, config: ModalConfig) -> Self {
         let (width, height) = config.size.resolve(screen);
         let area = centered(screen, width, height);
-        let block = panel::block(None, theme, Borders::ALL, theme.bg, true);
+        let block = panel::block(None, theme, Borders::ALL, theme.bg, true, true);
         let inner = block.inner(area);
 
         Self {

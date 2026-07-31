@@ -1,6 +1,6 @@
 use ratatui::style::{Color, Style};
 use ratatui::text::Line;
-use ratatui::widgets::{Block, Borders};
+use ratatui::widgets::{Block, BorderType, Borders};
 
 use crate::tui::theme::Theme;
 
@@ -10,6 +10,7 @@ pub fn block(
     borders: Borders,
     bg: Color,
     is_focused: bool,
+    rounded: bool,
 ) -> Block<'static> {
     let border_style = if is_focused {
         theme.focused_border()
@@ -23,6 +24,10 @@ pub fn block(
         .style(Style::default().bg(bg));
     if let Some(title) = title {
         block = block.title(title);
+    }
+
+    if rounded {
+        block = block.border_type(BorderType::Rounded);
     }
     block
 }

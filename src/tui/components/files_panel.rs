@@ -13,7 +13,14 @@ use crate::tui::components::panel;
 
 pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
     let theme = app.theme();
-    let block = panel::block(None, theme, Borders::NONE, theme.sidebar_bg, is_focused);
+    let block = panel::block(
+        None,
+        theme,
+        Borders::NONE,
+        theme.sidebar_bg,
+        is_focused,
+        false,
+    );
 
     app.ensure_rows();
     let selected_index = app.files_state().selected;
