@@ -4,6 +4,8 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-07-30
+
 ### Added
 
 - Find and jump to changed files with `Ctrl+P`, with case-insensitive path filtering.

@@ -1,7 +1,7 @@
 Require marten
 
 Set Shell "zsh"
-Set FontSize 14
+Set FontSize 12
 Set Width 1400
 Set Height 800
 Set WindowBar Rings
@@ -72,3 +72,9 @@ Up
 Sleep 900ms
 Enter
 Sleep 2000ms
+Ctrl+P
+Sleep 400ms
+Type "ci"
+Sleep 400ms
+Enter
+Sleep 800ms
