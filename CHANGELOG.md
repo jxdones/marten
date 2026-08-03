@@ -7,6 +7,7 @@ All notable changes to Marten will be documented in this file.
 ### Changed
 
 - Update modals to have a rounded border. 
+- Improve top bar stats colors for when there's no changes in the repo
 
 ## [0.1.5] - 2026-07-30
 

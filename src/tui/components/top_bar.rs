@@ -235,12 +235,30 @@ fn diff_summary(app: &App) -> Line<'static> {
     let deletions = files.iter().map(|slot| slot.entry.deletions).sum::<usize>();
     let file_label = if files.len() == 1 { "file" } else { "files" };
 
+    let insertions_color = if insertions > 0 {
+        theme.success()
+    } else {
+        theme.muted()
+    };
+
+    let deletions_color = if deletions > 0 {
+        theme.unstaged()
+    } else {
+        theme.muted()
+    };
+
+    let files_color = if files.is_empty() {
+        theme.muted()
+    } else {
+        theme.text_primary()
+    };
+
     Line::from(vec![
-        Span::styled(format!("+{insertions}"), theme.success()),
+        Span::styled(format!("+{insertions}"), insertions_color),
         Span::styled(" ", theme.muted()),
-        Span::styled(format!("-{deletions}"), theme.unstaged()),
+        Span::styled(format!("-{deletions}"), deletions_color),
         Span::styled("  ·  ", theme.muted()),
-        Span::styled(files.len().to_string(), theme.text_primary()),
+        Span::styled(files.len().to_string(), files_color),
         Span::styled(format!(" {file_label}"), theme.muted()),
     ])
 }
