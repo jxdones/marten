@@ -12,9 +12,21 @@
 ![Rust](https://img.shields.io/badge/rust-1.85%2B-orange.svg)
 [![Built With Ratatui](https://ratatui.rs/built-with-ratatui/badge.svg)](https://ratatui.rs/)
 [![Release](https://img.shields.io/github/v/release/jxdones/marten?display_name=release&logo=github)](https://github.com/jxdones/marten/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/jxdones/marten/ci.yml)](https://github.com/jxdones/marten/actions/workflows/ci.yml?branch=main)
+
+[Highlights](#highlights) • [Quick Start](#quick-start) • [Install](#install) • [Usage](#usage) • [Configuration](#configuration)
 </div>
 
-## Install
+## Highlights
+
+- Review staged, unstaged, and untracked changes in one place
+- Compare commits, branches, tags, and Git revision ranges
+- Switch between unified and side-by-side diffs
+- Find changed files and navigate between hunks quickly
+- Open a hunk directly in your editor
+- Use the mouse to select files and scroll through diffs
+
+## Quick Start
 
 Install the latest release on macOS or Linux:
 
@@ -22,10 +34,18 @@ Install the latest release on macOS or Linux:
 curl -fsSL https://raw.githubusercontent.com/jxdones/marten/main/install.sh | sh
 ```
 
-To install a specific version:
+Then run Marten inside a Git repository:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jxdones/marten/main/install.sh | sh -s -- v0.1.0
+marten
+```
+
+## Install
+
+To install a specific release, pass its version:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/jxdones/marten/main/install.sh | sh -s -- v0.1.5
 ```
 
 The installer supports Intel and ARM64 systems. Set `BINDIR` to install somewhere other than `/usr/local/bin`:
@@ -62,7 +82,7 @@ Run it from inside a Git repository:
 marten
 ```
 
-To inspect the changes introduced by a revision:
+Review the changes introduced by a commit, branch, tag, or other revision:
 
 ```bash
 marten show HEAD~1
@@ -70,13 +90,17 @@ marten show HEAD~1
 
 `show` accepts a commit, branch, tag, or other Git revision.
 
-To inspect the changes between two revisions:
+Compare two revisions directly:
 
 ```bash
 marten diff main..feature-branch
 ```
 
-Use `FROM...TO` to diff against the merge base instead of `FROM` directly, mirroring `git diff`'s two- and three-dot syntax.
+Compare the second revision with the merge base of both revisions:
+
+```bash
+marten diff main...feature-branch
+```
 
 ## Configuration
 
