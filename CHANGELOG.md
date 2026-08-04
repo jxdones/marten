@@ -4,6 +4,8 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-08-04
+
 ### Added
 
 - Mark files as reviewed with `m` to collapse them in the diff view and jump to the next unreviewed file. The state is kept in memory only and doesn't persist across restarts.
