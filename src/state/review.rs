@@ -30,6 +30,7 @@ pub enum DiffLoadState {
 pub struct FileSlot {
     pub entry: FileEntry,
     pub load: DiffLoadState,
+    pub reviewed: bool,
 }
 
 #[derive(Debug, Default)]
@@ -104,6 +105,9 @@ impl ReviewIndex {
 
 impl FileSlot {
     pub fn row_count(&self, layout: DiffLayout) -> usize {
+        if self.reviewed {
+            return HEADER_ROW;
+        }
         match &self.load {
             DiffLoadState::Binary => HEADER_ROW,
             DiffLoadState::NotLoaded | DiffLoadState::Loading | DiffLoadState::Error(_) => {
@@ -207,5 +211,19 @@ impl ContinuousDiff {
         };
 
         Some((self.files[file_idx].entry.path.as_str(), new_lineno))
+    }
+
+    pub fn toggle_reviewed(&mut self, file_idx: usize) {
+        if let Some(file) = self.files.get_mut(file_idx) {
+            file.reviewed = !file.reviewed;
+        }
+    }
+
+    pub fn next_unreviewed_after(&self, file_idx: usize) -> Option<usize> {
+        self.files
+            .get(file_idx + 1..)?
+            .iter()
+            .position(|file| !file.reviewed)
+            .map(|offset| file_idx + 1 + offset)
     }
 }

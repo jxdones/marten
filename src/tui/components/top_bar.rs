@@ -234,6 +234,7 @@ fn diff_summary(app: &App) -> Line<'static> {
         .sum::<usize>();
     let deletions = files.iter().map(|slot| slot.entry.deletions).sum::<usize>();
     let file_label = if files.len() == 1 { "file" } else { "files" };
+    let reviewed = files.iter().filter(|slot| slot.reviewed).count();
 
     let insertions_color = if insertions > 0 {
         theme.success()
@@ -253,12 +254,23 @@ fn diff_summary(app: &App) -> Line<'static> {
         theme.text_primary()
     };
 
-    Line::from(vec![
+    let mut spans = vec![
         Span::styled(format!("+{insertions}"), insertions_color),
         Span::styled(" ", theme.muted()),
         Span::styled(format!("-{deletions}"), deletions_color),
         Span::styled("  ·  ", theme.muted()),
-        Span::styled(files.len().to_string(), files_color),
-        Span::styled(format!(" {file_label}"), theme.muted()),
-    ])
+    ];
+
+    if reviewed > 0 {
+        spans.push(Span::styled(reviewed.to_string(), files_color));
+        spans.push(Span::styled("/", theme.muted()));
+        spans.push(Span::styled(files.len().to_string(), theme.muted()));
+        spans.push(Span::styled(format!(" {file_label}"), theme.muted()));
+        spans.push(Span::styled(" reviewed", theme.muted()));
+    } else {
+        spans.push(Span::styled(files.len().to_string(), files_color));
+        spans.push(Span::styled(format!(" {file_label}"), theme.muted()));
+    }
+
+    Line::from(spans)
 }

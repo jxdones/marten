@@ -4,6 +4,10 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Mark files as reviewed with `m` to collapse them in the diff view and jump to the next unreviewed file. The state is kept in memory only and doesn't persist across restarts.
+
 ### Changed
 
 - Update modals to have a rounded border. 

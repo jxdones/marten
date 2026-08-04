@@ -155,6 +155,7 @@ fn build_continuous_diff(
         file_slots.push(FileSlot {
             entry,
             load: DiffLoadState::NotLoaded,
+            reviewed: false,
         });
     }
 

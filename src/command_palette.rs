@@ -4,7 +4,7 @@ use crate::state::Overlay;
 #[derive(Debug, Clone, Copy)]
 pub enum Section {
     Navigation,
-    Hunk,
+    Diff,
     View,
     General,
     Settings,
@@ -14,7 +14,7 @@ impl Section {
     pub const fn label(self) -> &'static str {
         match self {
             Self::Navigation => "Navigation",
-            Self::Hunk => "Hunk",
+            Self::Diff => "Diff",
             Self::View => "View",
             Self::General => "General",
             Self::Settings => "Settings",
@@ -81,6 +81,11 @@ pub fn command_groups() -> &'static [CommandGroup] {
                     keybind: "[",
                     action: Action::PreviousHunk,
                 },
+            ],
+        },
+        CommandGroup {
+            section: Section::Diff,
+            items: &[
                 CommandItem {
                     label: "scroll diff left",
                     description: "show earlier columns in the diff",
@@ -93,16 +98,19 @@ pub fn command_groups() -> &'static [CommandGroup] {
                     keybind: "l / →",
                     action: Action::ScrollDiffRight,
                 },
+                CommandItem {
+                    label: "edit hunk",
+                    description: "edit hunk on your editor",
+                    keybind: "e",
+                    action: Action::OpenEditor,
+                },
+                CommandItem {
+                    label: "mark reviewed",
+                    description: "mark file as reviewd and collapses it",
+                    keybind: "m",
+                    action: Action::ToggleReviewed,
+                },
             ],
-        },
-        CommandGroup {
-            section: Section::Hunk,
-            items: &[CommandItem {
-                label: "edit hunk",
-                description: "edit hunk on your editor",
-                keybind: "e",
-                action: Action::OpenEditor,
-            }],
         },
         CommandGroup {
             section: Section::View,

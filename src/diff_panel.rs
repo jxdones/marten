@@ -83,6 +83,26 @@ impl DiffPanel {
                 self.continuous_scroll_by(direction, lines, diff_ctx.store);
                 self.sync_files_to_scroll(diff_ctx.files, diff_ctx.store);
             }
+            Action::ToggleReviewed => {
+                if let Some(file_idx) = self.current_continuous_file_idx(diff_ctx.store) {
+                    let will_be_reviewed = !diff_ctx.store.continuous_diff.files[file_idx].reviewed;
+                    diff_ctx.store.continuous_diff.toggle_reviewed(file_idx);
+                    diff_ctx.store.continuous_diff.rebuild_index();
+                    diff_ctx.store.continuous_diff.index_dirty = false;
+
+                    let anchor = if will_be_reviewed {
+                        diff_ctx
+                            .store
+                            .continuous_diff
+                            .next_unreviewed_after(file_idx)
+                            .or(Some(file_idx))
+                    } else {
+                        Some(file_idx)
+                    };
+                    self.sync_continuous_scroll_to_file(anchor, diff_ctx.store);
+                    self.sync_files_to_scroll(diff_ctx.files, diff_ctx.store);
+                }
+            }
             _ => {}
         }
     }
@@ -339,6 +359,9 @@ impl DiffPanel {
             .iter()
             .enumerate()
             .flat_map(|(file_idx, slot)| {
+                if slot.reviewed {
+                    return vec![];
+                }
                 let file_start = store
                     .continuous_diff
                     .index
@@ -360,11 +383,7 @@ impl DiffPanel {
     }
 
     fn max_continuous_scroll_offset(&self, store: &DiffStore) -> usize {
-        store
-            .continuous_diff
-            .index
-            .total_rows
-            .saturating_sub(self.state.viewport_height)
+        store.continuous_diff.index.total_rows.saturating_sub(1)
     }
 
     fn max_horizontal_scroll(&self, store: &DiffStore) -> usize {

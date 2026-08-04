@@ -5,6 +5,7 @@ use ratatui::{Frame, layout::Rect};
 
 const BORDER_WIDTH: usize = 2;
 const STATUS_LETTER_WIDTH: usize = 2;
+const REVIEWED_INDICATOR: &str = " ✓";
 
 use crate::app::App;
 use crate::git::repository::{FileChange, FileStatus};
@@ -77,7 +78,8 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
                     ])));
                 }
                 TreeRow::File(idx, depth) => {
-                    let entry = &files[*idx].entry;
+                    let slot = &files[*idx];
+                    let entry = &slot.entry;
                     let status_letter = match entry.change {
                         Some(FileChange::Added) => Span::styled("A ", theme.success()),
                         Some(FileChange::Modified) => Span::styled("M ", theme.partial()),
@@ -93,10 +95,26 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
                         },
                     };
 
+                    let reviewed = if slot.reviewed {
+                        REVIEWED_INDICATOR
+                    } else {
+                        ""
+                    };
+
+                    let display_path_style = if slot.reviewed {
+                        theme.muted()
+                    } else {
+                        theme.text_primary()
+                    };
+
                     let path = entry.path.split('/').next_back().unwrap_or(&entry.path);
                     let path_depth = "  ".repeat(*depth);
 
-                    let fixed_width = path_depth.len() + BORDER_WIDTH + STATUS_LETTER_WIDTH;
+                    let mut fixed_width = path_depth.len() + BORDER_WIDTH + STATUS_LETTER_WIDTH;
+                    if slot.reviewed {
+                        fixed_width += REVIEWED_INDICATOR.chars().count();
+                    }
+
                     let max_path_width = (area.width as usize).saturating_sub(fixed_width);
 
                     let display_path = if path.chars().count() > max_path_width {
@@ -116,7 +134,8 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App, is_focused: bool) {
                     items.push(ListItem::new(Line::from(vec![
                         Span::raw(path_depth),
                         status_letter,
-                        Span::styled(display_path, theme.text_primary()),
+                        Span::styled(display_path, display_path_style),
+                        Span::styled(reviewed, theme.muted()),
                     ])));
                 }
             }

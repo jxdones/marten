@@ -15,6 +15,10 @@ use crate::state::{ContinuousDiff, DiffLayout, DiffLoadState};
 use crate::syntax;
 use crate::tui::theme::Theme;
 
+const COLLAPSED_SYMBOL: &str = "▶ ";
+const EXPANDED_SYMBOL: &str = "▼ ";
+const REVIEWED_INDICATOR: &str = " ✓";
+
 #[derive(Clone, Copy)]
 struct HunkPosition {
     file_idx: Option<usize>,
@@ -175,7 +179,8 @@ fn render_continuous_diff(
                 &slot.entry,
                 theme,
                 position.for_file(file_idx),
-                is_focused,
+                is_focused && Some(file_idx) == pinned_file_idx,
+                slot.reviewed,
             )]
         }
     } else {
@@ -189,13 +194,14 @@ fn render_continuous_diff(
                     if Some(file_idx) == pinned_file_idx {
                         vec![]
                     } else {
-                        let entry = &continuous_diff.files[file_idx].entry;
+                        let slot = &continuous_diff.files[file_idx];
                         vec![render_file_header(
                             row_width,
-                            entry,
+                            &slot.entry,
                             theme,
                             position.for_file(file_idx),
-                            is_focused,
+                            is_focused && Some(file_idx) == pinned_file_idx,
+                            slot.reviewed,
                         )]
                     }
                 }
@@ -288,30 +294,36 @@ fn render_file_header(
     file: &FileEntry,
     theme: Theme,
     position: Option<HunkPosition>,
-    is_focused: bool,
+    is_selected: bool,
+    is_reviewed: bool,
 ) -> Line<'static> {
     if let Some(type_change) = file.type_change {
         return render_type_change_header(width, file, type_change, theme);
     }
 
-    let collapse_symbol = "▼ ";
+    let collapse_symbol = if is_reviewed {
+        COLLAPSED_SYMBOL
+    } else {
+        EXPANDED_SYMBOL
+    };
     let bg = Style::default().bg(theme.file_header_bg);
     let mut spans = vec![Span::styled(collapse_symbol, theme.muted().patch(bg))];
 
     let status_color = file_mark_color(file, theme);
     let status_symbol = file_mark_symbol(file);
-    let position_spans = position_spans(position, theme, bg, is_focused);
+    let position_spans = position_spans(position, theme, bg, is_selected);
     let position_width: usize = position_spans
         .iter()
         .map(|span| text_width(&span.content))
         .sum();
 
-    let mut path_style = if is_focused {
+    let mut path_style = if is_selected {
         theme.accent().patch(bg)
     } else {
         theme.muted().patch(bg)
     };
-    if position.is_some() {
+
+    if is_selected || position.is_some() {
         path_style = path_style.add_modifier(Modifier::BOLD);
     }
 
@@ -327,6 +339,7 @@ fn render_file_header(
                 .add_modifier(Modifier::BOLD),
         ]);
     }
+
     right_spans.push(Span::styled(" ", bg));
     let right_width: usize = right_spans
         .iter()
@@ -339,7 +352,8 @@ fn render_file_header(
         || truncate_from_start(&file.path, path_width),
         |previous_path| truncate_rename_paths(previous_path, &file.path, path_width),
     );
-    let path = format!(" {display_path}");
+    let reviewed_symbol = if is_reviewed { REVIEWED_INDICATOR } else { "" };
+    let path = format!(" {display_path}{reviewed_symbol}");
     let padding = width.saturating_sub(
         text_width(collapse_symbol)
             + text_width(status_symbol)

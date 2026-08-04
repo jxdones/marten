@@ -43,4 +43,5 @@ pub enum Action {
     FileFinderInput(char),
     FileFinderBackspace,
     FileFinderClear,
+    ToggleReviewed,
 }

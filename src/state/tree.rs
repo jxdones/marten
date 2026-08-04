@@ -139,6 +139,7 @@ mod tests {
                 deletions: 0,
             },
             load: DiffLoadState::NotLoaded,
+            reviewed: false,
         }
     }
 
