@@ -5,7 +5,7 @@ use crate::state::Overlay;
 pub enum Section {
     Navigation,
     Diff,
-    View,
+    Layout,
     General,
     Settings,
 }
@@ -15,7 +15,7 @@ impl Section {
         match self {
             Self::Navigation => "Navigation",
             Self::Diff => "Diff",
-            Self::View => "View",
+            Self::Layout => "Layout",
             Self::General => "General",
             Self::Settings => "Settings",
         }
@@ -113,7 +113,7 @@ pub fn command_groups() -> &'static [CommandGroup] {
             ],
         },
         CommandGroup {
-            section: Section::View,
+            section: Section::Layout,
             items: &[
                 CommandItem {
                     label: "toggle sidebar",

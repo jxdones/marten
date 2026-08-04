@@ -275,7 +275,12 @@ fn render_continuous_diff(
                 }
                 Some(RenderedRow::Binary { file_idx }) => {
                     let entry = &continuous_diff.files[file_idx].entry;
-                    vec![render_binary_header(row_width, entry, theme)]
+                    vec![render_binary_header(
+                        row_width,
+                        entry,
+                        theme,
+                        is_focused && Some(file_idx) == pinned_file_idx,
+                    )]
                 }
                 Some(RenderedRow::Error { msg, .. }) => vec![Line::from(Span::styled(
                     format!(" Error: {msg}"),
@@ -298,7 +303,7 @@ fn render_file_header(
     is_reviewed: bool,
 ) -> Line<'static> {
     if let Some(type_change) = file.type_change {
-        return render_type_change_header(width, file, type_change, theme);
+        return render_type_change_header(width, file, type_change, theme, is_selected);
     }
 
     let collapse_symbol = if is_reviewed {
@@ -490,8 +495,13 @@ fn counter_spans(
     ]
 }
 
-fn render_binary_header(width: usize, file: &FileEntry, theme: Theme) -> Line<'static> {
-    render_non_expandable_header(width, file, "binary", theme)
+fn render_binary_header(
+    width: usize,
+    file: &FileEntry,
+    theme: Theme,
+    is_selected: bool,
+) -> Line<'static> {
+    render_non_expandable_header(width, file, "binary", theme, is_selected)
 }
 
 fn render_type_change_header(
@@ -499,9 +509,10 @@ fn render_type_change_header(
     file: &FileEntry,
     type_change: FileTypeChange,
     theme: Theme,
+    is_selected: bool,
 ) -> Line<'static> {
     let label = format!("{} → {}", type_change.from.label(), type_change.to.label());
-    render_non_expandable_header(width, file, &label, theme)
+    render_non_expandable_header(width, file, &label, theme, is_selected)
 }
 
 fn render_non_expandable_header(
@@ -509,31 +520,57 @@ fn render_non_expandable_header(
     file: &FileEntry,
     label: &str,
     theme: Theme,
+    is_selected: bool,
 ) -> Line<'static> {
     let bg = Style::default().bg(theme.file_header_bg);
     let status_color = file_mark_color(file, theme);
     let status_symbol = file_mark_symbol(file);
     let prefix = "  ";
     let tag = format!(" {label}");
-    let path_width = width
-        .saturating_sub(text_width(prefix) + text_width(status_symbol) + 1 + text_width(&tag) + 1);
+
+    let mut path_style = if is_selected {
+        theme.accent().patch(bg)
+    } else {
+        theme.muted().patch(bg)
+    };
+    if is_selected {
+        path_style = path_style.add_modifier(Modifier::BOLD);
+    }
+
+    let mut right_spans = vec![Span::styled(tag, path_style.patch(bg))];
+    if file.previous_path.is_none() {
+        right_spans.extend([
+            Span::styled(" ", theme.muted().patch(bg)),
+            Span::styled(file_mark_label(file).to_lowercase(), status_color.patch(bg))
+                .add_modifier(Modifier::BOLD),
+        ]);
+    }
+    right_spans.push(Span::styled(" ", bg));
+    let right_width: usize = right_spans
+        .iter()
+        .map(|span| text_width(&span.content))
+        .sum();
+
+    let path_width =
+        width.saturating_sub(text_width(prefix) + text_width(status_symbol) + 1 + right_width);
     let display_path = file.previous_path.as_deref().map_or_else(
         || truncate_from_start(&file.path, path_width),
         |previous_path| truncate_rename_paths(previous_path, &file.path, path_width),
     );
     let path = format!(" {display_path}");
     let padding = width.saturating_sub(
-        text_width(prefix) + text_width(status_symbol) + text_width(&path) + text_width(&tag) + 1,
+        text_width(prefix) + text_width(status_symbol) + text_width(&path) + right_width,
     );
-    Line::from(vec![
+
+    let mut spans = vec![
         Span::styled(prefix, theme.muted().patch(bg)),
         Span::styled(status_symbol, status_color.patch(bg)),
-        Span::styled(path, theme.muted().patch(bg)),
+        Span::styled(path, path_style),
         Span::styled(" ".repeat(padding), bg),
-        Span::styled(tag, theme.muted().patch(bg)),
-        Span::styled(" ", bg),
-    ])
-    .style(bg)
+    ];
+    spans.extend(right_spans);
+
+    Line::from(spans).style(bg)
 }
 
 fn section_header_line(width: usize, kind: DiffSectionKind, theme: Theme) -> Line<'static> {
