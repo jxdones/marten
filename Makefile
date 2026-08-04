@@ -90,7 +90,7 @@ install:
 	cargo install --path . --locked
 
 clean:
-	cargo clean
+	cargo clean -p marten-diff
 
 tag:
 	git tag v$(VERSION)

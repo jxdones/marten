@@ -733,13 +733,18 @@ fn untracked_file_diff(repo: &Repository, path: &str) -> AppResult<Option<Vec<Di
 }
 
 fn untracked_line_count(repo: &Repository, path: &str) -> AppResult<usize> {
-    Ok(untracked_file_content(repo, path)?.lines().count())
+    Ok(untracked_file_content(repo, path)?
+        .map(|content| content.lines().count())
+        .unwrap_or(0))
 }
 
-fn untracked_file_content(repo: &Repository, path: &str) -> AppResult<String> {
+fn untracked_file_content(repo: &Repository, path: &str) -> AppResult<Option<String>> {
     let path = repo.workdir().unwrap_or_else(|| Path::new(".")).join(path);
+    if !path.is_file() {
+        return Ok(None);
+    }
     let bytes = fs::read(path)?;
-    Ok(String::from_utf8_lossy(&bytes).to_string())
+    Ok(Some(String::from_utf8_lossy(&bytes).to_string()))
 }
 
 fn head_status(repo: &Repository) -> AppResult<(Head, usize, usize)> {

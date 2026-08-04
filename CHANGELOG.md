@@ -4,6 +4,10 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Don't crash when a working-tree change is an untracked symlink pointing to a directory.
+
 ## [0.1.6] - 2026-08-04
 
 ### Added
