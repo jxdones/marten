@@ -120,10 +120,12 @@ ignore = ["*.lock", "generated/**", "vendor/"]
 
 `show_sidebar` controls whether the sidebar is visible at startup. When omitted, Marten shows it automatically when the terminal is wider than 120 columns. The sidebar can still be toggled while Marten is running.
 
-`ignore` lists glob patterns for noisy files you'd rather not review (lockfiles, generated code, snapshots, vendored sources).
-Matching files are collapsed to their header and skipped by the diff loaders. They remain listed in the sidebar (marked `⏭`) because they can still be staged or committed.
-Patterns without `/` match the basename at any depth (`*.lock` matches `backend/Cargo.lock`); `**` crosses directory boundaries (`**/generated/**` matches at any depth); a trailing `/` matches everything beneath a directory (`vendor/`).
-When omitted, nothing is ignored.
+`ignore` lists glob patterns for noisy files you'd rather not review (lockfiles, generated code, snapshots, vendored sources). When omitted, nothing is ignored.
+Matching files are collapsed to their header and skipped by the diff loaders. They remain listed in the sidebar (marked `~`) because they can still be staged or committed.
+
+- Patterns without `/` match the basename at any depth (`*.lock` matches `backend/Cargo.lock`)
+- `**` crosses directory boundaries (`**/generated/**` matches at any depth)
+- Trailing `/` matches everything beneath a directory (`vendor/`).
 
 ## Development
 

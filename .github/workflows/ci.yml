@@ -61,7 +61,7 @@ jobs:
           ARCHIVE="marten_${VERSION}_${{ matrix.asset_os }}_${{ matrix.arch }}.tar.gz"
           tar czf "$ARCHIVE" -C target/${{ matrix.target }}/release marten
       - name: Upload build artifact
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: marten-${{ matrix.asset_os }}-${{ matrix.arch }}
           path: marten_*.tar.gz
@@ -76,7 +76,7 @@ jobs:
       contents: write
     steps:
       - name: Download release artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           pattern: marten-*
           path: dist
