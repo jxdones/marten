@@ -14,6 +14,7 @@ mod event;
 mod file_finder;
 mod files_panel;
 mod git;
+mod glob;
 mod inline_diff;
 mod state;
 mod store;
