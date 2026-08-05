@@ -18,6 +18,7 @@ use crate::tui::theme::Theme;
 const COLLAPSED_SYMBOL: &str = "▶ ";
 const EXPANDED_SYMBOL: &str = "▼ ";
 const REVIEWED_INDICATOR: &str = " ✓";
+const IGNORED_INDICATOR: &str = " ~";
 
 #[derive(Clone, Copy)]
 struct HunkPosition {
@@ -181,6 +182,7 @@ fn render_continuous_diff(
                 position.for_file(file_idx),
                 is_focused && Some(file_idx) == pinned_file_idx,
                 slot.reviewed,
+                slot.ignored,
             )]
         }
     } else {
@@ -202,6 +204,7 @@ fn render_continuous_diff(
                             position.for_file(file_idx),
                             is_focused && Some(file_idx) == pinned_file_idx,
                             slot.reviewed,
+                            slot.ignored,
                         )]
                     }
                 }
@@ -301,12 +304,13 @@ fn render_file_header(
     position: Option<HunkPosition>,
     is_selected: bool,
     is_reviewed: bool,
+    is_ignored: bool,
 ) -> Line<'static> {
     if let Some(type_change) = file.type_change {
         return render_type_change_header(width, file, type_change, theme, is_selected);
     }
 
-    let collapse_symbol = if is_reviewed {
+    let collapse_symbol = if is_reviewed || is_ignored {
         COLLAPSED_SYMBOL
     } else {
         EXPANDED_SYMBOL
@@ -358,7 +362,8 @@ fn render_file_header(
         |previous_path| truncate_rename_paths(previous_path, &file.path, path_width),
     );
     let reviewed_symbol = if is_reviewed { REVIEWED_INDICATOR } else { "" };
-    let path = format!(" {display_path}{reviewed_symbol}");
+    let ignored_symbol = if is_ignored { IGNORED_INDICATOR } else { "" };
+    let path = format!(" {display_path}{reviewed_symbol}{ignored_symbol}");
     let padding = width.saturating_sub(
         text_width(collapse_symbol)
             + text_width(status_symbol)
