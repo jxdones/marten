@@ -226,7 +226,7 @@ fn truncate_with_ellipsis(text: &str, max_width: usize) -> String {
 
 fn diff_summary(app: &App) -> Line<'static> {
     let theme = app.theme();
-    let files = app.files();
+    let files: Vec<_> = app.files().iter().filter(|slot| !slot.ignored).collect();
 
     let insertions = files
         .iter()

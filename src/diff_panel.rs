@@ -85,6 +85,9 @@ impl DiffPanel {
             }
             Action::ToggleReviewed => {
                 if let Some(file_idx) = self.current_continuous_file_idx(diff_ctx.store) {
+                    if diff_ctx.store.continuous_diff.files[file_idx].ignored {
+                        return;
+                    }
                     let will_be_reviewed = !diff_ctx.store.continuous_diff.files[file_idx].reviewed;
                     diff_ctx.store.continuous_diff.toggle_reviewed(file_idx);
                     diff_ctx.store.continuous_diff.rebuild_index();
