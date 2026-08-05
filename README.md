@@ -25,6 +25,7 @@
 - Find changed files and navigate between hunks quickly
 - Open a hunk directly in your editor
 - Use the mouse to select files and scroll through diffs
+- Exclude noisy files from your review with configurable ignore patterns
 
 ## Quick Start
 
@@ -110,11 +111,19 @@ Marten reads its configuration from `~/.config/marten/config.toml` on macOS and 
 [ui]
 theme = "marten"
 show_sidebar = true
+
+[review]
+ignore = ["*.lock", "generated/**", "vendor/"]
 ```
 
 `theme` supports `marten`, `ermine`, `catppuccin`, `dracula`, and much more. When the setting is omitted, Marten uses `marten` by default. Choosing a theme from the in-app theme picker updates this setting.
 
 `show_sidebar` controls whether the sidebar is visible at startup. When omitted, Marten shows it automatically when the terminal is wider than 120 columns. The sidebar can still be toggled while Marten is running.
+
+`ignore` lists glob patterns for noisy files you'd rather not review (lockfiles, generated code, snapshots, vendored sources).
+Matching files are collapsed to their header and skipped by the diff loaders. They remain listed in the sidebar (marked `⏭`) because they can still be staged or committed.
+Patterns without `/` match the basename at any depth (`*.lock` matches `backend/Cargo.lock`); `**` crosses directory boundaries (`**/generated/**` matches at any depth); a trailing `/` matches everything beneath a directory (`vendor/`).
+When omitted, nothing is ignored.
 
 ## Development
 
