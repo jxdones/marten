@@ -140,6 +140,7 @@ mod tests {
             },
             load: DiffLoadState::NotLoaded,
             reviewed: false,
+            ignored: false,
         }
     }
 

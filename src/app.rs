@@ -86,7 +86,7 @@ impl App {
         let entries = repository::files_for_source(&repo, &diff_source)
             .map_err(|error| error.with_operation(operation))?;
 
-        let mut store = DiffStore::new(entries);
+        let mut store = DiffStore::new(entries, config.review.ignore.clone());
         store.continuous_diff.rebuild_index();
         store.spawn_workers(&diff_source);
 

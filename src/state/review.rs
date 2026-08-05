@@ -31,6 +31,7 @@ pub struct FileSlot {
     pub entry: FileEntry,
     pub load: DiffLoadState,
     pub reviewed: bool,
+    pub ignored: bool,
 }
 
 #[derive(Debug, Default)]
@@ -105,7 +106,7 @@ impl ReviewIndex {
 
 impl FileSlot {
     pub fn row_count(&self, layout: DiffLayout) -> usize {
-        if self.reviewed {
+        if self.reviewed || self.ignored {
             return HEADER_ROW;
         }
         match &self.load {
