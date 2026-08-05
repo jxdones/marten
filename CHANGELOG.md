@@ -4,6 +4,8 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-08-05
+
 ### Added
 
 - Ignore noisy files from a review with `[review] ignore` glob patterns in the config file. Matching files are collapsed and skipped by the diff loaders but remain listed in the sidebar with a `~` marker.
