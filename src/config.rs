@@ -11,14 +11,21 @@ const CONFIG_FILE: &str = "config.toml";
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
 pub struct Config {
-    pub ui: UiConfig,
+    pub ui: UI,
+    pub review: Review,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(default)]
-pub struct UiConfig {
+pub struct UI {
     pub theme: String,
     pub show_sidebar: Option<bool>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct Review {
+    pub ignore: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -50,7 +57,7 @@ pub enum ConfigError {
     },
 }
 
-impl UiConfig {
+impl UI {
     pub fn theme(&self) -> Theme {
         theme::entry_by_id(&self.theme)
             .unwrap_or_else(theme::default_entry)
@@ -62,7 +69,7 @@ impl UiConfig {
     }
 }
 
-impl Default for UiConfig {
+impl Default for UI {
     fn default() -> Self {
         Self {
             theme: theme::default_entry().id.into(),
@@ -323,5 +330,72 @@ mod tests {
         for entry in theme::THEMES {
             assert!(ids.insert(entry.id), "duplicate theme id: {}", entry.id);
         }
+    }
+
+    #[test]
+    fn review_ignore_patterns_load_from_config() {
+        let config: Config =
+            toml::from_str("[review]\nignore = [\"*.lock\", \"generated/**\"]\n").unwrap();
+
+        assert_eq!(config.review.ignore, vec!["*.lock", "generated/**"]);
+        assert!(crate::glob::matches_any(
+            &config.review.ignore,
+            "Cargo.lock"
+        ));
+        assert!(crate::glob::matches_any(
+            &config.review.ignore,
+            "generated/out.rs"
+        ));
+        assert!(crate::glob::matches_any(
+            &config.review.ignore,
+            "generated/sub/out.rs"
+        ));
+        assert!(!crate::glob::matches_any(
+            &config.review.ignore,
+            "src/generated/out.rs"
+        ));
+        assert!(!crate::glob::matches_any(
+            &config.review.ignore,
+            "src/main.rs"
+        ));
+    }
+
+    #[test]
+    fn missing_review_section_uses_empty_defaults() {
+        let config: Config = toml::from_str("[ui]\ntheme = 'ermine'\n").unwrap();
+
+        assert!(config.review.ignore.is_empty());
+        assert!(!crate::glob::matches_any(
+            &config.review.ignore,
+            "Cargo.lock"
+        ));
+    }
+
+    #[test]
+    fn empty_review_section_ignores_nothing() {
+        let config: Config = toml::from_str("[review]\n").unwrap();
+
+        assert!(config.review.ignore.is_empty());
+        assert!(!crate::glob::matches_any(
+            &config.review.ignore,
+            "anything/at/all.rs"
+        ));
+    }
+
+    #[test]
+    fn saving_theme_preserves_review_settings() {
+        let directory = tempdir().unwrap();
+        let path = directory.path().join("config.toml");
+        fs::write(
+            &path,
+            "[review]\nignore = [\"*.lock\"]\n\n[ui]\ntheme = 'marten'\n",
+        )
+        .unwrap();
+
+        save_theme_to(path.clone(), "ermine").unwrap();
+
+        let config = load_from(path).unwrap();
+        assert_eq!(config.ui.theme, "ermine");
+        assert_eq!(config.review.ignore, vec!["*.lock"]);
     }
 }
