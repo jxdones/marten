@@ -289,17 +289,19 @@ pub fn status(repo: &Repository) -> AppResult<RepositoryStatus> {
     })
 }
 
-pub fn files(repo: &Repository) -> AppResult<Vec<FileEntry>> {
+pub fn files(repo: &Repository, ignore_whitespace: bool) -> AppResult<Vec<FileEntry>> {
+    let mut staged_options = diff_options(ignore_whitespace);
     let staged_diff = if let Ok(head) = repo.head() {
         // repo has at least one commit
         let tree = head.peel_to_commit()?.tree()?;
-        repo.diff_tree_to_index(Some(&tree), None, None)?
+        repo.diff_tree_to_index(Some(&tree), None, Some(&mut staged_options))?
     } else {
         // no commits yet, diff against empty tree
-        repo.diff_tree_to_index(None, None, None)?
+        repo.diff_tree_to_index(None, None, Some(&mut staged_options))?
     };
 
-    let unstaged_diff = repo.diff_index_to_workdir(None, None)?;
+    let mut unstaged_options = diff_options(ignore_whitespace);
+    let unstaged_diff = repo.diff_index_to_workdir(None, Some(&mut unstaged_options))?;
 
     let staged_map: HashMap<String, (usize, usize)> = diff_stats(&staged_diff)?;
     let unstaged_map: HashMap<String, (usize, usize)> = diff_stats(&unstaged_diff)?;
@@ -435,15 +437,25 @@ pub fn resolve_range(repo: &Repository, input: &str) -> AppResult<RangeData> {
     })
 }
 
-pub fn files_for_source(repo: &Repository, source: &DiffSource) -> AppResult<Vec<FileEntry>> {
+pub fn files_for_source(
+    repo: &Repository,
+    source: &DiffSource,
+    ignore_whitespace: bool,
+) -> AppResult<Vec<FileEntry>> {
     match source {
-        DiffSource::Worktree => files(repo),
-        DiffSource::Revision(revision) => files_from_commit(repo, revision.oid),
-        DiffSource::Range(range) => files_between_commits(repo, Some(range.old_oid), range.new_oid),
+        DiffSource::Worktree => files(repo, ignore_whitespace),
+        DiffSource::Revision(revision) => files_from_commit(repo, revision.oid, ignore_whitespace),
+        DiffSource::Range(range) => {
+            files_between_commits(repo, Some(range.old_oid), range.new_oid, ignore_whitespace)
+        }
     }
 }
 
-pub fn files_from_commit(repo: &Repository, oid: Oid) -> AppResult<Vec<FileEntry>> {
+pub fn files_from_commit(
+    repo: &Repository,
+    oid: Oid,
+    ignore_whitespace: bool,
+) -> AppResult<Vec<FileEntry>> {
     let commit = repo.find_commit(oid)?;
 
     let parent_oid = if commit.parent_count() > 0 {
@@ -452,13 +464,14 @@ pub fn files_from_commit(repo: &Repository, oid: Oid) -> AppResult<Vec<FileEntry
         None
     };
 
-    files_between_commits(repo, parent_oid, oid)
+    files_between_commits(repo, parent_oid, oid, ignore_whitespace)
 }
 
 fn files_between_commits(
     repo: &Repository,
     old_oid: Option<Oid>,
     new_oid: Oid,
+    ignore_whitespace: bool,
 ) -> AppResult<Vec<FileEntry>> {
     let old_tree = if let Some(oid) = old_oid {
         Some(repo.find_commit(oid)?.tree()?)
@@ -467,7 +480,7 @@ fn files_between_commits(
     };
 
     let new_tree = repo.find_commit(new_oid)?.tree()?;
-    let mut diff_options = DiffOptions::new();
+    let mut diff_options = diff_options(ignore_whitespace);
     diff_options.include_typechange(true);
     let mut diff =
         repo.diff_tree_to_tree(old_tree.as_ref(), Some(&new_tree), Some(&mut diff_options))?;
@@ -525,10 +538,11 @@ pub fn file_diff(
     repo: &Repository,
     path: &str,
     status: FileStatus,
+    ignore_whitespace: bool,
 ) -> AppResult<Option<Vec<DiffSection>>> {
     match status {
         FileStatus::Staged => {
-            let Some(hunks) = staged_file_diff(repo, path)? else {
+            let Some(hunks) = staged_file_diff(repo, path, ignore_whitespace)? else {
                 return Ok(None);
             };
             Ok(Some(vec![DiffSection {
@@ -537,10 +551,10 @@ pub fn file_diff(
             }]))
         }
         FileStatus::Partial => {
-            let Some(staged) = staged_file_diff(repo, path)? else {
+            let Some(staged) = staged_file_diff(repo, path, ignore_whitespace)? else {
                 return Ok(None);
             };
-            let Some(unstaged) = unstaged_file_diff(repo, path)? else {
+            let Some(unstaged) = unstaged_file_diff(repo, path, ignore_whitespace)? else {
                 return Ok(None);
             };
             Ok(Some(vec![
@@ -555,7 +569,7 @@ pub fn file_diff(
             ]))
         }
         FileStatus::Unstaged => {
-            let Some(hunks) = unstaged_file_diff(repo, path)? else {
+            let Some(hunks) = unstaged_file_diff(repo, path, ignore_whitespace)? else {
                 return Ok(None);
             };
             Ok(Some(vec![DiffSection {
@@ -581,6 +595,7 @@ pub fn files_diff_from_commit(
     oid: Oid,
     path: &str,
     previous_path: Option<&str>,
+    ignore_whitespace: bool,
 ) -> AppResult<Option<Vec<DiffSection>>> {
     let commit = repo.find_commit(oid)?;
 
@@ -589,7 +604,14 @@ pub fn files_diff_from_commit(
     } else {
         None
     };
-    file_diff_between_commits(repo, parent_oid, oid, path, previous_path)
+    file_diff_between_commits(
+        repo,
+        parent_oid,
+        oid,
+        path,
+        previous_path,
+        ignore_whitespace,
+    )
 }
 
 fn file_diff_between_commits(
@@ -598,6 +620,7 @@ fn file_diff_between_commits(
     new_oid: Oid,
     path: &str,
     previous_path: Option<&str>,
+    ignore_whitespace: bool,
 ) -> AppResult<Option<Vec<DiffSection>>> {
     let old_tree = if let Some(oid) = old_oid {
         Some(repo.find_commit(oid)?.tree()?)
@@ -606,7 +629,7 @@ fn file_diff_between_commits(
     };
     let new_tree = repo.find_commit(new_oid)?.tree()?;
 
-    let mut opts = DiffOptions::new();
+    let mut opts = diff_options(ignore_whitespace);
     opts.include_typechange(true).pathspec(path);
     if let Some(previous_path) = previous_path {
         opts.pathspec(previous_path);
@@ -630,11 +653,12 @@ pub fn file_diff_for_source(
     path: &str,
     previous_path: Option<&str>,
     status: FileStatus,
+    ignore_whitespace: bool,
 ) -> AppResult<Option<Vec<DiffSection>>> {
     match source {
-        DiffSource::Worktree => file_diff(repo, path, status),
+        DiffSource::Worktree => file_diff(repo, path, status, ignore_whitespace),
         DiffSource::Revision(revision) => {
-            files_diff_from_commit(repo, revision.oid, path, previous_path)
+            files_diff_from_commit(repo, revision.oid, path, previous_path, ignore_whitespace)
         }
         DiffSource::Range(range) => file_diff_between_commits(
             repo,
@@ -642,6 +666,7 @@ pub fn file_diff_for_source(
             range.new_oid,
             path,
             previous_path,
+            ignore_whitespace,
         ),
     }
 }
@@ -685,9 +710,13 @@ fn diff_hunks(diff: Diff<'_>) -> AppResult<Option<Vec<DiffHunk>>> {
     Ok(Some(hunks))
 }
 
-fn staged_file_diff(repo: &Repository, path: &str) -> AppResult<Option<Vec<DiffHunk>>> {
+fn staged_file_diff(
+    repo: &Repository,
+    path: &str,
+    ignore_whitespace: bool,
+) -> AppResult<Option<Vec<DiffHunk>>> {
     let head = repo.head()?;
-    let mut opts = DiffOptions::new();
+    let mut opts = diff_options(ignore_whitespace);
     opts.pathspec(path);
 
     let head_commit = head.peel_to_commit()?;
@@ -698,8 +727,12 @@ fn staged_file_diff(repo: &Repository, path: &str) -> AppResult<Option<Vec<DiffH
     Ok(hunks)
 }
 
-fn unstaged_file_diff(repo: &Repository, path: &str) -> AppResult<Option<Vec<DiffHunk>>> {
-    let mut opts = DiffOptions::new();
+fn unstaged_file_diff(
+    repo: &Repository,
+    path: &str,
+    ignore_whitespace: bool,
+) -> AppResult<Option<Vec<DiffHunk>>> {
+    let mut opts = diff_options(ignore_whitespace);
     opts.pathspec(path);
 
     let diff = repo.diff_index_to_workdir(None, Some(&mut opts))?;
@@ -885,6 +918,12 @@ fn diff_stats(diff: &Diff<'_>) -> Result<HashMap<String, (usize, usize)>, git2::
     )?;
 
     Ok(stats)
+}
+
+fn diff_options(ignore_whitespace: bool) -> DiffOptions {
+    let mut options = DiffOptions::new();
+    options.ignore_whitespace(ignore_whitespace);
+    options
 }
 
 #[cfg(test)]
@@ -1113,7 +1152,7 @@ mod tests {
 
         write_file(&repo, "untracked.txt", "new\n");
 
-        let entries = files(&repo).unwrap();
+        let entries = files(&repo, false).unwrap();
         assert_eq!(entry(&entries, "staged.txt").status, FileStatus::Staged);
         assert_eq!(
             entry(&entries, "untracked.txt").status,
@@ -1133,7 +1172,7 @@ mod tests {
             "base\nstaged\nworking\n",
         );
 
-        let sections = file_diff(&repo, "partial.txt", FileStatus::Partial)
+        let sections = file_diff(&repo, "partial.txt", FileStatus::Partial, false)
             .unwrap()
             .expect("not binary");
         assert_eq!(sections.len(), 2);
@@ -1149,7 +1188,7 @@ mod tests {
         write_and_commit(&repo, "README.md", "hello\n", "init");
         write_file(&repo, "new.txt", "alpha\nbeta\n");
 
-        let sections = file_diff(&repo, "new.txt", FileStatus::Untracked)
+        let sections = file_diff(&repo, "new.txt", FileStatus::Untracked, false)
             .unwrap()
             .expect("not binary");
         assert_eq!(sections.len(), 1);
@@ -1159,5 +1198,46 @@ mod tests {
         assert_eq!(hunk.insertions, 2);
         assert_eq!(hunk.deletions, 0);
         assert!(hunk.lines.iter().all(|line| line.origin == '+'));
+    }
+
+    #[test]
+    fn file_diff_can_ignore_whitespace_only_worktree_changes() {
+        let (_dir, repo) = init_repo("ignore-whitespace");
+        write_and_commit(
+            &repo,
+            "main.rs",
+            "fn main() {\n    println!(\"hello\");\n}\n",
+            "init",
+        );
+        write_file(&repo, "main.rs", "fn main() {\n\tprintln!(\"hello\");\n}\n");
+
+        let visible = file_diff(&repo, "main.rs", FileStatus::Unstaged, false)
+            .unwrap()
+            .expect("not binary");
+        assert!(visible.iter().any(|section| !section.hunks.is_empty()));
+
+        let ignored = file_diff(&repo, "main.rs", FileStatus::Unstaged, true)
+            .unwrap()
+            .expect("not binary");
+        assert!(ignored.iter().all(|section| section.hunks.is_empty()));
+
+        let visible_entries = files(&repo, false).unwrap();
+        let visible_entry = entry(&visible_entries, "main.rs");
+        assert!(visible_entry.insertions > 0);
+        assert!(visible_entry.deletions > 0);
+
+        let ignored_entries = files(&repo, true).unwrap();
+        let ignored_entry = entry(&ignored_entries, "main.rs");
+        assert_eq!((ignored_entry.insertions, ignored_entry.deletions), (0, 0));
+
+        stage_path(&repo, "main.rs");
+        let ignored_staged = file_diff(&repo, "main.rs", FileStatus::Staged, true)
+            .unwrap()
+            .expect("not binary");
+        assert!(
+            ignored_staged
+                .iter()
+                .all(|section| section.hunks.is_empty())
+        );
     }
 }

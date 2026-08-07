@@ -13,6 +13,7 @@ const CONFIG_FILE: &str = "config.toml";
 pub struct Config {
     pub ui: UI,
     pub review: Review,
+    pub diff: Diff,
 }
 
 #[derive(Debug, Deserialize)]
@@ -26,6 +27,12 @@ pub struct UI {
 #[serde(default)]
 pub struct Review {
     pub ignore: Vec<String>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct Diff {
+    pub ignore_whitespace: bool,
 }
 
 #[derive(Debug)]
@@ -266,6 +273,18 @@ mod tests {
 
         assert!(!config.ui.show_sidebar(120));
         assert!(config.ui.show_sidebar(121));
+    }
+
+    #[test]
+    fn diff_ignore_whitespace_defaults_to_false() {
+        let config = Config::default();
+        assert!(!config.diff.ignore_whitespace);
+    }
+
+    #[test]
+    fn set_diff_ignore_whitespace_to_true() {
+        let config: Config = toml::from_str("[diff]\n ignore_whitespace = true").unwrap();
+        assert!(config.diff.ignore_whitespace);
     }
 
     #[test]

@@ -4,6 +4,10 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Ignore whitespace-only changes in diff hunks and statistics with `[diff] ignore_whitespace = true` in the config file.
+
 ## [0.1.7] - 2026-08-05
 
 ### Added

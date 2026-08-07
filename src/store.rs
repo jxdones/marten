@@ -13,12 +13,17 @@ use crate::state::{
 pub struct DiffStore {
     pub continuous_diff: ContinuousDiff,
     ignore_patterns: Vec<String>,
+    ignore_whitespace: bool,
     worker_tx: std::sync::mpsc::Sender<WorkerResult>,
     worker_rx: std::sync::mpsc::Receiver<WorkerResult>,
 }
 
 impl DiffStore {
-    pub fn new(entries: Vec<FileEntry>, ignore_patterns: Vec<String>) -> Self {
+    pub fn new(
+        entries: Vec<FileEntry>,
+        ignore_patterns: Vec<String>,
+        ignore_whitespace: bool,
+    ) -> Self {
         let (tx, rx) = std::sync::mpsc::channel::<WorkerResult>();
         Self {
             continuous_diff: build_continuous_diff(
@@ -28,6 +33,7 @@ impl DiffStore {
                 &ignore_patterns,
             ),
             ignore_patterns,
+            ignore_whitespace,
             worker_tx: tx,
             worker_rx: rx,
         }
@@ -64,6 +70,7 @@ impl DiffStore {
 
     pub fn spawn_workers(&self, diff_source: &DiffSource) {
         let generation = self.continuous_diff.generation;
+        let ignore_whitespace = self.ignore_whitespace;
         let jobs: Vec<_> = self
             .continuous_diff
             .files
@@ -104,6 +111,7 @@ impl DiffStore {
                         &path,
                         previous_path.as_deref(),
                         status,
+                        ignore_whitespace,
                     )
                     .map(|maybe_sections| {
                         maybe_sections.map(|sections| {
@@ -129,6 +137,10 @@ impl DiffStore {
                 }
             });
         }
+    }
+
+    pub const fn ignore_whitespace(&self) -> bool {
+        self.ignore_whitespace
     }
 }
 
@@ -222,7 +234,7 @@ mod tests {
             entry("src/old.rs", Some("src/renamed.rs")),
         ];
 
-        let store = DiffStore::new(entries, vec!["*.lock".into(), "renamed.rs".into()]);
+        let store = DiffStore::new(entries, vec!["*.lock".into(), "renamed.rs".into()], false);
 
         assert!(is_ignored(&store, "Cargo.lock"));
         assert!(!is_ignored(&store, "src/main.rs"));
@@ -237,7 +249,7 @@ mod tests {
             entry("src/lib.rs", None),
         ];
 
-        let store = DiffStore::new(entries, vec!["*.lock".into()]);
+        let store = DiffStore::new(entries, vec!["*.lock".into()], false);
         let jobs = store
             .continuous_diff
             .files
@@ -255,7 +267,11 @@ mod tests {
 
     #[test]
     fn reload_retains_ignore_patterns() {
-        let mut store = DiffStore::new(vec![entry("Cargo.lock", None)], vec!["*.lock".into()]);
+        let mut store = DiffStore::new(
+            vec![entry("Cargo.lock", None)],
+            vec!["*.lock".into()],
+            false,
+        );
 
         store.reload(vec![entry("Cargo.lock", None), entry("src/main.rs", None)]);
 

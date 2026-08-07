@@ -83,10 +83,11 @@ impl App {
             DiffSource::Revision(_) => "load revision changes",
             DiffSource::Range(_) => "load revision range",
         };
-        let entries = repository::files_for_source(&repo, &diff_source)
+        let ignore_whitespace = config.diff.ignore_whitespace;
+        let entries = repository::files_for_source(&repo, &diff_source, ignore_whitespace)
             .map_err(|error| error.with_operation(operation))?;
 
-        let mut store = DiffStore::new(entries, config.review.ignore.clone());
+        let mut store = DiffStore::new(entries, config.review.ignore.clone(), ignore_whitespace);
         store.continuous_diff.rebuild_index();
         store.spawn_workers(&diff_source);
 

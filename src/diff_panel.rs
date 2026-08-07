@@ -124,8 +124,10 @@ impl DiffPanel {
             DiffSource::Revision(_) => "refresh revision changes",
             DiffSource::Range(_) => "refresh revision range",
         };
-        let entries = repository::files_for_source(diff_ctx.repo, diff_ctx.diff_source)
-            .map_err(|error| error.with_operation(operation))?;
+        let ignore_whitespace = diff_ctx.store.ignore_whitespace();
+        let entries =
+            repository::files_for_source(diff_ctx.repo, diff_ctx.diff_source, ignore_whitespace)
+                .map_err(|error| error.with_operation(operation))?;
 
         diff_ctx.store.reload(entries);
         diff_ctx.files.mark_dirty();
@@ -174,6 +176,7 @@ impl DiffPanel {
                     &path,
                     previous_path.as_deref(),
                     status,
+                    diff_ctx.store.ignore_whitespace(),
                 );
 
                 match result {

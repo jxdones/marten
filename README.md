@@ -114,18 +114,24 @@ show_sidebar = true
 
 [review]
 ignore = ["*.lock", "generated/**", "vendor/"]
+
+[diff]
+ignore_whitespace = false
 ```
 
 `theme` supports `marten`, `ermine`, `catppuccin`, `dracula`, and much more. When the setting is omitted, Marten uses `marten` by default. Choosing a theme from the in-app theme picker updates this setting.
 
 `show_sidebar` controls whether the sidebar is visible at startup. When omitted, Marten shows it automatically when the terminal is wider than 120 columns. The sidebar can still be toggled while Marten is running.
 
-`ignore` lists glob patterns for noisy files you'd rather not review (lockfiles, generated code, snapshots, vendored sources). When omitted, nothing is ignored.
-Matching files are collapsed to their header and skipped by the diff loaders. They remain listed in the sidebar (marked `~`) because they can still be staged or committed.
+`ignore` lists glob patterns for noisy files you'd rather not review (lockfiles, generated code, snapshots, vendored sources). When omitted, nothing is ignored.  
+Matching files are collapsed to their header and skipped by the diff loaders. They remain listed in the sidebar (marked `~`) because they can still be visible as part of the changes.
 
 - Patterns without `/` match the basename at any depth (`*.lock` matches `backend/Cargo.lock`)
 - `**` crosses directory boundaries (`**/generated/**` matches at any depth)
 - Trailing `/` matches everything beneath a directory (`vendor/`).
+
+`ignore_whitespace` hides whitespace-only changes from diff hunks and statistics in working-tree, revision, and revision-range views. It defaults to `false`.  
+Files containing only whitespace changes remain listed because Git still considers them modified, but their diff is empty while this option is enabled.
 
 ## Development
 
