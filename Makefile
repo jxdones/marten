@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 
 APP := marten
-VERSION := 0.1.7
+VERSION := 0.1.8
 
 .PHONY: help build run run-release play demo dev-files clean-dev-files check test fmt fmt-check lint lint-strict audit ci ci-full release install clean tag
 

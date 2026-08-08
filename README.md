@@ -46,7 +46,7 @@ marten
 To install a specific release, pass its version:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/jxdones/marten/main/install.sh | sh -s -- v0.1.7
+curl -fsSL https://raw.githubusercontent.com/jxdones/marten/main/install.sh | sh -s -- v0.1.8
 ```
 
 The installer supports Intel and ARM64 systems. Set `BINDIR` to install somewhere other than `/usr/local/bin`:
