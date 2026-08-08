@@ -46,7 +46,7 @@ impl HunkPosition {
 fn hunk_position(app: &App) -> HunkPosition {
     let continuous_diff = app.continuous_diff();
     let layout = continuous_diff.layout;
-    let scroll = app.review_state().continuous_scroll;
+    let scroll = app.review_state().selected_row;
     match continuous_diff.lookup_row(scroll) {
         Some(RenderedRow::HunkHeader { file_idx, hunk_idx }) => {
             let (total, line_count) = match &continuous_diff.files[file_idx].load {
@@ -118,8 +118,9 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App, is_focused: bool, has_side
     let position = hunk_position(app);
 
     let scroll = app.review_state().continuous_scroll;
+    let selected_row = app.review_state().selected_row;
     let continuous_diff = app.continuous_diff();
-    let selected_hunk = match continuous_diff.lookup_row(scroll) {
+    let selected_hunk = match continuous_diff.lookup_row(selected_row) {
         Some(RenderedRow::HunkHeader { file_idx, hunk_idx }) => Some((file_idx, hunk_idx)),
         Some(RenderedRow::DiffRow {
             file_idx, hunk_idx, ..

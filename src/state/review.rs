@@ -53,6 +53,7 @@ pub struct ContinuousDiff {
 #[derive(Debug, Default)]
 pub struct ReviewState {
     pub continuous_scroll: usize,
+    pub selected_row: usize,
 }
 
 #[derive(Debug)]

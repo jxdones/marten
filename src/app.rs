@@ -396,7 +396,7 @@ impl App {
                 return Ok(());
             }
             Action::OpenEditor => {
-                let scroll = diff.review().continuous_scroll;
+                let scroll = diff.review().selected_row;
                 if let Some((path, line)) = store.continuous_diff.selected_line(scroll) {
                     *pending_editor = Some((PathBuf::from(path), line));
                 }
