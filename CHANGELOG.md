@@ -4,6 +4,10 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Navigate diff lines with a visible selection cursor.
+
 ## [0.1.8] - 2026-08-08
 
 ### Added

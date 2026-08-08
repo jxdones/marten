@@ -13,6 +13,7 @@ use crate::store::DiffStore;
 const SCROLL_STEP: usize = 1;
 const HORIZONTAL_SCROLL_STEP: usize = 4;
 const GUTTER_WIDTH: usize = 1;
+const VERTICAL_SCROLL_MARGIN: usize = 2;
 
 pub struct DiffPanel {
     state: Diff,
@@ -48,12 +49,12 @@ impl DiffPanel {
 
         match action {
             Action::MoveDown if focus == Focus::Diff => {
-                self.continuous_scroll_down(diff_ctx.store);
-                self.sync_files_to_scroll(diff_ctx.files, diff_ctx.store);
+                self.select_next_line(diff_ctx.store);
+                self.sync_files_to_selection(diff_ctx.files, diff_ctx.store);
             }
             Action::MoveUp if focus == Focus::Diff => {
-                self.continuous_scroll_up();
-                self.sync_files_to_scroll(diff_ctx.files, diff_ctx.store);
+                self.select_previous_line(diff_ctx.store);
+                self.sync_files_to_selection(diff_ctx.files, diff_ctx.store);
             }
             Action::ScrollDiffLeft => {
                 self.state.scroll_left(HORIZONTAL_SCROLL_STEP);
@@ -63,11 +64,11 @@ impl DiffPanel {
             }
             Action::NextHunk => {
                 self.select_next_hunk(diff_ctx.store);
-                self.sync_files_to_scroll(diff_ctx.files, diff_ctx.store);
+                self.sync_files_to_selection(diff_ctx.files, diff_ctx.store);
             }
             Action::PreviousHunk => {
                 self.select_previous_hunk(diff_ctx.store);
-                self.sync_files_to_scroll(diff_ctx.files, diff_ctx.store);
+                self.sync_files_to_selection(diff_ctx.files, diff_ctx.store);
             }
             Action::ToggleDiffLineNumbers => {
                 self.state.toggle_line_numbers();
@@ -81,7 +82,8 @@ impl DiffPanel {
             }
             Action::ScrollDiff { direction, lines } => {
                 self.continuous_scroll_by(direction, lines, diff_ctx.store);
-                self.sync_files_to_scroll(diff_ctx.files, diff_ctx.store);
+                self.keep_selection_in_view(diff_ctx.store);
+                self.sync_files_to_selection(diff_ctx.files, diff_ctx.store);
             }
             Action::ToggleReviewed => {
                 if let Some(file_idx) = self.current_continuous_file_idx(diff_ctx.store) {
@@ -103,7 +105,7 @@ impl DiffPanel {
                         Some(file_idx)
                     };
                     self.sync_continuous_scroll_to_file(anchor, diff_ctx.store);
-                    self.sync_files_to_scroll(diff_ctx.files, diff_ctx.store);
+                    self.sync_files_to_selection(diff_ctx.files, diff_ctx.store);
                 }
             }
             _ => {}
@@ -228,23 +230,36 @@ impl DiffPanel {
 
         let file_anchor = self.current_continuous_file_idx(store);
         let hunk_anchor = match store.continuous_diff.lookup_row(self.review.selected_row) {
-            Some(RenderedRow::HunkHeader { file_idx, hunk_idx })
-            | Some(RenderedRow::DiffRow {
-                file_idx, hunk_idx, ..
-            }) => Some((file_idx, hunk_idx)),
+            Some(RenderedRow::HunkHeader { file_idx, hunk_idx }) => {
+                Some((file_idx, hunk_idx, None))
+            }
+            Some(RenderedRow::DiffRow {
+                file_idx,
+                hunk_idx,
+                row_idx,
+            }) => Some((file_idx, hunk_idx, Some(row_idx))),
             _ => None,
         };
         store.continuous_diff.layout = layout;
         store.continuous_diff.rebuild_index();
 
-        if let Some((file_idx, hunk_idx)) = hunk_anchor
+        if let Some((file_idx, hunk_idx, row_idx)) = hunk_anchor
             && let Some(&file_start) = store.continuous_diff.index.file_starts.get(file_idx)
-            && let DiffLoadState::Loaded { index, .. } = &store.continuous_diff.files[file_idx].load
+            && let DiffLoadState::Loaded { hunks, index } =
+                &store.continuous_diff.files[file_idx].load
             && let Some(&hunk_start) = index.hunk_starts_for(layout).get(hunk_idx)
         {
-            let row = file_start + 1 + hunk_start;
-            self.review.continuous_scroll = row;
-            self.review.selected_row = row;
+            let hunk_header = file_start + 1 + hunk_start;
+            let row_count = match layout {
+                DiffLayout::Unified => hunks[hunk_idx].lines.len(),
+                DiffLayout::SideBySide => hunks[hunk_idx].comparison_rows.len(),
+            };
+            let row_offset = row_idx
+                .filter(|_| row_count > 0)
+                .map_or(0, |row_idx| 1 + row_idx.min(row_count - 1));
+            self.review.selected_row = hunk_header + row_offset;
+            self.review.continuous_scroll = self.review.selected_row;
+            self.ensure_selection_visible(store);
         } else {
             self.sync_continuous_scroll_to_file(file_anchor, store);
         }
@@ -258,18 +273,6 @@ impl DiffPanel {
     pub fn refresh_horizontal_scroll_bounds(&mut self, store: &DiffStore) {
         let max = self.max_horizontal_scroll(store);
         self.state.set_max_horizontal_scroll(max);
-    }
-
-    pub fn continuous_scroll_down(&mut self, store: &DiffStore) {
-        let max_offset = self.max_continuous_scroll_offset(store);
-        let offset = (self.review.continuous_scroll + SCROLL_STEP).min(max_offset);
-        self.review.continuous_scroll = offset;
-        self.review.selected_row = offset;
-    }
-
-    pub fn continuous_scroll_up(&mut self) {
-        self.review.continuous_scroll = self.review.continuous_scroll.saturating_sub(SCROLL_STEP);
-        self.review.selected_row = self.review.continuous_scroll;
     }
 
     fn continuous_scroll_by(
@@ -287,7 +290,6 @@ impl DiffPanel {
                 .min(self.max_continuous_scroll_offset(store)),
             ScrollDirection::Up => self.review.continuous_scroll.saturating_sub(distance),
         };
-        self.review.selected_row = self.review.continuous_scroll;
     }
 
     pub fn select_next_hunk(&mut self, store: &DiffStore) {
@@ -306,17 +308,14 @@ impl DiffPanel {
         let Some(&file_idx) = store.continuous_diff.by_key.get(&key) else {
             return;
         };
-        let row = store.continuous_diff.index.file_starts[file_idx];
-        self.review.continuous_scroll = row;
-        self.review.selected_row = row;
+        self.set_position_to_file(file_idx, store);
     }
 
     pub fn sync_continuous_scroll_to_file(&mut self, file_idx: Option<usize>, store: &DiffStore) {
         if let Some(file_idx) = file_idx
-            && let Some(&row) = store.continuous_diff.index.file_starts.get(file_idx)
+            && file_idx < store.continuous_diff.files.len()
         {
-            self.review.continuous_scroll = row;
-            self.review.selected_row = row;
+            self.set_position_to_file(file_idx, store);
             return;
         }
         let max_offset = self.max_continuous_scroll_offset(store);
@@ -332,6 +331,82 @@ impl DiffPanel {
             .map(|(file_idx, _)| file_idx)
     }
 
+    pub fn select_next_line(&mut self, store: &DiffStore) {
+        if let Some(row) = Self::next_selectable_row(store, self.review.selected_row) {
+            self.review.selected_row = row;
+            self.ensure_selection_visible(store);
+        }
+    }
+
+    pub fn select_previous_line(&mut self, store: &DiffStore) {
+        if let Some(row) = Self::previous_selectable_row(store, self.review.selected_row) {
+            self.review.selected_row = row;
+            self.ensure_selection_visible(store);
+        }
+    }
+
+    fn ensure_selection_visible(&mut self, store: &DiffStore) {
+        // Reserve one row for the pinned file header.
+        let visible_height = self.state.viewport_height.saturating_sub(1).max(1);
+        let margin = VERTICAL_SCROLL_MARGIN.min(visible_height.saturating_sub(1) / 2);
+        let selected = self.review.selected_row;
+        let top = self.review.continuous_scroll;
+        let bottom = top.saturating_add(visible_height - 1);
+        let upper_edge = top.saturating_add(margin);
+        let lower_edge = bottom.saturating_sub(margin);
+
+        if selected < upper_edge {
+            self.review.continuous_scroll = selected.saturating_sub(margin);
+        } else if selected > lower_edge {
+            self.review.continuous_scroll = selected.saturating_sub(visible_height - 1 - margin);
+        }
+
+        let max_scroll = store
+            .continuous_diff
+            .index
+            .total_rows
+            .saturating_sub(visible_height);
+
+        self.review.continuous_scroll = self.review.continuous_scroll.min(max_scroll);
+    }
+
+    fn keep_selection_in_view(&mut self, store: &DiffStore) {
+        let visible_height = self.state.viewport_height.saturating_sub(1).max(1);
+        let top = self.review.continuous_scroll;
+        let bottom = top.saturating_add(visible_height - 1);
+
+        if self.review.selected_row < top {
+            if let Some(row) = (top..=bottom).find(|&row| Self::is_selectable_row(store, row)) {
+                self.review.selected_row = row;
+            }
+        } else if self.review.selected_row > bottom
+            && let Some(row) = (top..=bottom)
+                .rev()
+                .find(|&row| Self::is_selectable_row(store, row))
+        {
+            self.review.selected_row = row;
+        }
+    }
+
+    fn is_selectable_row(store: &DiffStore, row: usize) -> bool {
+        matches!(
+            store.continuous_diff.lookup_row(row),
+            Some(RenderedRow::DiffRow { .. })
+        )
+    }
+
+    fn next_selectable_row(store: &DiffStore, current: usize) -> Option<usize> {
+        let start = current.saturating_add(1);
+        (start..store.continuous_diff.index.total_rows)
+            .find(|&row| Self::is_selectable_row(store, row))
+    }
+
+    fn previous_selectable_row(store: &DiffStore, current: usize) -> Option<usize> {
+        (0..current)
+            .rev()
+            .find(|&row| Self::is_selectable_row(store, row))
+    }
+
     #[cfg(test)]
     pub fn continuous_scroll(&self) -> usize {
         self.review.continuous_scroll
@@ -343,25 +418,27 @@ impl DiffPanel {
         self.review.selected_row = scroll;
     }
 
-    fn sync_files_to_scroll(&mut self, files: &mut FilesPanel, store: &DiffStore) {
+    fn sync_files_to_selection(&mut self, files: &mut FilesPanel, store: &DiffStore) {
         files.match_selected_file(store, self.review.selected_row);
     }
 
     fn next_continuous_hunk(&mut self, store: &DiffStore) {
-        let current = self.review.selected_row;
+        let current = self
+            .selected_hunk_header_row(store)
+            .unwrap_or(self.review.selected_row);
         let rows = self.continuous_hunk_rows(store);
         if let Some(&row) = rows.iter().find(|&&r| r > current) {
-            self.review.continuous_scroll = row;
-            self.review.selected_row = row;
+            self.select_hunk_at_row(row, store);
         }
     }
 
     fn prev_continuous_hunk(&mut self, store: &DiffStore) {
-        let current = self.review.selected_row;
+        let current = self
+            .selected_hunk_header_row(store)
+            .unwrap_or(self.review.selected_row);
         let rows = self.continuous_hunk_rows(store);
         if let Some(&row) = rows.iter().rfind(|&&r| r < current) {
-            self.review.continuous_scroll = row;
-            self.review.selected_row = row;
+            self.select_hunk_at_row(row, store);
         }
     }
 
@@ -393,6 +470,51 @@ impl DiffPanel {
                 }
             })
             .collect()
+    }
+
+    fn selected_hunk_header_row(&self, store: &DiffStore) -> Option<usize> {
+        let (file_idx, hunk_idx) =
+            match store.continuous_diff.lookup_row(self.review.selected_row)? {
+                RenderedRow::HunkHeader { file_idx, hunk_idx }
+                | RenderedRow::DiffRow {
+                    file_idx, hunk_idx, ..
+                } => (file_idx, hunk_idx),
+                _ => return None,
+            };
+        let file_start = *store.continuous_diff.index.file_starts.get(file_idx)?;
+        let DiffLoadState::Loaded { index, .. } = &store.continuous_diff.files[file_idx].load
+        else {
+            return None;
+        };
+        let hunk_start = *index
+            .hunk_starts_for(store.continuous_diff.layout)
+            .get(hunk_idx)?;
+        Some(file_start + 1 + hunk_start)
+    }
+
+    fn select_hunk_at_row(&mut self, hunk_header: usize, store: &DiffStore) {
+        self.review.continuous_scroll = hunk_header;
+        self.review.selected_row = hunk_header
+            .checked_add(1)
+            .filter(|&row| Self::is_selectable_row(store, row))
+            .unwrap_or(hunk_header);
+    }
+
+    fn set_position_to_file(&mut self, file_idx: usize, store: &DiffStore) {
+        let file_start = store.continuous_diff.index.file_starts[file_idx];
+        let file_end = store
+            .continuous_diff
+            .index
+            .file_starts
+            .get(file_idx + 1)
+            .copied()
+            .unwrap_or(store.continuous_diff.index.total_rows);
+        let selected_row = (file_start..file_end)
+            .find(|&row| Self::is_selectable_row(store, row))
+            .unwrap_or(file_start);
+
+        self.review.continuous_scroll = file_start;
+        self.review.selected_row = selected_row;
     }
 
     fn max_continuous_scroll_offset(&self, store: &DiffStore) -> usize {
@@ -498,4 +620,117 @@ fn display_width(content: &str) -> usize {
             }
         })
         .sum()
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::git::repository::{
+        DiffHunk, DiffLine, DiffSection, DiffSectionKind, FileChange, FileStatus,
+    };
+
+    use super::*;
+
+    fn store_with_hunks(line_counts: &[usize]) -> DiffStore {
+        let total_lines = line_counts.iter().sum();
+        let entry = FileEntry {
+            path: "src/main.rs".to_string(),
+            previous_path: None,
+            status: FileStatus::Unstaged,
+            change: Some(FileChange::Modified),
+            type_change: None,
+            insertions: total_lines,
+            deletions: 0,
+        };
+        let mut next_line = 1;
+        let hunks: Vec<DiffHunk> = line_counts
+            .iter()
+            .map(|&line_count| {
+                let lines = (0..line_count)
+                    .map(|_| {
+                        let line = DiffLine {
+                            old_lineno: None,
+                            new_lineno: Some(next_line),
+                            origin: '+',
+                            content: format!("line {next_line}\n"),
+                        };
+                        next_line += 1;
+                        line
+                    })
+                    .collect();
+                DiffHunk::new("@@ hunk @@\n".to_string(), lines)
+            })
+            .collect();
+        let sections = vec![DiffSection {
+            kind: DiffSectionKind::Unstaged,
+            hunks: hunks.clone(),
+        }];
+        let index = LineIndex::new(&sections);
+        let mut store = DiffStore::new(vec![entry], Vec::new(), false);
+        store.continuous_diff.files[0].load = DiffLoadState::Loaded { hunks, index };
+        store.continuous_diff.rebuild_index();
+        store
+    }
+
+    fn store_with_lines(line_count: usize) -> DiffStore {
+        store_with_hunks(&[line_count])
+    }
+
+    #[test]
+    fn line_navigation_skips_headers_and_scrolls_near_the_viewport_edge() {
+        let store = store_with_lines(6);
+        let mut panel = DiffPanel::new();
+        panel.set_viewport_height(8);
+        panel.sync_continuous_scroll_to_file(Some(0), &store);
+
+        assert!(matches!(
+            store
+                .continuous_diff
+                .lookup_row(panel.review().selected_row),
+            Some(RenderedRow::DiffRow { row_idx: 0, .. })
+        ));
+        assert_eq!(panel.review().continuous_scroll, 0);
+
+        let first_row = panel.review().selected_row;
+        panel.select_next_line(&store);
+        assert_eq!(panel.review().selected_row, first_row + 1);
+        assert_eq!(panel.review().continuous_scroll, 0);
+
+        panel.select_next_line(&store);
+        assert_eq!(panel.review().selected_row, first_row + 2);
+        assert_eq!(panel.review().continuous_scroll, 0);
+
+        panel.select_next_line(&store);
+        assert_eq!(panel.review().selected_row, first_row + 3);
+        assert_eq!(panel.review().continuous_scroll, 1);
+
+        panel.select_previous_line(&store);
+        assert_eq!(panel.review().selected_row, first_row + 2);
+    }
+
+    #[test]
+    fn hunk_navigation_anchors_the_hunk_header_at_the_viewport_top() {
+        let store = store_with_hunks(&[2, 2]);
+        let mut panel = DiffPanel::new();
+        panel.set_viewport_height(8);
+        panel.sync_continuous_scroll_to_file(Some(0), &store);
+
+        panel.select_next_hunk(&store);
+
+        assert!(matches!(
+            store
+                .continuous_diff
+                .lookup_row(panel.review().continuous_scroll),
+            Some(RenderedRow::HunkHeader { hunk_idx: 1, .. })
+        ));
+        assert!(matches!(
+            store
+                .continuous_diff
+                .lookup_row(panel.review().selected_row),
+            Some(RenderedRow::DiffRow {
+                hunk_idx: 1,
+                row_idx: 0,
+                ..
+            })
+        ));
+    }
 }

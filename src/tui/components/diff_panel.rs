@@ -117,7 +117,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App, is_focused: bool, has_side
     let panel_width = (area.width as usize).saturating_sub(border_width);
     let position = hunk_position(app);
 
-    let scroll = app.review_state().continuous_scroll;
+    let scroll_offset = app.review_state().continuous_scroll;
     let selected_row = app.review_state().selected_row;
     let continuous_diff = app.continuous_diff();
     let selected_hunk = match continuous_diff.lookup_row(selected_row) {
@@ -128,9 +128,10 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App, is_focused: bool, has_side
         _ => None,
     };
     let lines = render_continuous_diff(
-        scroll,
+        scroll_offset,
         viewport_height,
         continuous_diff,
+        selected_row,
         selected_hunk,
         app.diff_state().show_line_numbers,
         app.diff_state().horizontal_scroll,
@@ -156,6 +157,7 @@ fn render_continuous_diff(
     scroll_offset: usize,
     viewport_height: usize,
     continuous_diff: &ContinuousDiff,
+    selected_row: usize,
     selected_hunk: Option<(usize, usize)>,
     show_line_numbers: bool,
     horizontal_scroll: usize,
@@ -237,12 +239,13 @@ fn render_continuous_diff(
                     hunk_idx,
                     row_idx,
                 }) => {
+                    let is_selected_row = is_focused && global_row == selected_row;
                     let state = &continuous_diff.files[file_idx].load;
                     match state {
                         DiffLoadState::Loaded { hunks, .. } => {
                             let hunk = &hunks[hunk_idx];
                             let path = &continuous_diff.files[file_idx].entry.path;
-                            let is_selected = selected_hunk == Some((file_idx, hunk_idx));
+                            let is_selected_hunk = selected_hunk == Some((file_idx, hunk_idx));
                             let diff = match continuous_diff.layout {
                                 DiffLayout::Unified => {
                                     let line = &hunk.lines[row_idx];
@@ -252,7 +255,8 @@ fn render_continuous_diff(
                                         line,
                                         path,
                                         &ranges,
-                                        is_selected,
+                                        is_selected_hunk,
+                                        is_selected_row,
                                         show_line_numbers,
                                         horizontal_scroll,
                                         theme,
@@ -263,7 +267,8 @@ fn render_continuous_diff(
                                     hunk,
                                     row_idx,
                                     path,
-                                    is_selected,
+                                    is_selected_hunk,
+                                    is_selected_row,
                                     show_line_numbers,
                                     horizontal_scroll,
                                     theme,
@@ -647,7 +652,8 @@ fn diff_line(
     line: &DiffLine,
     path: &str,
     inline_ranges: &[Range],
-    is_selected: bool,
+    is_selected_hunk: bool,
+    is_selected_row: bool,
     show_line_numbers: bool,
     horizontal_scroll: usize,
     theme: Theme,
@@ -656,6 +662,11 @@ fn diff_line(
         '+' => theme.diff_add(),
         '-' => theme.diff_del(),
         _ => theme.muted().bg(theme.bg),
+    };
+    let row_style = if is_selected_row {
+        base.bg(theme.select_hi)
+    } else {
+        base
     };
     let content = display_content(&line.content);
     let prefix = if show_line_numbers {
@@ -668,11 +679,22 @@ fn diff_line(
 
     let highlighted = syntax::highlight_line(path, &content, base, theme.syntax_theme)
         .unwrap_or_else(|| vec![Span::styled(content, base)]);
-    let content_spans = style_content_spans(highlighted, inline_ranges, line.origin, false, theme);
-    let mut spans = vec![Span::styled(prefix, base)];
+    let content_spans = style_content_spans(
+        highlighted,
+        inline_ranges,
+        line.origin,
+        is_selected_row,
+        theme,
+    );
+    let mut spans = vec![Span::styled(prefix, row_style)];
     spans.extend(skip_spans(content_spans, horizontal_scroll));
 
-    bordered_line(width, spans, base, border_style(line, is_selected, theme))
+    bordered_line(
+        width,
+        spans,
+        row_style,
+        border_style(line, is_selected_hunk, theme),
+    )
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -681,7 +703,8 @@ fn side_by_side_diff_line(
     hunk: &DiffHunk,
     row_idx: usize,
     path: &str,
-    is_selected: bool,
+    is_selected_hunk: bool,
+    is_selected_row: bool,
     show_line_numbers: bool,
     horizontal_scroll: usize,
     theme: Theme,
@@ -693,13 +716,14 @@ fn side_by_side_diff_line(
 
     let left_width = width / 2;
     let right_width = width.saturating_sub(left_width);
+    let selected_bg = is_selected_row.then_some(theme.select_hi);
     let mut spans = vec![change_gutter(
         old_line,
         '-',
-        is_selected,
+        is_selected_hunk,
         theme.del_gutter,
         " ",
-        Style::default().bg(theme.bg),
+        Style::default().bg(selected_bg.unwrap_or(theme.bg)),
     )];
     spans.extend(comparison_side_spans(
         old_line,
@@ -709,15 +733,18 @@ fn side_by_side_diff_line(
         show_line_numbers,
         horizontal_scroll,
         left_width.saturating_sub(1),
+        is_selected_row,
         theme,
     ));
     spans.push(change_gutter(
         new_line,
         '+',
-        is_selected,
+        is_selected_hunk,
         theme.add_gutter,
         "│",
-        Style::default().fg(theme.hunk_header_bg),
+        Style::default()
+            .fg(theme.hunk_header_bg)
+            .bg(selected_bg.unwrap_or(theme.bg)),
     ));
     spans.extend(comparison_side_spans(
         new_line,
@@ -727,10 +754,16 @@ fn side_by_side_diff_line(
         show_line_numbers,
         horizontal_scroll,
         right_width.saturating_sub(1),
+        is_selected_row,
         theme,
     ));
 
-    Line::from(spans)
+    let line = Line::from(spans);
+    if let Some(bg) = selected_bg {
+        line.style(Style::default().bg(bg))
+    } else {
+        line
+    }
 }
 
 fn change_gutter(
@@ -742,7 +775,7 @@ fn change_gutter(
     fallback_style: Style,
 ) -> Span<'static> {
     if is_selected && line.is_some_and(|line| line.origin == origin) {
-        Span::styled("▌", Style::default().fg(color))
+        Span::styled("▌", fallback_style.fg(color))
     } else {
         Span::styled(fallback, fallback_style)
     }
@@ -757,15 +790,21 @@ fn comparison_side_spans(
     show_line_numbers: bool,
     horizontal_scroll: usize,
     width: usize,
+    is_selected_row: bool,
     theme: Theme,
 ) -> Vec<Span<'static>> {
     let Some(line) = line else {
-        return alignment_gap_spans(width, theme);
+        return alignment_gap_spans(width, is_selected_row, theme);
     };
-    let style = match line.origin {
+    let base = match line.origin {
         '+' => theme.diff_add(),
         '-' => theme.diff_del(),
         _ => theme.muted().bg(theme.bg),
+    };
+    let row_style = if is_selected_row {
+        base.bg(theme.select_hi)
+    } else {
+        base
     };
     let number = if old_side {
         line.old_lineno
@@ -778,18 +817,29 @@ fn comparison_side_spans(
         format!("{} ", line.origin)
     };
     let content = display_content(&line.content);
-    let highlighted = syntax::highlight_line(path, &content, style, theme.syntax_theme)
-        .unwrap_or_else(|| vec![Span::styled(content, style)]);
-    let content_spans = style_content_spans(highlighted, inline_ranges, line.origin, false, theme);
-    let mut spans = vec![Span::styled(prefix, style)];
+    let highlighted = syntax::highlight_line(path, &content, base, theme.syntax_theme)
+        .unwrap_or_else(|| vec![Span::styled(content, base)]);
+    let content_spans = style_content_spans(
+        highlighted,
+        inline_ranges,
+        line.origin,
+        is_selected_row,
+        theme,
+    );
+    let mut spans = vec![Span::styled(prefix, row_style)];
     spans.extend(skip_spans(content_spans, horizontal_scroll));
-    fit_spans(spans, width, style)
+    fit_spans(spans, width, row_style)
 }
 
-fn alignment_gap_spans(width: usize, theme: Theme) -> Vec<Span<'static>> {
+fn alignment_gap_spans(width: usize, is_selected_row: bool, theme: Theme) -> Vec<Span<'static>> {
+    let bg = if is_selected_row {
+        theme.select_hi
+    } else {
+        theme.bg
+    };
     vec![Span::styled(
         "╱".repeat(width),
-        Style::default().fg(theme.line).bg(theme.bg),
+        Style::default().fg(theme.line).bg(bg),
     )]
 }
 
@@ -931,13 +981,14 @@ fn style_content_spans(
         for (local_idx, ch) in span.content.chars().enumerate() {
             let changed = in_ranges(offset + local_idx, ranges);
             if segment_started && changed != segment_changed {
-                let style = if segment_changed {
+                let mut style = if segment_changed {
                     span.style.patch(inline_overlay)
-                } else if is_selected {
-                    span.style.patch(selected_overlay)
                 } else {
                     span.style
                 };
+                if is_selected {
+                    style = style.patch(selected_overlay);
+                }
                 highlighted.push(Span::styled(std::mem::take(&mut segment), style));
             }
 
@@ -947,13 +998,14 @@ fn style_content_spans(
         }
 
         if !segment.is_empty() {
-            let style = if segment_changed {
+            let mut style = if segment_changed {
                 span.style.patch(inline_overlay)
-            } else if is_selected {
-                span.style.patch(selected_overlay)
             } else {
                 span.style
             };
+            if is_selected {
+                style = style.patch(selected_overlay);
+            }
             highlighted.push(Span::styled(segment, style));
         }
 
@@ -999,7 +1051,7 @@ fn bordered_line(
     let padding = content_width.saturating_sub(used_width);
     let border = border_style.map_or_else(
         || Span::styled(" ", style),
-        |border| Span::styled("▌", border),
+        |border| Span::styled("▌", style.patch(border)),
     );
 
     let mut line_spans = Vec::with_capacity(spans.len() + 2);
@@ -1091,4 +1143,66 @@ fn draw_empty_diff(frame: &mut Frame, area: Rect, theme: Theme) {
     .split(vertical[1]);
 
     frame.render_widget(widget, horizontal[1]);
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::tui::theme::MARTEN;
+
+    use super::*;
+
+    fn added_line(content: &str) -> DiffLine {
+        DiffLine {
+            old_lineno: None,
+            new_lineno: Some(1),
+            origin: '+',
+            content: content.to_string(),
+        }
+    }
+
+    #[test]
+    fn selected_unified_row_fills_with_selection_background() {
+        let line = added_line("let answer = 42;\n");
+        let rendered = diff_line(40, &line, "test.rs", &[], true, true, true, 0, MARTEN);
+
+        assert_eq!(rendered.style.bg, Some(MARTEN.select_hi));
+        assert!(
+            rendered
+                .spans
+                .iter()
+                .all(|span| span.style.bg == Some(MARTEN.select_hi))
+        );
+    }
+
+    #[test]
+    fn row_selection_background_takes_priority_over_inline_changes() {
+        let spans = style_content_spans(
+            vec![Span::styled("ab", MARTEN.diff_add())],
+            &[(0, 1)],
+            '+',
+            true,
+            MARTEN,
+        );
+
+        assert_eq!(spans[0].content, "a");
+        assert_eq!(spans[0].style.bg, Some(MARTEN.select_hi));
+        assert!(spans[0].style.add_modifier.contains(Modifier::BOLD));
+        assert_eq!(spans[1].content, "b");
+        assert_eq!(spans[1].style.bg, Some(MARTEN.select_hi));
+    }
+
+    #[test]
+    fn selected_side_by_side_row_uses_selection_background() {
+        let hunk = DiffHunk::new("@@ -0,0 +1 @@\n".to_string(), vec![added_line("answer\n")]);
+        let rendered = side_by_side_diff_line(40, &hunk, 0, "test.rs", true, true, true, 0, MARTEN);
+
+        assert_eq!(rendered.style.bg, Some(MARTEN.select_hi));
+        assert!(
+            rendered
+                .spans
+                .iter()
+                .filter(|span| !span.content.is_empty())
+                .all(|span| span.style.bg.is_none() || span.style.bg == Some(MARTEN.select_hi))
+        );
+    }
 }
