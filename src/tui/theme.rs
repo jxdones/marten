@@ -17,6 +17,7 @@ pub struct Theme {
 
     pub file_header_bg: Color,
     pub hunk_header_bg: Color,
+    pub active_file_fg: Color,
 
     pub add_bg: Color,
     pub add_inline_bg: Color,
@@ -165,6 +166,7 @@ pub const MARTEN: Theme = Theme {
 
     file_header_bg: Color::Rgb(29, 23, 18),
     hunk_header_bg: Color::Rgb(36, 29, 23),
+    active_file_fg: Color::Rgb(212, 163, 104),
 
     add_bg: Color::Rgb(43, 46, 28),
     add_inline_bg: Color::Rgb(68, 82, 38),
@@ -210,6 +212,7 @@ pub const ERMINE: Theme = Theme {
 
     file_header_bg: Color::Rgb(238, 230, 214),
     hunk_header_bg: Color::Rgb(231, 220, 199),
+    active_file_fg: Color::Rgb(158, 101, 26),
 
     add_bg: Color::Rgb(233, 238, 211),
     add_inline_bg: Color::Rgb(200, 218, 152),
@@ -254,6 +257,7 @@ pub const CATPPUCCIN: Theme = Theme {
 
     file_header_bg: Color::Rgb(24, 24, 37),
     hunk_header_bg: Color::Rgb(49, 50, 68),
+    active_file_fg: Color::Rgb(137, 180, 250),
 
     add_bg: Color::Rgb(36, 49, 43),
     add_inline_bg: Color::Rgb(50, 78, 59),
@@ -298,6 +302,7 @@ pub const DRACULA: Theme = Theme {
 
     file_header_bg: Color::Rgb(33, 34, 44),
     hunk_header_bg: Color::Rgb(68, 71, 90),
+    active_file_fg: Color::Rgb(255, 128, 191),
 
     add_bg: Color::Rgb(26, 58, 26),
     add_inline_bg: Color::Rgb(35, 85, 42),
@@ -342,6 +347,7 @@ pub const EVERFOREST: Theme = Theme {
 
     file_header_bg: Color::Rgb(51, 60, 67),
     hunk_header_bg: Color::Rgb(52, 63, 68),
+    active_file_fg: Color::Rgb(167, 192, 128),
 
     add_bg: Color::Rgb(32, 48, 59),
     add_inline_bg: Color::Rgb(42, 75, 69),
@@ -386,6 +392,7 @@ pub const GRUVBOX: Theme = Theme {
 
     file_header_bg: Color::Rgb(60, 56, 54),
     hunk_header_bg: Color::Rgb(80, 73, 69),
+    active_file_fg: Color::Rgb(131, 165, 152),
 
     add_bg: Color::Rgb(50, 48, 47),
     add_inline_bg: Color::Rgb(68, 72, 38),
@@ -430,6 +437,7 @@ pub const TOKYO_NIGHT: Theme = Theme {
 
     file_header_bg: Color::Rgb(30, 32, 48),
     hunk_header_bg: Color::Rgb(34, 36, 54),
+    active_file_fg: Color::Rgb(130, 170, 255),
 
     add_bg: Color::Rgb(32, 48, 59),
     add_inline_bg: Color::Rgb(42, 75, 69),
@@ -474,6 +482,7 @@ pub const GITHUB: Theme = Theme {
 
     file_header_bg: Color::Rgb(1, 4, 9),
     hunk_header_bg: Color::Rgb(22, 27, 34),
+    active_file_fg: Color::Rgb(88, 166, 255),
 
     add_bg: Color::Rgb(3, 58, 22),
     add_inline_bg: Color::Rgb(5, 90, 35),
@@ -518,6 +527,7 @@ pub const FLEXOKI_LIGHT: Theme = Theme {
 
     file_header_bg: Color::Rgb(242, 240, 229),
     hunk_header_bg: Color::Rgb(230, 228, 217),
+    active_file_fg: Color::Rgb(32, 94, 166),
 
     add_bg: Color::Rgb(237, 238, 207),
     add_inline_bg: Color::Rgb(221, 226, 178),
@@ -562,6 +572,7 @@ pub const GITHUB_LIGHT: Theme = Theme {
 
     file_header_bg: Color::Rgb(246, 248, 250),
     hunk_header_bg: Color::Rgb(240, 243, 246),
+    active_file_fg: Color::Rgb(9, 105, 218),
 
     add_bg: Color::Rgb(218, 251, 225),
     add_inline_bg: Color::Rgb(172, 238, 187),
@@ -606,6 +617,7 @@ pub const CATPPUCCIN_LATTE: Theme = Theme {
 
     file_header_bg: Color::Rgb(230, 233, 239),
     hunk_header_bg: Color::Rgb(220, 224, 232),
+    active_file_fg: Color::Rgb(30, 102, 245),
 
     add_bg: Color::Rgb(214, 240, 217),
     add_inline_bg: Color::Rgb(201, 227, 203),
@@ -650,6 +662,7 @@ pub const EVERFOREST_LIGHT_SOFT: Theme = Theme {
 
     file_header_bg: Color::Rgb(234, 228, 202),
     hunk_header_bg: Color::Rgb(229, 223, 197),
+    active_file_fg: Color::Rgb(141, 161, 1),
 
     add_bg: Color::Rgb(229, 230, 197),
     add_inline_bg: Color::Rgb(211, 217, 169),
@@ -696,6 +709,10 @@ impl Theme {
 
     pub fn accent(self) -> Style {
         Style::default().fg(self.accent)
+    }
+
+    pub fn active_file(self) -> Style {
+        Style::default().fg(self.active_file_fg)
     }
 
     pub fn success(self) -> Style {

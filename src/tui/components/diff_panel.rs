@@ -333,7 +333,7 @@ fn render_file_header(
         .sum();
 
     let mut path_style = if is_selected {
-        theme.accent().patch(bg)
+        theme.active_file().patch(bg)
     } else {
         theme.muted().patch(bg)
     };
@@ -540,7 +540,7 @@ fn render_non_expandable_header(
     let tag = format!(" {label}");
 
     let mut path_style = if is_selected {
-        theme.accent().patch(bg)
+        theme.active_file().patch(bg)
     } else {
         theme.muted().patch(bg)
     };
@@ -609,7 +609,7 @@ fn hunk_header_line(
 ) -> Line<'static> {
     let style = if is_selected {
         Style::default()
-            .fg(theme.accent)
+            .fg(theme.active_file_fg)
             .bg(theme.hunk_header_bg)
             .add_modifier(Modifier::BOLD)
     } else {
