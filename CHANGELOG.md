@@ -12,6 +12,7 @@ All notable changes to Marten will be documented in this file.
 ### Fixed
 
 - Toggle the sidebar on terminals narrower than 120 columns. It now shows down to 80 columns.
+- Soften the deleted-line and deleted-word background colors in the GitHub dark theme.
 
 ## [0.1.8] - 2026-08-08
 

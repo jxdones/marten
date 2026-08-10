@@ -479,8 +479,8 @@ pub const GITHUB: Theme = Theme {
     add_inline_bg: Color::Rgb(5, 90, 35),
     add_fg: Color::Rgb(63, 185, 80),
     add_gutter: Color::Rgb(63, 185, 80),
-    del_bg: Color::Rgb(103, 6, 12),
-    del_inline_bg: Color::Rgb(142, 17, 26),
+    del_bg: Color::Rgb(58, 15, 14),
+    del_inline_bg: Color::Rgb(108, 22, 20),
     del_fg: Color::Rgb(248, 81, 73),
     del_gutter: Color::Rgb(248, 81, 73),
 
