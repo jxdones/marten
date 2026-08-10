@@ -4,10 +4,13 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.9] - 2026-08-10
+
 ### Changed
 
 - Navigate diff lines with a visible selection cursor.
 - Improve sidebar size for narrower and wider terminals.
+- Give the selected file name its own accent color per theme, starting with a distinct pink for Dracula, instead of reusing the general accent color.
 - Dim the "hunk" and "line" labels in the file header to match the counter color.
 
 ### Fixed

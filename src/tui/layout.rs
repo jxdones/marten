@@ -57,7 +57,6 @@ fn sidebar_percentage(sidebar_width: u16) -> u16 {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -74,7 +73,7 @@ mod tests {
     fn sidebar_shown_above_min_width_when_requested() {
         let area = Rect::new(0, 0, MIN_TERMINAL_WIDTH + 1, 24);
         let result = home(area, true);
-        assert_eq!(result.left_sidebar.width, 12);
+        assert_eq!(result.left_sidebar.width, 20);
     }
 
     #[test]
