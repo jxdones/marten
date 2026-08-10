@@ -8,6 +8,7 @@ All notable changes to Marten will be documented in this file.
 
 - Navigate diff lines with a visible selection cursor.
 - Improve sidebar size for narrower and wider terminals.
+- Dim the "hunk" and "line" labels in the file header to match the counter color.
 
 ### Fixed
 

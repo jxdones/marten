@@ -499,7 +499,7 @@ fn counter_spans(
 ) -> Vec<Span<'static>> {
     vec![
         Span::styled(" · ", muted_style),
-        Span::styled(label, label_style),
+        Span::styled(label, muted_style),
         Span::styled(current.to_string(), label_style),
         Span::styled("/", muted_style),
         Span::styled(total.to_string(), muted_style),
