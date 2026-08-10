@@ -7,6 +7,11 @@ All notable changes to Marten will be documented in this file.
 ### Changed
 
 - Navigate diff lines with a visible selection cursor.
+- Improve sidebar size for narrower and wider terminals.
+
+### Fixed
+
+- Toggle the sidebar on terminals narrower than 120 columns. It now shows down to 80 columns.
 
 ## [0.1.8] - 2026-08-08
 
