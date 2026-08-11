@@ -8,6 +8,14 @@ use git2::{
 
 const DEFAULT_HEAD: &str = "HEAD";
 const SHORT_COMMIT_LEN: usize = 7;
+const COMMIT_HISTORY_LIMIT: usize = 1_000;
+
+#[derive(Debug, Clone)]
+pub struct CommitInfo {
+    pub oid: Oid,
+    pub subject: String,
+    pub committed_at: i64,
+}
 
 #[derive(Debug, Clone)]
 pub struct RepositoryStatus {
@@ -287,6 +295,31 @@ pub fn status(repo: &Repository) -> AppResult<RepositoryStatus> {
         behind,
         changes,
     })
+}
+
+pub fn commits(repo: &Repository) -> AppResult<Vec<CommitInfo>> {
+    let mut revwalk = repo.revwalk()?;
+    if let Err(error) = revwalk.push_head() {
+        if is_unknown_head_error(&error) {
+            return Ok(Vec::new());
+        }
+        return Err(error.into());
+    }
+    revwalk.set_sorting(git2::Sort::TOPOLOGICAL | git2::Sort::TIME)?;
+
+    revwalk
+        .take(COMMIT_HISTORY_LIMIT)
+        .map(|oid| {
+            let oid = oid?;
+            let commit = repo.find_commit(oid)?;
+
+            Ok(CommitInfo {
+                oid,
+                subject: commit.summary()?.unwrap_or_default().to_string(),
+                committed_at: commit.time().seconds(),
+            })
+        })
+        .collect()
 }
 
 pub fn files(repo: &Repository, ignore_whitespace: bool) -> AppResult<Vec<FileEntry>> {
