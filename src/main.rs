@@ -6,6 +6,7 @@ mod action;
 mod app;
 mod cli;
 mod command_palette;
+mod commits_finder;
 mod config;
 mod diff_panel;
 mod editor;

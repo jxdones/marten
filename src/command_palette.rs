@@ -58,6 +58,12 @@ pub fn command_groups() -> &'static [CommandGroup] {
                     action: Action::ToggleFileFinder,
                 },
                 CommandItem {
+                    label: "commit history",
+                    description: "browse commits and open a historical diff",
+                    keybind: "H",
+                    action: Action::ToggleCommitsFinder,
+                },
+                CommandItem {
                     label: "next file",
                     description: "select the next changed file",
                     keybind: "n",

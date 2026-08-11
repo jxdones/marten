@@ -1,4 +1,5 @@
 pub mod command_palette;
+pub mod commits_finder;
 pub mod diff_panel;
 pub mod file_finder;
 pub mod files_panel;

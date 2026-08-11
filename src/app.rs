@@ -13,15 +13,16 @@ use crate::diff_panel::{DiffContext, DiffPanel};
 use crate::error::{AppError, AppResult};
 use crate::event::Event;
 use crate::files_panel::FilesPanel;
-use crate::git::repository::{self, DiffSource};
+use crate::git::repository::{self, CommitInfo, DiffSource, RevisionData};
 use crate::state::{
-    CommandPaletteState, ContinuousDiff, Diff, FileFinderState, FileSlot, Files, Focus, Overlay,
-    ReviewState, Screen, ThemeSelectorState, TreeRow,
+    CommandPaletteState, CommitsFinderFocus, CommitsFinderState, ContinuousDiff, Diff,
+    FileFinderState, FileSlot, Files, Focus, Overlay, ReviewState, Screen, ThemeSelectorState,
+    TreeRow,
 };
 use crate::store::DiffStore;
 use crate::tui::layout;
 use crate::tui::theme::{THEMES, Theme};
-use crate::{command_palette, file_finder, theme};
+use crate::{command_palette, commits_finder, file_finder, theme};
 
 const MOUSE_SCROLL_LINES: usize = 3;
 
@@ -39,6 +40,7 @@ pub struct App {
 
     store: DiffStore,
     repository_status: Option<repository::RepositoryStatus>,
+    commits: Vec<CommitInfo>,
     diff_source: DiffSource,
 
     overlay: Overlay,
@@ -78,6 +80,8 @@ impl App {
             repository::status(&repo)
                 .map_err(|error| error.with_operation("read repository status"))?,
         );
+        let commits = repository::commits(&repo)
+            .map_err(|error| error.with_operation("load commit history"))?;
         let operation = match diff_source {
             DiffSource::Worktree => "load working-tree changes",
             DiffSource::Revision(_) => "load revision changes",
@@ -125,6 +129,7 @@ impl App {
             should_quit: false,
             show_sidebar,
             repository_status,
+            commits,
             diff_source,
             overlay,
             pending_editor: None,
@@ -166,6 +171,10 @@ impl App {
 
     pub const fn repository_status(&self) -> Option<&repository::RepositoryStatus> {
         self.repository_status.as_ref()
+    }
+
+    pub fn commits(&self) -> &[CommitInfo] {
+        &self.commits
     }
 
     pub const fn diff_source(&self) -> &DiffSource {
@@ -258,6 +267,7 @@ impl App {
             store,
             repo,
             repository_status,
+            commits,
             diff_source,
             show_sidebar,
             should_quit,
@@ -288,6 +298,8 @@ impl App {
                     repository::status(repo)
                         .map_err(|error| error.with_operation("refresh repository status"))?,
                 );
+                *commits = repository::commits(repo)
+                    .map_err(|error| error.with_operation("refresh commit history"))?;
                 diff.reload(&mut DiffContext {
                     files,
                     store,
@@ -358,6 +370,55 @@ impl App {
                 };
                 return Ok(());
             }
+            Action::ToggleCommitsFinder => {
+                *overlay = match overlay {
+                    Overlay::None => Overlay::CommitsFinder(CommitsFinderState::default()),
+                    Overlay::CommitsFinder(_) => Overlay::None,
+                    _ => Overlay::None,
+                };
+                return Ok(());
+            }
+            Action::SelectCommitsFinderResult => {
+                let Some(commit) = commits_finder::selected_commit(overlay, commits).cloned()
+                else {
+                    return Ok(());
+                };
+                let new_source = DiffSource::Revision(RevisionData {
+                    oid: commit.oid,
+                    short_oid: commit.oid.to_string().chars().take(7).collect(),
+                    subject: commit.subject,
+                });
+                load_diff_source(
+                    repo,
+                    diff_source,
+                    store,
+                    files,
+                    diff,
+                    new_source,
+                    "load selected commit",
+                )?;
+                *overlay = Overlay::None;
+                *focus = Focus::Diff;
+                return Ok(());
+            }
+            Action::ResetToCurrentChanges => {
+                *repository_status = Some(
+                    repository::status(repo)
+                        .map_err(|error| error.with_operation("refresh repository status"))?,
+                );
+                load_diff_source(
+                    repo,
+                    diff_source,
+                    store,
+                    files,
+                    diff,
+                    DiffSource::Worktree,
+                    "load current changes",
+                )?;
+                *overlay = Overlay::None;
+                *focus = Focus::Diff;
+                return Ok(());
+            }
             Action::SelectFileFinderResult => {
                 let Some(file_idx) =
                     file_finder::selected_file_index(overlay, &store.continuous_diff.files)
@@ -393,6 +454,18 @@ impl App {
                 {
                     *active_theme = entry.theme;
                 }
+                return Ok(());
+            }
+            Action::CommitsFinderInput(_)
+            | Action::CommitsFinderBackspace
+            | Action::CommitsFinderClear
+            | Action::ToggleCommitsFinderFocus
+            | Action::FocusCommitsFinderList
+            | Action::MoveDown
+            | Action::MoveUp
+                if matches!(overlay, Overlay::CommitsFinder(_)) =>
+            {
+                commits_finder::update(overlay, action, commits);
                 return Ok(());
             }
             Action::OpenEditor => {
@@ -530,12 +603,43 @@ impl App {
             };
         }
 
+        if let Overlay::CommitsFinder(state) = self.overlay() {
+            let search_focused = state.focus == CommitsFinderFocus::Search;
+            return match key.code {
+                KeyCode::Esc => Action::ToggleCommitsFinder,
+                KeyCode::Char('H') => Action::FocusCommitsFinderList,
+                KeyCode::Char('/') => Action::ToggleCommitsFinderFocus,
+                KeyCode::Enter => Action::SelectCommitsFinderResult,
+                KeyCode::Char('r') if !search_focused => Action::ResetToCurrentChanges,
+                KeyCode::Down => Action::MoveDown,
+                KeyCode::Up => Action::MoveUp,
+                KeyCode::Char('j') if !search_focused => Action::MoveDown,
+                KeyCode::Char('k') if !search_focused => Action::MoveUp,
+                KeyCode::Backspace if search_focused => Action::CommitsFinderBackspace,
+                KeyCode::Char('u')
+                    if search_focused && key.modifiers.contains(KeyModifiers::CONTROL) =>
+                {
+                    Action::CommitsFinderClear
+                }
+                KeyCode::Char(character)
+                    if search_focused
+                        && !key
+                            .modifiers
+                            .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT) =>
+                {
+                    Action::CommitsFinderInput(character)
+                }
+                _ => Action::Noop,
+            };
+        }
+
         match key.code {
             KeyCode::Char('q') => Action::Quit,
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => Action::Quit,
             KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => {
                 Action::ToggleFileFinder
             }
+            KeyCode::Char('H') => Action::ToggleCommitsFinder,
             KeyCode::Tab => Action::NextFocus,
             KeyCode::BackTab => Action::PreviousFocus,
             KeyCode::Char('0') => Action::FocusPanel(Focus::Diff),
@@ -588,6 +692,31 @@ impl App {
             _ => Action::Noop,
         }
     }
+}
+
+fn load_diff_source(
+    repo: &Repository,
+    diff_source: &mut DiffSource,
+    store: &mut DiffStore,
+    files: &mut FilesPanel,
+    diff: &mut DiffPanel,
+    new_source: DiffSource,
+    operation: &'static str,
+) -> AppResult<()> {
+    let entries = repository::files_for_source(repo, &new_source, store.ignore_whitespace())
+        .map_err(|error| error.with_operation(operation))?;
+
+    *diff_source = new_source;
+    diff.load_source(
+        &mut DiffContext {
+            files,
+            store,
+            repo,
+            diff_source,
+        },
+        entries,
+    );
+    Ok(())
 }
 
 impl std::fmt::Debug for App {
