@@ -783,6 +783,19 @@ fn untracked_file_content(repo: &Repository, path: &str) -> AppResult<Option<Str
 fn head_status(repo: &Repository) -> AppResult<(Head, usize, usize)> {
     let head = match repo.head() {
         Ok(head) => head,
+        Err(error) if error.code() == git2::ErrorCode::UnbornBranch => {
+            let name = repo
+                .find_reference(DEFAULT_HEAD)?
+                .symbolic_target()?
+                .map(|target| {
+                    target
+                        .strip_prefix("refs/heads/")
+                        .unwrap_or(target)
+                        .to_string()
+                })
+                .unwrap_or_else(|| DEFAULT_HEAD.to_string());
+            return Ok((Head::Branch(name), 0, 0));
+        }
         Err(error) if is_unknown_head_error(&error) => {
             return Ok((Head::Unknown, 0, 0));
         }
@@ -1037,11 +1050,14 @@ mod tests {
     }
 
     #[test]
-    fn head_status_is_unknown_on_unborn_branch() {
+    fn head_status_is_current_branch_on_unborn_branch() {
         let (_dir, repo) = init_repo("unborn");
         let status = status(&repo).unwrap();
 
-        assert!(matches!(status.head, Head::Unknown));
+        match status.head {
+            Head::Branch(name) => assert_eq!(name, "main"),
+            other => panic!("expected Head::Branch, got {other:?}"),
+        }
         assert_eq!(status.ahead, 0);
         assert_eq!(status.behind, 0);
     }

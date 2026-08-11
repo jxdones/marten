@@ -4,6 +4,10 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Show the current branch name instead of "unknown" for repositories with no commits yet.
+
 ## [0.1.9] - 2026-08-10
 
 ### Changed
