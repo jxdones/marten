@@ -301,7 +301,7 @@ pub const DRACULA: Theme = Theme {
     select_hi: Color::Rgb(85, 88, 109),
 
     file_header_bg: Color::Rgb(33, 34, 44),
-    hunk_header_bg: Color::Rgb(68, 71, 90),
+    hunk_header_bg: Color::Rgb(51, 54, 69),
     active_file_fg: Color::Rgb(255, 128, 191),
 
     add_bg: Color::Rgb(26, 58, 26),
