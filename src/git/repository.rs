@@ -952,7 +952,9 @@ mod tests {
     fn init_repo(dir_name: &str) -> (TempDir, Repository) {
         let parent = TempDir::new().unwrap();
         let repo_path = parent.path().join(dir_name);
-        let repo = Repository::init(&repo_path).unwrap();
+        let mut opts = git2::RepositoryInitOptions::new();
+        opts.initial_head("main");
+        let repo = Repository::init_opts(&repo_path, &opts).unwrap();
         (parent, repo)
     }
 
