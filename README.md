@@ -21,6 +21,7 @@
 
 - Review staged, unstaged, and untracked changes in one place
 - Compare commits, branches, tags, and Git revision ranges
+- Browse and search commit history without leaving the app
 - Switch between unified and side-by-side diffs
 - Find changed files and navigate between hunks quickly
 - Open a hunk directly in your editor

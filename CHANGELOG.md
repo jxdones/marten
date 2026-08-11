@@ -4,6 +4,10 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Browse and search commit history with `H`, load a selected commit's diff, and return to current working-tree changes with `r`.
+
 ### Fixed
 
 - Show the current branch name instead of "unknown" for repositories with no commits yet.

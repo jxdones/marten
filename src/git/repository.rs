@@ -298,13 +298,15 @@ pub fn status(repo: &Repository) -> AppResult<RepositoryStatus> {
 }
 
 pub fn commits(repo: &Repository) -> AppResult<Vec<CommitInfo>> {
+    let head = match repo.head() {
+        Ok(head) => head,
+        Err(error) if is_unknown_head_error(&error) => return Ok(Vec::new()),
+        Err(error) => return Err(error.into()),
+    };
+    let head_oid = head.peel_to_commit()?.id();
+
     let mut revwalk = repo.revwalk()?;
-    if let Err(error) = revwalk.push_head() {
-        if is_unknown_head_error(&error) {
-            return Ok(Vec::new());
-        }
-        return Err(error.into());
-    }
+    revwalk.push(head_oid)?;
     revwalk.set_sorting(git2::Sort::TOPOLOGICAL | git2::Sort::TIME)?;
 
     revwalk
