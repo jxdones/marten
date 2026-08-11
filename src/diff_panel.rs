@@ -131,6 +131,28 @@ impl DiffPanel {
             repository::files_for_source(diff_ctx.repo, diff_ctx.diff_source, ignore_whitespace)
                 .map_err(|error| error.with_operation(operation))?;
 
+        self.replace_entries(diff_ctx, entries, selected_key);
+        Ok(())
+    }
+
+    pub fn load_source(&mut self, diff_ctx: &mut DiffContext, entries: Vec<FileEntry>) {
+        let selected_key = diff_ctx
+            .files
+            .selected_file(diff_ctx.store)
+            .map(|file| FileKey {
+                path: file.path.clone(),
+                status: file.status,
+            });
+
+        self.replace_entries(diff_ctx, entries, selected_key);
+    }
+
+    fn replace_entries(
+        &mut self,
+        diff_ctx: &mut DiffContext,
+        entries: Vec<FileEntry>,
+        selected_key: Option<FileKey>,
+    ) {
         diff_ctx.store.reload(entries);
         diff_ctx.files.mark_dirty();
         diff_ctx.files.ensure_rows(diff_ctx.store);
@@ -143,7 +165,6 @@ impl DiffPanel {
         diff_ctx.store.spawn_workers(diff_ctx.diff_source);
 
         self.refresh(diff_ctx);
-        Ok(())
     }
 
     pub const fn state(&self) -> &Diff {
