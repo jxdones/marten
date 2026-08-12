@@ -4,6 +4,8 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.10] - 2026-08-11
+
 ### Added
 
 - Browse and search commit history with `H`, load a selected commit's diff, and return to current working-tree changes with `r`.
