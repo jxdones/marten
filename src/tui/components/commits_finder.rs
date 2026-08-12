@@ -171,7 +171,7 @@ fn draw_commit_list(
         })
         .collect::<Vec<_>>();
 
-    let list = List::new(items).highlight_style(Style::default().bg(theme.select_hi));
+    let list = List::new(items).highlight_style(Style::default().bg(theme.select_hi).bold());
     let mut state = ListState::default().with_selected(Some(selected));
     frame.render_stateful_widget(list, area, &mut state);
 }
