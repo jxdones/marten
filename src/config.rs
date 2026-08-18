@@ -7,6 +7,7 @@ use crate::tui::theme::{self, Theme};
 const CONFIG_DIR: &str = ".config";
 const APP_DIR: &str = "marten";
 const CONFIG_FILE: &str = "config.toml";
+pub const DEFAULT_TAB_WIDTH: usize = 4;
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(default)]
@@ -29,10 +30,11 @@ pub struct Review {
     pub ignore: Vec<String>,
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(default)]
 pub struct Diff {
     pub ignore_whitespace: bool,
+    pub tab_width: usize,
 }
 
 #[derive(Debug)]
@@ -85,6 +87,15 @@ impl Default for UI {
     }
 }
 
+impl Default for Diff {
+    fn default() -> Self {
+        Self {
+            ignore_whitespace: false,
+            tab_width: DEFAULT_TAB_WIDTH,
+        }
+    }
+}
+
 pub fn load() -> Result<Config, ConfigError> {
     let Some(path) = config_path() else {
         return Ok(Config::default());
@@ -121,6 +132,13 @@ fn load_from(path: PathBuf) -> Result<Config, ConfigError> {
         path: path.clone(),
         source,
     })?;
+
+    if config.diff.tab_width == 0 {
+        return Err(ConfigError::Invalid {
+            path,
+            message: "`diff.tab_width` must be greater than zero".into(),
+        });
+    }
 
     if theme::entry_by_id(&config.ui.theme).is_none() {
         let expected = theme::THEMES
@@ -285,6 +303,18 @@ mod tests {
     fn set_diff_ignore_whitespace_to_true() {
         let config: Config = toml::from_str("[diff]\n ignore_whitespace = true").unwrap();
         assert!(config.diff.ignore_whitespace);
+    }
+
+    #[test]
+    fn diff_tab_width_defaults_to_four() {
+        let config = Config::default();
+        assert!(config.diff.tab_width == DEFAULT_TAB_WIDTH)
+    }
+
+    #[test]
+    fn set_tab_width_to_two() {
+        let config: Config = toml::from_str("[diff]\n tab_width = 2").unwrap();
+        assert!(config.diff.tab_width == 2);
     }
 
     #[test]

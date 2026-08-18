@@ -4,6 +4,10 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Configure how many spaces each tab occupies in diff content. It defaults to `4` and must be greater than zero.
+
 ### Fixed
 
 - Align related changed lines by content similarity when side-by-side change blocks contain unequal additions and deletions, keeping unrelated lines in gap rows and inline highlights focused on the actual edits.

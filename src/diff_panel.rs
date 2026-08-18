@@ -28,9 +28,9 @@ pub struct DiffContext<'a> {
 }
 
 impl DiffPanel {
-    pub fn new() -> Self {
+    pub fn new(tab_width: usize) -> Self {
         Self {
-            state: Diff::default(),
+            state: Diff::new(tab_width),
             review: ReviewState::default(),
         }
     }
@@ -565,7 +565,8 @@ impl DiffPanel {
                                 .state
                                 .viewport_width
                                 .saturating_sub(GUTTER_WIDTH + prefix_width);
-                            let overflow = display_width(&line.content).saturating_sub(available);
+                            let overflow = display_width(&line.content, self.state.tab_width)
+                                .saturating_sub(available);
                             max_scroll = max_scroll.max(overflow);
                         }
                     }
@@ -579,8 +580,8 @@ impl DiffPanel {
                                 );
                                 let available =
                                     left_width.saturating_sub(GUTTER_WIDTH + prefix_width);
-                                let overflow =
-                                    display_width(&line.content).saturating_sub(available);
+                                let overflow = display_width(&line.content, self.state.tab_width)
+                                    .saturating_sub(available);
                                 max_scroll = max_scroll.max(overflow);
                             }
                             if let Some(line_idx) = row.new_line_idx {
@@ -591,8 +592,8 @@ impl DiffPanel {
                                 );
                                 let available =
                                     right_width.saturating_sub(GUTTER_WIDTH + prefix_width);
-                                let overflow =
-                                    display_width(&line.content).saturating_sub(available);
+                                let overflow = display_width(&line.content, self.state.tab_width)
+                                    .saturating_sub(available);
                                 max_scroll = max_scroll.max(overflow);
                             }
                         }
@@ -629,13 +630,13 @@ fn line_number_width(line_number: Option<u32>) -> usize {
     line_number.map_or(4, |number| number.to_string().len().max(4))
 }
 
-fn display_width(content: &str) -> usize {
+fn display_width(content: &str, tab_width: usize) -> usize {
     content
         .trim_end()
         .chars()
         .map(|ch| {
             if ch == '\t' {
-                4
+                tab_width
             } else {
                 ch.width().unwrap_or(0)
             }
@@ -645,8 +646,11 @@ fn display_width(content: &str) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use crate::git::repository::{
-        DiffHunk, DiffLine, DiffSection, DiffSectionKind, FileChange, FileStatus,
+    use crate::{
+        config::DEFAULT_TAB_WIDTH,
+        git::repository::{
+            DiffHunk, DiffLine, DiffSection, DiffSectionKind, FileChange, FileStatus,
+        },
     };
 
     use super::*;
@@ -699,7 +703,7 @@ mod tests {
     #[test]
     fn line_navigation_skips_headers_and_scrolls_near_the_viewport_edge() {
         let store = store_with_lines(6);
-        let mut panel = DiffPanel::new();
+        let mut panel = DiffPanel::new(DEFAULT_TAB_WIDTH);
         panel.set_viewport_height(8);
         panel.sync_continuous_scroll_to_file(Some(0), &store);
 
@@ -731,7 +735,7 @@ mod tests {
     #[test]
     fn hunk_navigation_anchors_the_hunk_header_at_the_viewport_top() {
         let store = store_with_hunks(&[2, 2]);
-        let mut panel = DiffPanel::new();
+        let mut panel = DiffPanel::new(DEFAULT_TAB_WIDTH);
         panel.set_viewport_height(8);
         panel.sync_continuous_scroll_to_file(Some(0), &store);
 

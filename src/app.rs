@@ -99,7 +99,7 @@ impl App {
         files.ensure_rows(&store);
         files.select_first();
 
-        let mut diff = DiffPanel::new();
+        let mut diff = DiffPanel::new(config.diff.tab_width);
         diff.refresh(&mut DiffContext {
             files: &mut files,
             store: &mut store,

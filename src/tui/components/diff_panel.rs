@@ -135,6 +135,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App, is_focused: bool, has_side
         selected_hunk,
         app.diff_state().show_line_numbers,
         app.diff_state().horizontal_scroll,
+        app.diff_state().tab_width,
         theme,
         panel_width,
         position,
@@ -161,6 +162,7 @@ fn render_continuous_diff(
     selected_hunk: Option<(usize, usize)>,
     show_line_numbers: bool,
     horizontal_scroll: usize,
+    tab_width: usize,
     theme: Theme,
     panel_width: usize,
     position: HunkPosition,
@@ -249,7 +251,7 @@ fn render_continuous_diff(
                             let diff = match continuous_diff.layout {
                                 DiffLayout::Unified => {
                                     let line = &hunk.lines[row_idx];
-                                    let ranges = inline_ranges(hunk, row_idx);
+                                    let ranges = inline_ranges(hunk, row_idx, tab_width);
                                     diff_line(
                                         row_width,
                                         line,
@@ -259,6 +261,7 @@ fn render_continuous_diff(
                                         is_selected_row,
                                         show_line_numbers,
                                         horizontal_scroll,
+                                        tab_width,
                                         theme,
                                     )
                                 }
@@ -271,6 +274,7 @@ fn render_continuous_diff(
                                     is_selected_row,
                                     show_line_numbers,
                                     horizontal_scroll,
+                                    tab_width,
                                     theme,
                                 ),
                             };
@@ -656,6 +660,7 @@ fn diff_line(
     is_selected_row: bool,
     show_line_numbers: bool,
     horizontal_scroll: usize,
+    tab_width: usize,
     theme: Theme,
 ) -> Line<'static> {
     let base = match line.origin {
@@ -668,7 +673,7 @@ fn diff_line(
     } else {
         base
     };
-    let content = display_content(&line.content);
+    let content = display_content(&line.content, tab_width);
     let prefix = if show_line_numbers {
         let old_lineno = line_number(line.old_lineno);
         let new_lineno = line_number(line.new_lineno);
@@ -707,12 +712,13 @@ fn side_by_side_diff_line(
     is_selected_row: bool,
     show_line_numbers: bool,
     horizontal_scroll: usize,
+    tab_width: usize,
     theme: Theme,
 ) -> Line<'static> {
     let row = &hunk.comparison_rows[row_idx];
     let old_line = row.old_line_idx.map(|idx| &hunk.lines[idx]);
     let new_line = row.new_line_idx.map(|idx| &hunk.lines[idx]);
-    let (old_ranges, new_ranges) = comparison_inline_ranges(old_line, new_line);
+    let (old_ranges, new_ranges) = comparison_inline_ranges(old_line, new_line, tab_width);
 
     let left_width = width / 2;
     let right_width = width.saturating_sub(left_width);
@@ -732,6 +738,7 @@ fn side_by_side_diff_line(
         &old_ranges,
         show_line_numbers,
         horizontal_scroll,
+        tab_width,
         left_width.saturating_sub(1),
         is_selected_row,
         theme,
@@ -753,6 +760,7 @@ fn side_by_side_diff_line(
         &new_ranges,
         show_line_numbers,
         horizontal_scroll,
+        tab_width,
         right_width.saturating_sub(1),
         is_selected_row,
         theme,
@@ -789,6 +797,7 @@ fn comparison_side_spans(
     inline_ranges: &[Range],
     show_line_numbers: bool,
     horizontal_scroll: usize,
+    tab_width: usize,
     width: usize,
     is_selected_row: bool,
     theme: Theme,
@@ -816,7 +825,7 @@ fn comparison_side_spans(
     } else {
         format!("{} ", line.origin)
     };
-    let content = display_content(&line.content);
+    let content = display_content(&line.content, tab_width);
     let highlighted = syntax::highlight_line(path, &content, base, theme.syntax_theme)
         .unwrap_or_else(|| vec![Span::styled(content, base)]);
     let content_spans = style_content_spans(
@@ -877,12 +886,13 @@ fn skip_spans(spans: Vec<Span<'static>>, mut amount: usize) -> Vec<Span<'static>
 fn comparison_inline_ranges(
     old_line: Option<&DiffLine>,
     new_line: Option<&DiffLine>,
+    tab_width: usize,
 ) -> (Vec<Range>, Vec<Range>) {
     match (old_line, new_line) {
         (Some(old_line), Some(new_line)) if old_line.origin == '-' && new_line.origin == '+' => {
             inline_diff::changed_ranges(
-                &display_content(&old_line.content),
-                &display_content(&new_line.content),
+                &display_content(&old_line.content, tab_width),
+                &display_content(&new_line.content, tab_width),
             )
         }
         _ => (Vec::new(), Vec::new()),
@@ -919,7 +929,7 @@ fn fit_spans(spans: Vec<Span<'static>>, width: usize, fill_style: Style) -> Vec<
     fitted
 }
 
-fn inline_ranges(hunk: &DiffHunk, line_idx: usize) -> Vec<Range> {
+fn inline_ranges(hunk: &DiffHunk, line_idx: usize, tab_width: usize) -> Vec<Range> {
     if !matches!(hunk.lines[line_idx].origin, '+' | '-') {
         return Vec::new();
     }
@@ -942,8 +952,8 @@ fn inline_ranges(hunk: &DiffHunk, line_idx: usize) -> Vec<Range> {
     };
 
     let (old_ranges, new_ranges) = inline_diff::changed_ranges(
-        &display_content(&hunk.lines[old_line_idx].content),
-        &display_content(&hunk.lines[new_line_idx].content),
+        &display_content(&hunk.lines[old_line_idx].content, tab_width),
+        &display_content(&hunk.lines[new_line_idx].content, tab_width),
     );
     if line_idx == old_line_idx {
         old_ranges
@@ -1112,8 +1122,9 @@ fn text_width(text: &str) -> usize {
     UnicodeWidthStr::width(text)
 }
 
-fn display_content(content: &str) -> String {
-    content.trim_end().replace('\t', "    ")
+fn display_content(content: &str, tab_width: usize) -> String {
+    let tab = " ".repeat(tab_width);
+    content.trim_end().replace('\t', &tab)
 }
 
 fn draw_empty_diff(frame: &mut Frame, area: Rect, theme: Theme) {
@@ -1147,7 +1158,7 @@ fn draw_empty_diff(frame: &mut Frame, area: Rect, theme: Theme) {
 
 #[cfg(test)]
 mod tests {
-    use crate::tui::theme::MARTEN;
+    use crate::{config::DEFAULT_TAB_WIDTH, tui::theme::MARTEN};
 
     use super::*;
 
@@ -1163,7 +1174,18 @@ mod tests {
     #[test]
     fn selected_unified_row_fills_with_selection_background() {
         let line = added_line("let answer = 42;\n");
-        let rendered = diff_line(40, &line, "test.rs", &[], true, true, true, 0, MARTEN);
+        let rendered = diff_line(
+            40,
+            &line,
+            "test.rs",
+            &[],
+            true,
+            true,
+            true,
+            0,
+            DEFAULT_TAB_WIDTH,
+            MARTEN,
+        );
 
         assert_eq!(rendered.style.bg, Some(MARTEN.select_hi));
         assert!(
@@ -1194,7 +1216,18 @@ mod tests {
     #[test]
     fn selected_side_by_side_row_uses_selection_background() {
         let hunk = DiffHunk::new("@@ -0,0 +1 @@\n".to_string(), vec![added_line("answer\n")]);
-        let rendered = side_by_side_diff_line(40, &hunk, 0, "test.rs", true, true, true, 0, MARTEN);
+        let rendered = side_by_side_diff_line(
+            40,
+            &hunk,
+            0,
+            "test.rs",
+            true,
+            true,
+            true,
+            0,
+            DEFAULT_TAB_WIDTH,
+            MARTEN,
+        );
 
         assert_eq!(rendered.style.bg, Some(MARTEN.select_hi));
         assert!(
