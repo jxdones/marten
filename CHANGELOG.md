@@ -4,6 +4,8 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.11] - 2026-08-18
+
 ### Added
 
 - Configure how many spaces each tab occupies in diff content. It defaults to `4` and must be greater than zero.

@@ -118,6 +118,7 @@ ignore = ["*.lock", "generated/**", "vendor/"]
 
 [diff]
 ignore_whitespace = false
+tab_width = 4
 ```
 
 `theme` supports `marten`, `ermine`, `catppuccin`, `dracula`, and much more. When the setting is omitted, Marten uses `marten` by default. Choosing a theme from the in-app theme picker updates this setting.
@@ -133,6 +134,8 @@ Matching files are collapsed to their header and skipped by the diff loaders. Th
 
 `ignore_whitespace` hides whitespace-only changes from diff hunks and statistics in working-tree, revision, and revision-range views. It defaults to `false`.  
 Files containing only whitespace changes remain listed because Git still considers them modified, but their diff is empty while this option is enabled.
+
+`tab_width` defines the width of `\t`. It defaults to `0` in case is omitted.
 
 ## Development
 
