@@ -9,6 +9,8 @@ use git2::{
 const DEFAULT_HEAD: &str = "HEAD";
 const SHORT_COMMIT_LEN: usize = 7;
 const COMMIT_HISTORY_LIMIT: usize = 1_000;
+const MAX_ALIGNMENT_COMPARISONS: usize = 4096;
+const MIN_IMPROVEMENT_PER_PAIR: f32 = 0.5;
 
 #[derive(Debug, Clone)]
 pub struct CommitInfo {
@@ -195,13 +197,8 @@ fn build_comparison_rows(lines: &[DiffLine]) -> Vec<ComparisonRow> {
                     line_idx += 1;
                 }
 
-                let row_count = old_lines.len().max(new_lines.len());
-                for row_idx in 0..row_count {
-                    rows.push(ComparisonRow {
-                        old_line_idx: old_lines.get(row_idx).copied(),
-                        new_line_idx: new_lines.get(row_idx).copied(),
-                    });
-                }
+                let offset = choose_alignment_offset(lines, &old_lines, &new_lines);
+                rows.extend(comparison_rows_at_offset(&old_lines, &new_lines, offset));
             }
             '<' => {
                 rows.push(ComparisonRow {
@@ -228,6 +225,123 @@ fn build_comparison_rows(lines: &[DiffLine]) -> Vec<ComparisonRow> {
     }
 
     rows
+}
+
+fn comparison_rows_at_offset(
+    old_lines: &[usize],
+    new_lines: &[usize],
+    offset: usize,
+) -> Vec<ComparisonRow> {
+    let row_count = old_lines.len().max(new_lines.len());
+    let surplus = old_lines.len().abs_diff(new_lines.len());
+
+    debug_assert!(offset <= surplus);
+
+    let old_start = if new_lines.len() > old_lines.len() {
+        offset
+    } else {
+        0
+    };
+
+    let new_start = if old_lines.len() > new_lines.len() {
+        offset
+    } else {
+        0
+    };
+
+    (0..row_count)
+        .map(|row_idx| ComparisonRow {
+            old_line_idx: row_idx
+                .checked_sub(old_start)
+                .and_then(|idx| old_lines.get(idx))
+                .copied(),
+            new_line_idx: row_idx
+                .checked_sub(new_start)
+                .and_then(|idx| new_lines.get(idx))
+                .copied(),
+        })
+        .collect()
+}
+
+fn line_similarity(old: &[char], new: &[char]) -> f32 {
+    if old == new {
+        return 1.0;
+    }
+
+    let min_len = old.len().min(new.len());
+    let max_len = old.len().max(new.len());
+
+    if min_len == 0 {
+        return 0.0;
+    }
+
+    let prefix_len = old
+        .iter()
+        .zip(new.iter())
+        .take_while(|(old_ch, new_ch)| old_ch == new_ch)
+        .count();
+
+    let suffix_len = old
+        .iter()
+        .rev()
+        .zip(new.iter().rev())
+        .take(min_len - prefix_len)
+        .take_while(|(old_ch, new_ch)| old_ch == new_ch)
+        .count();
+
+    (prefix_len + suffix_len) as f32 / max_len as f32
+}
+
+fn normalized_line(line: &str) -> Vec<char> {
+    line.chars().filter(|ch| !ch.is_whitespace()).collect()
+}
+
+fn choose_alignment_offset(lines: &[DiffLine], old_lines: &[usize], new_lines: &[usize]) -> usize {
+    let pair_count = old_lines.len().min(new_lines.len());
+    let surplus = old_lines.len().abs_diff(new_lines.len());
+
+    let comparison_count = pair_count.saturating_mul(surplus.saturating_add(1));
+
+    if pair_count == 0 || surplus == 0 || comparison_count > MAX_ALIGNMENT_COMPARISONS {
+        return 0;
+    }
+
+    let normalized_old: Vec<_> = old_lines
+        .iter()
+        .map(|&idx| normalized_line(&lines[idx].content))
+        .collect();
+    let normalized_new: Vec<_> = new_lines
+        .iter()
+        .map(|&idx| normalized_line(&lines[idx].content))
+        .collect();
+
+    let longer_additions = new_lines.len() > old_lines.len();
+    let score_offset = |offset: usize| {
+        (0..pair_count)
+            .map(|pair_idx| {
+                let (old_idx, new_idx) = if longer_additions {
+                    (pair_idx, pair_idx + offset)
+                } else {
+                    (pair_idx + offset, pair_idx)
+                };
+
+                line_similarity(&normalized_old[old_idx], &normalized_new[new_idx])
+            })
+            .sum::<f32>()
+    };
+
+    let mut best_offset = 0;
+    let mut best_score = score_offset(0) + pair_count as f32 * MIN_IMPROVEMENT_PER_PAIR;
+
+    for offset in 1..=surplus {
+        let score = score_offset(offset);
+        if score > best_score {
+            best_offset = offset;
+            best_score = score;
+        }
+    }
+
+    best_offset
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -997,6 +1111,15 @@ mod tests {
         Signature::now("Test User", "test@example.com").unwrap()
     }
 
+    fn diff_line(origin: char, content: &str) -> DiffLine {
+        DiffLine {
+            old_lineno: None,
+            new_lineno: None,
+            origin,
+            content: content.to_string(),
+        }
+    }
+
     fn write_file(repo: &Repository, path: &str, content: &str) {
         let workdir = repo.workdir().expect("bare repos are unsupported in tests");
         let full = workdir.join(path);
@@ -1291,6 +1414,64 @@ mod tests {
             ignored_staged
                 .iter()
                 .all(|section| section.hunks.is_empty())
+        );
+    }
+
+    #[test]
+    fn comparison_rows_pair_a_deletion_with_the_similar_later_addition() {
+        let lines = vec![
+            diff_line('-', " return total(items, tax_rate);\n"),
+            diff_line('+', " let items = get_items();\n"),
+            diff_line('+', " let tax_rate = get_tax_rate();\n"),
+            diff_line('+', " return total(items, tax_rate, discount);\n"),
+        ];
+
+        let rows = build_comparison_rows(&lines);
+
+        assert_eq!(
+            rows,
+            vec![
+                ComparisonRow {
+                    old_line_idx: None,
+                    new_line_idx: Some(1),
+                },
+                ComparisonRow {
+                    old_line_idx: None,
+                    new_line_idx: Some(2),
+                },
+                ComparisonRow {
+                    old_line_idx: Some(0),
+                    new_line_idx: Some(3),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn realigns_when_deletions_are_longer() {
+        let lines = vec![
+            diff_line('-', "assert_ready(order);\n"),
+            diff_line('-', "return compute_total(items, tax_rate);\n"),
+            diff_line('-', "record_total(order);\n"),
+            diff_line('+', "return compute_total(items, tax_rate, discount);\n"),
+        ];
+
+        assert_eq!(
+            build_comparison_rows(&lines),
+            vec![
+                ComparisonRow {
+                    old_line_idx: Some(0),
+                    new_line_idx: None,
+                },
+                ComparisonRow {
+                    old_line_idx: Some(1),
+                    new_line_idx: Some(3),
+                },
+                ComparisonRow {
+                    old_line_idx: Some(2),
+                    new_line_idx: None,
+                },
+            ]
         );
     }
 }

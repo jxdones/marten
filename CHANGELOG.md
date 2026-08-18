@@ -4,6 +4,10 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Align related changed lines by content similarity when side-by-side change blocks contain unequal additions and deletions, keeping unrelated lines in gap rows and inline highlights focused on the actual edits.
+
 ## [0.1.10] - 2026-08-11
 
 ### Added
