@@ -1,6 +1,7 @@
 Require marten
 
 Set Shell "zsh"
+Set FontFamily "JetBrainsMono Nerd Font"
 Set FontSize 12
 Set Width 1400
 Set Height 800
