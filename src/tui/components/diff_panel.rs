@@ -750,7 +750,7 @@ fn side_by_side_diff_line(
         theme.add_gutter,
         "│",
         Style::default()
-            .fg(theme.hunk_header_bg)
+            .fg(theme.line)
             .bg(selected_bg.unwrap_or(theme.bg)),
     ));
     spans.extend(comparison_side_spans(

@@ -112,6 +112,7 @@ Marten reads its configuration from `~/.config/marten/config.toml` on macOS and 
 [ui]
 theme = "marten"
 show_sidebar = true
+transparent_background = false
 
 [review]
 ignore = ["*.lock", "generated/**", "vendor/"]
@@ -124,6 +125,8 @@ tab_width = 4
 `theme` supports `marten`, `ermine`, `catppuccin`, `dracula`, and much more. When the setting is omitted, Marten uses `marten` by default. Choosing a theme from the in-app theme picker updates this setting.
 
 `show_sidebar` controls whether the sidebar is visible at startup. When omitted, Marten shows it automatically when the terminal is wider than 120 columns. The sidebar can still be toggled while Marten is running.
+
+`transparent_background` lets your terminal's own background (and any background image or blur it applies) show through the base panels, sidebar, popups, and file/hunk headers. Diff add/delete backgrounds and selection highlights stay opaque for legibility. It defaults to `false`.
 
 `ignore` lists glob patterns for noisy files you'd rather not review (lockfiles, generated code, snapshots, vendored sources). When omitted, nothing is ignored.  
 Matching files are collapsed to their header and skipped by the diff loaders. They remain listed in the sidebar (marked `~`) because they can still be visible as part of the changes.

@@ -22,6 +22,7 @@ pub struct Config {
 pub struct UI {
     pub theme: String,
     pub show_sidebar: Option<bool>,
+    pub transparent_background: bool,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -83,6 +84,7 @@ impl Default for UI {
         Self {
             theme: theme::default_entry().id.into(),
             show_sidebar: None,
+            transparent_background: false,
         }
     }
 }
@@ -291,6 +293,18 @@ mod tests {
 
         assert!(!config.ui.show_sidebar(120));
         assert!(config.ui.show_sidebar(121));
+    }
+
+    #[test]
+    fn transparent_background_defaults_to_false() {
+        let config = Config::default();
+        assert!(!config.ui.transparent_background);
+    }
+
+    #[test]
+    fn set_transparent_background_to_true() {
+        let config: Config = toml::from_str("[ui]\ntransparent_background = true").unwrap();
+        assert!(config.ui.transparent_background);
     }
 
     #[test]

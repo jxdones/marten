@@ -4,6 +4,10 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Show the terminal's own background through Marten's panels, sidebar, popups, and file/hunk headers with `[ui] transparent_background = true` in the config file. Diff add/delete backgrounds and selection highlights stay opaque for legibility.
+
 ## [0.1.11] - 2026-08-18
 
 ### Added

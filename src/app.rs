@@ -5,6 +5,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent,
 use crossterm::{execute, terminal::SetTitle};
 use git2::{ErrorCode, Repository};
 use ratatui::layout::{Position, Rect};
+use ratatui::style::Color;
 
 use crate::action::{Action, ScrollDirection};
 use crate::cli::Command;
@@ -30,6 +31,7 @@ pub struct App {
     screen: Screen,
     focus: Focus,
     theme: Theme,
+    transparent_background: bool,
     repo: Repository,
 
     should_quit: bool,
@@ -118,13 +120,17 @@ impl App {
 
         let overlay = Overlay::None;
 
+        let transparent_background = config.ui.transparent_background;
+        let theme = apply_transparency(config.ui.theme(), transparent_background);
+
         Ok(Self {
             screen: Screen::Home,
             focus,
             files,
             diff,
             store,
-            theme: config.ui.theme(),
+            theme,
+            transparent_background,
             repo,
             should_quit: false,
             show_sidebar,
@@ -262,6 +268,7 @@ impl App {
         let App {
             focus,
             theme: active_theme,
+            transparent_background,
             files,
             diff,
             store,
@@ -333,14 +340,17 @@ impl App {
 
                 if let Some(original) = original {
                     if let Some(entry) = THEMES.get(original) {
-                        *active_theme = entry.theme;
+                        *active_theme = apply_transparency(entry.theme, *transparent_background);
                     }
 
                     *overlay = Overlay::None;
                 } else {
                     let current = THEMES
                         .iter()
-                        .position(|entry| entry.theme == *active_theme)
+                        .position(|entry| {
+                            apply_transparency(entry.theme, *transparent_background)
+                                == *active_theme
+                        })
                         .unwrap_or(0);
 
                     *overlay = Overlay::ThemeSelector(ThemeSelectorState {
@@ -452,7 +462,7 @@ impl App {
                 if let Overlay::ThemeSelector(state) = overlay
                     && let Some(entry) = THEMES.get(state.selected)
                 {
-                    *active_theme = entry.theme;
+                    *active_theme = apply_transparency(entry.theme, *transparent_background);
                 }
                 return Ok(());
             }
@@ -691,6 +701,20 @@ impl App {
             }
             _ => Action::Noop,
         }
+    }
+}
+
+fn apply_transparency(theme: Theme, transparent_background: bool) -> Theme {
+    if !transparent_background {
+        return theme;
+    }
+
+    Theme {
+        bg: Color::Reset,
+        sidebar_bg: Color::Reset,
+        file_header_bg: Color::Reset,
+        hunk_header_bg: Color::Reset,
+        ..theme
     }
 }
 
