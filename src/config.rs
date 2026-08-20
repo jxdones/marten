@@ -24,6 +24,7 @@ pub struct UI {
     pub theme: String,
     pub show_sidebar: Option<bool>,
     pub transparent_background: bool,
+    pub nerd_fonts: bool,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -106,6 +107,7 @@ impl Default for UI {
             theme: theme::default_entry().id.into(),
             show_sidebar: None,
             transparent_background: false,
+            nerd_fonts: false,
         }
     }
 }
@@ -327,6 +329,15 @@ mod tests {
     fn set_transparent_background_to_true() {
         let config: Config = toml::from_str("[ui]\ntransparent_background = true").unwrap();
         assert!(config.ui.transparent_background);
+    }
+
+    #[test]
+    fn nerd_fonts_defaults_to_false_and_can_be_enabled() {
+        let config = Config::default();
+        assert!(!config.ui.nerd_fonts);
+
+        let config: Config = toml::from_str("[ui]\nnerd_fonts = true").unwrap();
+        assert!(config.ui.nerd_fonts);
     }
 
     #[test]

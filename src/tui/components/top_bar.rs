@@ -2,6 +2,7 @@ use crate::app::App;
 use crate::git::repository::{
     DiffSource, Head, RangeData, RangeKind, RepositoryStatus, RevisionData,
 };
+use crate::state::DiffLayout;
 use crate::tui::theme::Theme;
 use ratatui::{
     Frame,
@@ -23,7 +24,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
-    let right_line = diff_summary(app);
+    let right_line = right_summary(app);
     let right_width = u16::try_from(right_line.width()).unwrap_or(u16::MAX);
     let (left, right) = content_areas(inner, right_width);
 
@@ -224,7 +225,31 @@ fn truncate_with_ellipsis(text: &str, max_width: usize) -> String {
     truncated
 }
 
-fn diff_summary(app: &App) -> Line<'static> {
+fn diff_layout_mode(app: &App) -> Vec<Span<'static>> {
+    let theme = app.theme();
+    let layout = app.continuous_diff().layout;
+    let mode = if app.nerd_fonts() {
+        match layout {
+            DiffLayout::SideBySide => "\u{eb56}",
+            DiffLayout::Unified => "\u{eb57}",
+        }
+    } else {
+        match layout {
+            DiffLayout::SideBySide => "||",
+            DiffLayout::Unified => "≡",
+        }
+    };
+
+    let color = if app.diff_layout_override().is_none() {
+        theme.muted()
+    } else {
+        theme.text_primary()
+    };
+
+    vec![Span::styled(mode, color)]
+}
+
+fn right_summary(app: &App) -> Line<'static> {
     let theme = app.theme();
     let files: Vec<_> = app.files().iter().filter(|slot| !slot.ignored).collect();
 
@@ -254,12 +279,14 @@ fn diff_summary(app: &App) -> Line<'static> {
         theme.text_primary()
     };
 
-    let mut spans = vec![
-        Span::styled(format!("+{insertions}"), insertions_color),
-        Span::styled(" ", theme.muted()),
-        Span::styled(format!("-{deletions}"), deletions_color),
-        Span::styled("  ·  ", theme.muted()),
-    ];
+    let mut spans = vec![];
+    spans.extend(diff_layout_mode(app));
+    spans.push(Span::styled("  ·  ", theme.muted()));
+
+    spans.push(Span::styled(format!("+{insertions}"), insertions_color));
+    spans.push(Span::styled(" ", theme.muted()));
+    spans.push(Span::styled(format!("-{deletions}"), deletions_color));
+    spans.push(Span::styled("  ·  ", theme.muted()));
 
     if reviewed > 0 {
         spans.push(Span::styled(reviewed.to_string(), files_color));

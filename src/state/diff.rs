@@ -96,11 +96,15 @@ impl Diff {
             .unwrap_or_else(|| DiffLayout::for_width(width))
     }
 
+    pub fn layout_override(&self) -> Option<DiffLayout> {
+        self.layout_override
+    }
+
     pub fn cycle_layout_mode(&mut self) -> DiffLayout {
         self.layout_override = match self.layout_override {
-            None => Some(DiffLayout::SideBySide),
-            Some(DiffLayout::SideBySide) => Some(DiffLayout::Unified),
-            Some(DiffLayout::Unified) => None,
+            None => Some(DiffLayout::Unified),
+            Some(DiffLayout::Unified) => Some(DiffLayout::SideBySide),
+            Some(DiffLayout::SideBySide) => None,
         };
         self.layout_for_width(self.viewport_width)
     }

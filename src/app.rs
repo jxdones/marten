@@ -16,7 +16,7 @@ use crate::event::Event;
 use crate::files_panel::FilesPanel;
 use crate::git::repository::{self, CommitInfo, DiffSource, RevisionData};
 use crate::state::{
-    CommandPaletteState, CommitsFinderFocus, CommitsFinderState, ContinuousDiff, Diff,
+    CommandPaletteState, CommitsFinderFocus, CommitsFinderState, ContinuousDiff, Diff, DiffLayout,
     FileFinderState, FileSlot, Files, Focus, Overlay, ReviewState, Screen, ThemeSelectorState,
     TreeRow,
 };
@@ -32,6 +32,7 @@ pub struct App {
     focus: Focus,
     theme: Theme,
     transparent_background: bool,
+    nerd_fonts: bool,
     repo: Repository,
 
     should_quit: bool,
@@ -131,6 +132,7 @@ impl App {
             store,
             theme,
             transparent_background,
+            nerd_fonts: config.ui.nerd_fonts,
             repo,
             should_quit: false,
             show_sidebar,
@@ -224,6 +226,14 @@ impl App {
 
     pub fn continuous_diff(&self) -> &ContinuousDiff {
         &self.store.continuous_diff
+    }
+
+    pub fn diff_layout_override(&self) -> Option<DiffLayout> {
+        self.diff.layout_override()
+    }
+
+    pub const fn nerd_fonts(&self) -> bool {
+        self.nerd_fonts
     }
 
     pub fn review_state(&self) -> &ReviewState {

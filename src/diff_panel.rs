@@ -289,6 +289,10 @@ impl DiffPanel {
         self.state.layout_for_width(width)
     }
 
+    pub fn layout_override(&self) -> Option<DiffLayout> {
+        self.state.layout_override()
+    }
+
     pub fn refresh_horizontal_scroll_bounds(&mut self, store: &DiffStore) {
         let max = self.max_horizontal_scroll(store);
         self.state.set_max_horizontal_scroll(max);

@@ -8,6 +8,7 @@ All notable changes to Marten will be documented in this file.
 
 - Show the terminal's own background through Marten's panels, sidebar, popups, and file/hunk headers with `[ui] transparent_background = true` in the config file. Diff add/delete backgrounds and selection highlights stay opaque for legibility.
 - Cycle through auto, side-by-side, and unified diff layouts with `v` instead of only toggling between the last two. Set the startup layout with `[diff] layout = "auto" | "split" | "unified"` in the config file.
+- Show the current diff layout in the top bar, with Nerd Font glyphs available via `[ui] nerd_fonts = true`.
 
 ## [0.1.11] - 2026-08-18
 
