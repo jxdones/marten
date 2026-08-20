@@ -1,6 +1,6 @@
 [package]
 name = "marten-diff"
-version = "0.1.11"
+version = "0.1.12"
 authors = ["Jones Dias"]
 description = "A terminal diff viewer for reviewing your work before it becomes a commit or pull request."
 keywords = ["tui", "terminal", "git", "diff", "review"]
