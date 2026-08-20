@@ -28,9 +28,9 @@ pub struct DiffContext<'a> {
 }
 
 impl DiffPanel {
-    pub fn new(tab_width: usize) -> Self {
+    pub fn new(tab_width: usize, layout_override: Option<DiffLayout>) -> Self {
         Self {
-            state: Diff::new(tab_width),
+            state: Diff::new(tab_width, layout_override),
             review: ReviewState::default(),
         }
     }
@@ -75,9 +75,7 @@ impl DiffPanel {
                 self.refresh_horizontal_scroll_bounds(diff_ctx.store);
             }
             Action::ToggleDiffLayout => {
-                let layout = self
-                    .state
-                    .toggle_layout_override(diff_ctx.store.continuous_diff.layout);
+                let layout = self.state.cycle_layout_mode();
                 self.set_layout(layout, diff_ctx.store);
             }
             Action::ScrollDiff { direction, lines } => {
@@ -703,7 +701,7 @@ mod tests {
     #[test]
     fn line_navigation_skips_headers_and_scrolls_near_the_viewport_edge() {
         let store = store_with_lines(6);
-        let mut panel = DiffPanel::new(DEFAULT_TAB_WIDTH);
+        let mut panel = DiffPanel::new(DEFAULT_TAB_WIDTH, None);
         panel.set_viewport_height(8);
         panel.sync_continuous_scroll_to_file(Some(0), &store);
 
@@ -735,7 +733,7 @@ mod tests {
     #[test]
     fn hunk_navigation_anchors_the_hunk_header_at_the_viewport_top() {
         let store = store_with_hunks(&[2, 2]);
-        let mut panel = DiffPanel::new(DEFAULT_TAB_WIDTH);
+        let mut panel = DiffPanel::new(DEFAULT_TAB_WIDTH, None);
         panel.set_viewport_height(8);
         panel.sync_continuous_scroll_to_file(Some(0), &store);
 

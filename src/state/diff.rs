@@ -30,7 +30,7 @@ pub struct Diff {
 }
 
 impl Diff {
-    pub fn new(tab_width: usize) -> Self {
+    pub fn new(tab_width: usize, layout_override: Option<DiffLayout>) -> Self {
         Self {
             viewport_width: 1,
             viewport_height: 1,
@@ -38,7 +38,7 @@ impl Diff {
             horizontal_scroll: 0,
             tab_width,
             max_horizontal_scroll: 0,
-            layout_override: None,
+            layout_override,
         }
     }
 }
@@ -96,12 +96,12 @@ impl Diff {
             .unwrap_or_else(|| DiffLayout::for_width(width))
     }
 
-    pub fn toggle_layout_override(&mut self, current: DiffLayout) -> DiffLayout {
-        let layout = match current {
-            DiffLayout::Unified => DiffLayout::SideBySide,
-            DiffLayout::SideBySide => DiffLayout::Unified,
+    pub fn cycle_layout_mode(&mut self) -> DiffLayout {
+        self.layout_override = match self.layout_override {
+            None => Some(DiffLayout::SideBySide),
+            Some(DiffLayout::SideBySide) => Some(DiffLayout::Unified),
+            Some(DiffLayout::Unified) => None,
         };
-        self.layout_override = Some(layout);
-        layout
+        self.layout_for_width(self.viewport_width)
     }
 }

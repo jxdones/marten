@@ -134,8 +134,8 @@ pub fn command_groups() -> &'static [CommandGroup] {
                     action: Action::ToggleDiffLineNumbers,
                 },
                 CommandItem {
-                    label: "toggle diff layout",
-                    description: "switch between unified and side-by-side",
+                    label: "cycle diff layout",
+                    description: "cycle between auto, side-by-side, and unified",
                     keybind: "v",
                     action: Action::ToggleDiffLayout,
                 },

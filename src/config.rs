@@ -2,6 +2,7 @@ use std::{env, fs, io::ErrorKind, path::PathBuf};
 
 use serde::Deserialize;
 
+use crate::state::DiffLayout;
 use crate::tui::theme::{self, Theme};
 
 const CONFIG_DIR: &str = ".config";
@@ -36,6 +37,26 @@ pub struct Review {
 pub struct Diff {
     pub ignore_whitespace: bool,
     pub tab_width: usize,
+    pub layout: DiffLayoutSetting,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DiffLayoutSetting {
+    #[default]
+    Auto,
+    Split,
+    Unified,
+}
+
+impl DiffLayoutSetting {
+    pub const fn as_override(self) -> Option<DiffLayout> {
+        match self {
+            Self::Auto => None,
+            Self::Split => Some(DiffLayout::SideBySide),
+            Self::Unified => Some(DiffLayout::Unified),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -94,6 +115,7 @@ impl Default for Diff {
         Self {
             ignore_whitespace: false,
             tab_width: DEFAULT_TAB_WIDTH,
+            layout: DiffLayoutSetting::Auto,
         }
     }
 }
@@ -329,6 +351,30 @@ mod tests {
     fn set_tab_width_to_two() {
         let config: Config = toml::from_str("[diff]\n tab_width = 2").unwrap();
         assert!(config.diff.tab_width == 2);
+    }
+
+    #[test]
+    fn diff_layout_defaults_to_auto() {
+        let config = Config::default();
+        assert_eq!(config.diff.layout, DiffLayoutSetting::Auto);
+        assert_eq!(config.diff.layout.as_override(), None);
+    }
+
+    #[test]
+    fn set_diff_layout_to_split() {
+        let config: Config = toml::from_str("[diff]\n layout = 'split'").unwrap();
+        assert_eq!(config.diff.layout, DiffLayoutSetting::Split);
+        assert_eq!(
+            config.diff.layout.as_override(),
+            Some(DiffLayout::SideBySide)
+        );
+    }
+
+    #[test]
+    fn set_diff_layout_to_unified() {
+        let config: Config = toml::from_str("[diff]\n layout = 'unified'").unwrap();
+        assert_eq!(config.diff.layout, DiffLayoutSetting::Unified);
+        assert_eq!(config.diff.layout.as_override(), Some(DiffLayout::Unified));
     }
 
     #[test]

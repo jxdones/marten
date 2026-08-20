@@ -101,7 +101,7 @@ impl App {
         files.ensure_rows(&store);
         files.select_first();
 
-        let mut diff = DiffPanel::new(config.diff.tab_width);
+        let mut diff = DiffPanel::new(config.diff.tab_width, config.diff.layout.as_override());
         diff.refresh(&mut DiffContext {
             files: &mut files,
             store: &mut store,
