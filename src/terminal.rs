@@ -8,7 +8,7 @@ use crossterm::{
     execute,
     terminal::{
         BeginSynchronizedUpdate, EndSynchronizedUpdate, EnterAlternateScreen, LeaveAlternateScreen,
-        disable_raw_mode, enable_raw_mode,
+        SetTitle, disable_raw_mode, enable_raw_mode,
     },
 };
 
@@ -151,7 +151,8 @@ fn restore_terminal(mut terminal: DefaultTerminal) -> io::Result<()> {
     execute!(
         terminal.backend_mut(),
         DisableMouseCapture,
-        LeaveAlternateScreen
+        LeaveAlternateScreen,
+        SetTitle("")
     )?;
     Ok(())
 }

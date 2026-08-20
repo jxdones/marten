@@ -36,6 +36,12 @@ pub struct ChangeCounts {
     pub conflicted: usize,
 }
 
+impl ChangeCounts {
+    pub const fn is_dirty(&self) -> bool {
+        self.staged + self.unstaged + self.untracked + self.conflicted > 0
+    }
+}
+
 #[derive(Debug, Clone)]
 pub enum Head {
     Branch(String),

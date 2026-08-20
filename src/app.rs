@@ -54,7 +54,6 @@ pub struct App {
 
 impl App {
     pub fn new(command: Option<Command>, config: &Config) -> AppResult<Self> {
-        execute!(std::io::stdout(), SetTitle("marten"))?;
         let repo = Repository::discover(".").map_err(|source| {
             if source.code() == ErrorCode::NotFound {
                 AppError::NotRepository { source }
@@ -79,10 +78,15 @@ impl App {
     }
 
     fn init(repo: Repository, diff_source: DiffSource, config: &Config) -> AppResult<Self> {
-        let repository_status = Some(
-            repository::status(&repo)
-                .map_err(|error| error.with_operation("read repository status"))?,
-        );
+        let repository_status = repository::status(&repo)
+            .map_err(|error| error.with_operation("read repository status"))?;
+
+        execute!(
+            std::io::stdout(),
+            SetTitle(window_title(&repository_status, &diff_source))
+        )?;
+
+        let repository_status = Some(repository_status);
         let commits = repository::commits(&repo)
             .map_err(|error| error.with_operation("load commit history"))?;
         let operation = match diff_source {
@@ -315,6 +319,13 @@ impl App {
                     repository::status(repo)
                         .map_err(|error| error.with_operation("refresh repository status"))?,
                 );
+                execute!(
+                    std::io::stdout(),
+                    SetTitle(window_title(
+                        repository_status.as_ref().expect("just set above"),
+                        diff_source
+                    ))
+                )?;
                 *commits = repository::commits(repo)
                     .map_err(|error| error.with_operation("refresh commit history"))?;
                 diff.reload(&mut DiffContext {
@@ -408,8 +419,12 @@ impl App {
                     short_oid: commit.oid.to_string().chars().take(7).collect(),
                     subject: commit.subject,
                 });
+                let status = repository_status
+                    .as_ref()
+                    .expect("repository status is set after init");
                 load_diff_source(
                     repo,
+                    status,
                     diff_source,
                     store,
                     files,
@@ -426,8 +441,12 @@ impl App {
                     repository::status(repo)
                         .map_err(|error| error.with_operation("refresh repository status"))?,
                 );
+                let status = repository_status
+                    .as_ref()
+                    .expect("repository status is set after init");
                 load_diff_source(
                     repo,
+                    status,
                     diff_source,
                     store,
                     files,
@@ -728,8 +747,10 @@ fn apply_transparency(theme: Theme, transparent_background: bool) -> Theme {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn load_diff_source(
     repo: &Repository,
+    repository_status: &repository::RepositoryStatus,
     diff_source: &mut DiffSource,
     store: &mut DiffStore,
     files: &mut FilesPanel,
@@ -741,6 +762,10 @@ fn load_diff_source(
         .map_err(|error| error.with_operation(operation))?;
 
     *diff_source = new_source;
+    execute!(
+        std::io::stdout(),
+        SetTitle(window_title(repository_status, diff_source))
+    )?;
     diff.load_source(
         &mut DiffContext {
             files,
@@ -751,6 +776,29 @@ fn load_diff_source(
         entries,
     );
     Ok(())
+}
+
+fn window_title(
+    repository_status: &repository::RepositoryStatus,
+    diff_source: &DiffSource,
+) -> String {
+    let repo_name = &repository_status.name;
+    let dirty_prefix = match diff_source {
+        DiffSource::Worktree if repository_status.changes.is_dirty() => "* ",
+        _ => "",
+    };
+    let context = match diff_source {
+        DiffSource::Worktree => match &repository_status.head {
+            repository::Head::Branch(name) => format!("{repo_name} ({name})"),
+            repository::Head::Detached(oid) => format!("{repo_name} @ {oid}"),
+            repository::Head::Unknown => repo_name.clone(),
+        },
+        DiffSource::Revision(revision) => format!("{repo_name} @ {}", revision.short_oid),
+        DiffSource::Range(range) => {
+            format!("{repo_name} {}..{}", range.from_label, range.to_label)
+        }
+    };
+    format!("{dirty_prefix}{context} - marten")
 }
 
 impl std::fmt::Debug for App {
