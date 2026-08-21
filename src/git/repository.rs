@@ -446,13 +446,16 @@ pub fn commits(repo: &Repository) -> AppResult<Vec<CommitInfo>> {
 
 pub fn files(repo: &Repository, ignore_whitespace: bool) -> AppResult<Vec<FileEntry>> {
     let mut staged_options = diff_options(ignore_whitespace);
-    let staged_diff = if let Ok(head) = repo.head() {
-        // repo has at least one commit
-        let tree = head.peel_to_commit()?.tree()?;
-        repo.diff_tree_to_index(Some(&tree), None, Some(&mut staged_options))?
-    } else {
-        // no commits yet, diff against empty tree
-        repo.diff_tree_to_index(None, None, Some(&mut staged_options))?
+    let staged_diff = match repo.head() {
+        Ok(head) => {
+            let tree = head.peel_to_commit()?.tree()?;
+            repo.diff_tree_to_index(Some(&tree), None, Some(&mut staged_options))?
+        }
+        Err(error) if is_unknown_head_error(&error) => {
+            // no commits yet, diff against empty tree
+            repo.diff_tree_to_index(None, None, Some(&mut staged_options))?
+        }
+        Err(error) => return Err(error.into()),
     };
 
     let mut unstaged_options = diff_options(ignore_whitespace);
@@ -870,13 +873,20 @@ fn staged_file_diff(
     path: &str,
     ignore_whitespace: bool,
 ) -> AppResult<Option<Vec<DiffHunk>>> {
-    let head = repo.head()?;
     let mut opts = diff_options(ignore_whitespace);
     opts.pathspec(path);
 
-    let head_commit = head.peel_to_commit()?;
-    let head_tree = head_commit.tree()?;
-    let diff = repo.diff_tree_to_index(Some(&head_tree), None, Some(&mut opts))?;
+    let diff = match repo.head() {
+        Ok(head) => {
+            let head_tree = head.peel_to_commit()?.tree()?;
+            repo.diff_tree_to_index(Some(&head_tree), None, Some(&mut opts))?
+        }
+        Err(error) if is_unknown_head_error(&error) => {
+            // no commits yet, diff against empty tree
+            repo.diff_tree_to_index(None, None, Some(&mut opts))?
+        }
+        Err(error) => return Err(error.into()),
+    };
 
     let hunks = diff_hunks(diff)?;
     Ok(hunks)

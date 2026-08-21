@@ -4,6 +4,10 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Viewing a staged file's diff no longer errors with `reference 'refs/heads/main' not found` in a repository with no commits yet.
+
 ## [0.1.13] - 2026-08-21
 
 ### Added
