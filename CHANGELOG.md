@@ -4,6 +4,8 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.13] - 2026-08-21
+
 ### Added
 
 - Show the repository name and current branch (or the revision/range being viewed) in the terminal tab title, with a leading `*` when the working tree has uncommitted changes. The title reverts on exit.
