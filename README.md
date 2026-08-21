@@ -113,7 +113,7 @@ Marten reads its configuration from `~/.config/marten/config.toml` on macOS and 
 theme = "marten"
 show_sidebar = true
 transparent_background = false
-nerd_fonts = false
+nerd_fonts = true
 
 [review]
 ignore = ["*.lock", "generated/**", "vendor/"]
@@ -130,7 +130,7 @@ layout = "auto"
 
 `transparent_background` lets your terminal's own background (and any background image or blur it applies) show through the base panels, sidebar, popups, and file/hunk headers. Diff add/delete backgrounds and selection highlights stay opaque for legibility. It defaults to `false`.
 
-`nerd_fonts` swaps the diff layout indicator in the top bar for Nerd Font glyphs instead of plain ASCII/Unicode. Only enable it if your terminal font is a [Nerd Font](https://www.nerdfonts.com/). It defaults to `false`.
+`nerd_fonts` swaps the diff layout indicator in the top bar for Nerd Font glyphs instead of plain ASCII/Unicode. It defaults to `true`; set it to `false` if your terminal font isn't a [Nerd Font](https://www.nerdfonts.com/).
 
 `ignore` lists glob patterns for noisy files you'd rather not review (lockfiles, generated code, snapshots, vendored sources). When omitted, nothing is ignored.  
 Matching files are collapsed to their header and skipped by the diff loaders. They remain listed in the sidebar (marked `~`) because they can still be visible as part of the changes.

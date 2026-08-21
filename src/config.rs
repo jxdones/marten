@@ -107,7 +107,7 @@ impl Default for UI {
             theme: theme::default_entry().id.into(),
             show_sidebar: None,
             transparent_background: false,
-            nerd_fonts: false,
+            nerd_fonts: true,
         }
     }
 }
@@ -332,12 +332,12 @@ mod tests {
     }
 
     #[test]
-    fn nerd_fonts_defaults_to_false_and_can_be_enabled() {
+    fn nerd_fonts_defaults_to_true_and_can_be_disabled() {
         let config = Config::default();
-        assert!(!config.ui.nerd_fonts);
-
-        let config: Config = toml::from_str("[ui]\nnerd_fonts = true").unwrap();
         assert!(config.ui.nerd_fonts);
+
+        let config: Config = toml::from_str("[ui]\nnerd_fonts = false").unwrap();
+        assert!(!config.ui.nerd_fonts);
     }
 
     #[test]

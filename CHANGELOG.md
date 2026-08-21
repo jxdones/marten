@@ -8,6 +8,10 @@ All notable changes to Marten will be documented in this file.
 
 - Show the repository name and current branch (or the revision/range being viewed) in the terminal tab title, with a leading `*` when the working tree has uncommitted changes. The title reverts on exit.
 
+### Changed
+
+- `[ui] nerd_fonts` now defaults to `true`. Set it to `false` if your terminal font isn't a [Nerd Font](https://www.nerdfonts.com/).
+
 ## [0.1.12] - 2026-08-20
 
 ### Added
