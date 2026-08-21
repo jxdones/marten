@@ -337,12 +337,11 @@ impl App {
             }
             Action::ToggleSidebar => {
                 *show_sidebar = !*show_sidebar;
-
-                if *focus == Focus::Files {
-                    *focus = Focus::Diff;
+                *focus = if *show_sidebar {
+                    Focus::Files
                 } else {
-                    *focus = Focus::Files;
-                }
+                    Focus::Diff
+                };
                 return Ok(());
             }
             Action::ToggleCommandPalette => {

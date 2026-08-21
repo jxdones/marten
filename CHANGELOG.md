@@ -12,6 +12,10 @@ All notable changes to Marten will be documented in this file.
 
 - `[ui] nerd_fonts` now defaults to `true`. Set it to `false` if your terminal font isn't a [Nerd Font](https://www.nerdfonts.com/).
 
+### Fixed
+
+- Hiding the sidebar always moves focus to the diff panel, instead of sometimes leaving it stuck on the now-hidden files panel.
+
 ## [0.1.12] - 2026-08-20
 
 ### Added
