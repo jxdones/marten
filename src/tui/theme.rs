@@ -141,6 +141,12 @@ pub const THEMES: &[ThemeEntry] = &[
         theme: FLEXOKI_DARK,
     },
     ThemeEntry {
+        name: "Nord",
+        id: "nord",
+        appearance: "dark",
+        theme: NORD,
+    },
+    ThemeEntry {
         name: "GitHub",
         id: "github",
         appearance: "dark",
@@ -708,6 +714,51 @@ pub const FLEXOKI_DARK: Theme = Theme {
     unstaged: Color::Rgb(209, 77, 65),
     untracked: Color::Rgb(218, 112, 44),
     conflict: Color::Rgb(206, 93, 151),
+};
+
+pub const NORD: Theme = Theme {
+    syntax_theme: "nord",
+    syntax_palette: Some(SyntaxPalette {
+        comment: Color::Rgb(76, 86, 106),
+        keyword: Color::Rgb(129, 161, 193),
+        function: Color::Rgb(136, 192, 208),
+        variable: Color::Rgb(216, 222, 233),
+        string: Color::Rgb(163, 190, 140),
+        number: Color::Rgb(180, 142, 173),
+        type_name: Color::Rgb(143, 188, 187),
+        operator: Color::Rgb(94, 129, 172),
+        punctuation: Color::Rgb(216, 222, 233),
+    }),
+
+    bg: Color::Rgb(46, 52, 64),
+    sidebar_bg: Color::Rgb(46, 52, 64),
+    line: Color::Rgb(76, 86, 106),
+
+    fg: Color::Rgb(216, 222, 233),
+    dim: Color::Rgb(76, 86, 106),
+
+    accent: Color::Rgb(136, 192, 208),
+    select: Color::Rgb(59, 66, 82),
+    select_hi: Color::Rgb(67, 76, 94),
+
+    file_header_bg: Color::Rgb(36, 41, 51),
+    hunk_header_bg: Color::Rgb(59, 66, 82),
+    active_file_fg: Color::Rgb(136, 192, 208),
+
+    add_bg: Color::Rgb(34, 46, 34),
+    add_inline_bg: Color::Rgb(46, 66, 44),
+    add_fg: Color::Rgb(163, 190, 140),
+    add_gutter: Color::Rgb(163, 190, 140),
+    del_bg: Color::Rgb(52, 34, 38),
+    del_inline_bg: Color::Rgb(77, 42, 47),
+    del_fg: Color::Rgb(191, 97, 106),
+    del_gutter: Color::Rgb(191, 97, 106),
+
+    staged: Color::Rgb(163, 190, 140),
+    partial: Color::Rgb(235, 203, 139),
+    unstaged: Color::Rgb(191, 97, 106),
+    untracked: Color::Rgb(208, 135, 112),
+    conflict: Color::Rgb(191, 97, 106),
 };
 
 pub const GITHUB: Theme = Theme {
