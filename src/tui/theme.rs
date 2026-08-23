@@ -129,6 +129,12 @@ pub const THEMES: &[ThemeEntry] = &[
         theme: AYU_LIGHT,
     },
     ThemeEntry {
+        name: "Rose Pine Dawn",
+        id: "rose-pine-dawn",
+        appearance: "light",
+        theme: ROSE_PINE_DAWN,
+    },
+    ThemeEntry {
         name: "GitHub",
         id: "github",
         appearance: "dark",
@@ -606,6 +612,51 @@ pub const AYU_LIGHT: Theme = Theme {
     unstaged: Color::Rgb(240, 113, 113),
     untracked: Color::Rgb(250, 141, 62),
     conflict: Color::Rgb(230, 80, 80),
+};
+
+pub const ROSE_PINE_DAWN: Theme = Theme {
+    syntax_theme: "rose-pine-dawn",
+    syntax_palette: Some(SyntaxPalette {
+        comment: Color::Rgb(152, 147, 165),
+        keyword: Color::Rgb(40, 105, 131),
+        function: Color::Rgb(215, 130, 126),
+        variable: Color::Rgb(180, 99, 122),
+        string: Color::Rgb(234, 157, 52),
+        number: Color::Rgb(144, 122, 169),
+        type_name: Color::Rgb(86, 148, 159),
+        operator: Color::Rgb(121, 117, 147),
+        punctuation: Color::Rgb(121, 117, 147),
+    }),
+
+    bg: Color::Rgb(250, 244, 237),
+    sidebar_bg: Color::Rgb(250, 244, 237),
+    line: Color::Rgb(223, 218, 217),
+
+    fg: Color::Rgb(87, 82, 121),
+    dim: Color::Rgb(152, 147, 165),
+
+    accent: Color::Rgb(144, 122, 169),
+    select: Color::Rgb(244, 237, 232),
+    select_hi: Color::Rgb(223, 218, 217),
+
+    file_header_bg: Color::Rgb(255, 250, 243),
+    hunk_header_bg: Color::Rgb(244, 237, 232),
+    active_file_fg: Color::Rgb(144, 122, 169),
+
+    add_bg: Color::Rgb(224, 237, 236),
+    add_inline_bg: Color::Rgb(196, 223, 221),
+    add_fg: Color::Rgb(86, 148, 159),
+    add_gutter: Color::Rgb(86, 148, 159),
+    del_bg: Color::Rgb(247, 228, 231),
+    del_inline_bg: Color::Rgb(240, 205, 211),
+    del_fg: Color::Rgb(180, 99, 122),
+    del_gutter: Color::Rgb(180, 99, 122),
+
+    staged: Color::Rgb(86, 148, 159),
+    partial: Color::Rgb(234, 157, 52),
+    unstaged: Color::Rgb(180, 99, 122),
+    untracked: Color::Rgb(215, 130, 126),
+    conflict: Color::Rgb(180, 99, 122),
 };
 
 pub const GITHUB: Theme = Theme {
