@@ -4,6 +4,10 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Add Rose Pine, Rose Pine Dawn, Ayu Dark, Ayu Light, Flexoki Dark, Gruvbox Light, and Nord themes.
+
 ### Fixed
 
 - Viewing a staged file's diff no longer errors with `reference 'refs/heads/main' not found` in a repository with no commits yet.
