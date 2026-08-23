@@ -105,6 +105,12 @@ pub const THEMES: &[ThemeEntry] = &[
         theme: GRUVBOX,
     },
     ThemeEntry {
+        name: "Gruvbox Light",
+        id: "gruvbox-light",
+        appearance: "light",
+        theme: GRUVBOX_LIGHT,
+    },
+    ThemeEntry {
         name: "Tokyo Night",
         id: "tokyonight",
         appearance: "dark",
@@ -759,6 +765,51 @@ pub const NORD: Theme = Theme {
     unstaged: Color::Rgb(191, 97, 106),
     untracked: Color::Rgb(208, 135, 112),
     conflict: Color::Rgb(191, 97, 106),
+};
+
+pub const GRUVBOX_LIGHT: Theme = Theme {
+    syntax_theme: "gruvbox-light",
+    syntax_palette: Some(SyntaxPalette {
+        comment: Color::Rgb(146, 131, 116),
+        keyword: Color::Rgb(204, 36, 29),
+        function: Color::Rgb(152, 151, 26),
+        variable: Color::Rgb(69, 133, 136),
+        string: Color::Rgb(215, 153, 33),
+        number: Color::Rgb(177, 98, 134),
+        type_name: Color::Rgb(104, 157, 106),
+        operator: Color::Rgb(214, 93, 14),
+        punctuation: Color::Rgb(60, 56, 54),
+    }),
+
+    bg: Color::Rgb(251, 241, 199),
+    sidebar_bg: Color::Rgb(251, 241, 199),
+    line: Color::Rgb(189, 174, 147),
+
+    fg: Color::Rgb(60, 56, 54),
+    dim: Color::Rgb(146, 131, 116),
+
+    accent: Color::Rgb(69, 133, 136),
+    select: Color::Rgb(235, 219, 178),
+    select_hi: Color::Rgb(213, 196, 161),
+
+    file_header_bg: Color::Rgb(235, 219, 178),
+    hunk_header_bg: Color::Rgb(213, 196, 161),
+    active_file_fg: Color::Rgb(69, 133, 136),
+
+    add_bg: Color::Rgb(234, 237, 204),
+    add_inline_bg: Color::Rgb(216, 224, 163),
+    add_fg: Color::Rgb(152, 151, 26),
+    add_gutter: Color::Rgb(152, 151, 26),
+    del_bg: Color::Rgb(247, 225, 213),
+    del_inline_bg: Color::Rgb(240, 196, 177),
+    del_fg: Color::Rgb(204, 36, 29),
+    del_gutter: Color::Rgb(204, 36, 29),
+
+    staged: Color::Rgb(152, 151, 26),
+    partial: Color::Rgb(215, 153, 33),
+    unstaged: Color::Rgb(204, 36, 29),
+    untracked: Color::Rgb(214, 93, 14),
+    conflict: Color::Rgb(204, 36, 29),
 };
 
 pub const GITHUB: Theme = Theme {
