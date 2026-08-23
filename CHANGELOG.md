@@ -6,7 +6,7 @@ All notable changes to Marten will be documented in this file.
 
 ### Added
 
-- Add Rose Pine, Rose Pine Dawn, Ayu Dark, Ayu Light, Flexoki Dark, Gruvbox Light, and Nord themes.
+- Add Rose Pine, Rose Pine Dawn, Ayu Dark, Ayu Light, Flexoki Dark, Gruvbox Light, Nord, and Tokyo Night Light themes.
 
 ### Fixed
 

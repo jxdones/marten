@@ -117,6 +117,12 @@ pub const THEMES: &[ThemeEntry] = &[
         theme: TOKYO_NIGHT,
     },
     ThemeEntry {
+        name: "Tokyo Night Light",
+        id: "tokyonight-light",
+        appearance: "light",
+        theme: TOKYO_NIGHT_LIGHT,
+    },
+    ThemeEntry {
         name: "Rose Pine",
         id: "rose-pine",
         appearance: "dark",
@@ -810,6 +816,51 @@ pub const GRUVBOX_LIGHT: Theme = Theme {
     unstaged: Color::Rgb(204, 36, 29),
     untracked: Color::Rgb(214, 93, 14),
     conflict: Color::Rgb(204, 36, 29),
+};
+
+pub const TOKYO_NIGHT_LIGHT: Theme = Theme {
+    syntax_theme: "tokyonight-light",
+    syntax_palette: Some(SyntaxPalette {
+        comment: Color::Rgb(136, 139, 148),
+        keyword: Color::Rgb(101, 53, 157),
+        function: Color::Rgb(41, 89, 170),
+        variable: Color::Rgb(52, 59, 88),
+        string: Color::Rgb(56, 95, 13),
+        number: Color::Rgb(150, 80, 39),
+        type_name: Color::Rgb(0, 108, 134),
+        operator: Color::Rgb(0, 108, 134),
+        punctuation: Color::Rgb(52, 59, 89),
+    }),
+
+    bg: Color::Rgb(230, 231, 237),
+    sidebar_bg: Color::Rgb(230, 231, 237),
+    line: Color::Rgb(193, 194, 199),
+
+    fg: Color::Rgb(52, 59, 89),
+    dim: Color::Rgb(136, 139, 148),
+
+    accent: Color::Rgb(41, 89, 170),
+    select: Color::Rgb(214, 216, 223),
+    select_hi: Color::Rgb(218, 220, 227),
+
+    file_header_bg: Color::Rgb(214, 216, 223),
+    hunk_header_bg: Color::Rgb(220, 222, 228),
+    active_file_fg: Color::Rgb(41, 89, 170),
+
+    add_bg: Color::Rgb(214, 232, 229),
+    add_inline_bg: Color::Rgb(188, 219, 213),
+    add_fg: Color::Rgb(45, 156, 145),
+    add_gutter: Color::Rgb(45, 156, 145),
+    del_bg: Color::Rgb(241, 220, 220),
+    del_inline_bg: Color::Rgb(247, 197, 197),
+    del_fg: Color::Rgb(232, 104, 104),
+    del_gutter: Color::Rgb(232, 104, 104),
+
+    staged: Color::Rgb(45, 156, 145),
+    partial: Color::Rgb(143, 94, 21),
+    unstaged: Color::Rgb(232, 104, 104),
+    untracked: Color::Rgb(150, 80, 39),
+    conflict: Color::Rgb(232, 104, 104),
 };
 
 pub const GITHUB: Theme = Theme {
