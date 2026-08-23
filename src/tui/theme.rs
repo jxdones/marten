@@ -135,6 +135,12 @@ pub const THEMES: &[ThemeEntry] = &[
         theme: ROSE_PINE_DAWN,
     },
     ThemeEntry {
+        name: "Flexoki Dark",
+        id: "flexoki-dark",
+        appearance: "dark",
+        theme: FLEXOKI_DARK,
+    },
+    ThemeEntry {
         name: "GitHub",
         id: "github",
         appearance: "dark",
@@ -657,6 +663,51 @@ pub const ROSE_PINE_DAWN: Theme = Theme {
     unstaged: Color::Rgb(180, 99, 122),
     untracked: Color::Rgb(215, 130, 126),
     conflict: Color::Rgb(180, 99, 122),
+};
+
+pub const FLEXOKI_DARK: Theme = Theme {
+    syntax_theme: "flexoki-dark",
+    syntax_palette: Some(SyntaxPalette {
+        comment: Color::Rgb(87, 86, 83),
+        keyword: Color::Rgb(135, 154, 57),
+        function: Color::Rgb(218, 112, 44),
+        variable: Color::Rgb(67, 133, 190),
+        string: Color::Rgb(58, 169, 159),
+        number: Color::Rgb(139, 126, 200),
+        type_name: Color::Rgb(206, 93, 151),
+        operator: Color::Rgb(135, 133, 128),
+        punctuation: Color::Rgb(135, 133, 128),
+    }),
+
+    bg: Color::Rgb(16, 15, 15),
+    sidebar_bg: Color::Rgb(16, 15, 15),
+    line: Color::Rgb(40, 39, 38),
+
+    fg: Color::Rgb(206, 205, 195),
+    dim: Color::Rgb(135, 133, 128),
+
+    accent: Color::Rgb(67, 133, 190),
+    select: Color::Rgb(28, 27, 26),
+    select_hi: Color::Rgb(64, 62, 60),
+
+    file_header_bg: Color::Rgb(28, 27, 26),
+    hunk_header_bg: Color::Rgb(40, 39, 38),
+    active_file_fg: Color::Rgb(67, 133, 190),
+
+    add_bg: Color::Rgb(24, 38, 18),
+    add_inline_bg: Color::Rgb(39, 59, 22),
+    add_fg: Color::Rgb(135, 154, 57),
+    add_gutter: Color::Rgb(135, 154, 57),
+    del_bg: Color::Rgb(40, 20, 18),
+    del_inline_bg: Color::Rgb(66, 28, 24),
+    del_fg: Color::Rgb(209, 77, 65),
+    del_gutter: Color::Rgb(209, 77, 65),
+
+    staged: Color::Rgb(135, 154, 57),
+    partial: Color::Rgb(208, 162, 21),
+    unstaged: Color::Rgb(209, 77, 65),
+    untracked: Color::Rgb(218, 112, 44),
+    conflict: Color::Rgb(206, 93, 151),
 };
 
 pub const GITHUB: Theme = Theme {
