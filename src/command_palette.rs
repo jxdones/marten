@@ -1,18 +1,6 @@
 use crate::action::Action;
 use crate::state::{Focus, Overlay};
 
-pub fn update(overlay: &mut Overlay, action: Action, focus: Focus) {
-    let Overlay::CommandPalette(state) = overlay else {
-        return;
-    };
-
-    match action {
-        Action::MoveDown => state.select_next(command_count(focus)),
-        Action::MoveUp => state.select_previous(command_count(focus)),
-        _ => {}
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 pub enum Section {
     Navigation,
@@ -44,6 +32,18 @@ pub struct CommandItem {
 pub struct CommandGroup {
     pub section: Section,
     pub items: &'static [CommandItem],
+}
+
+pub fn update(overlay: &mut Overlay, action: Action, focus: Focus) {
+    let Overlay::CommandPalette(state) = overlay else {
+        return;
+    };
+
+    match action {
+        Action::MoveDown => state.select_next(command_count(focus)),
+        Action::MoveUp => state.select_previous(command_count(focus)),
+        _ => {}
+    }
 }
 
 pub fn command_groups() -> &'static [CommandGroup] {
