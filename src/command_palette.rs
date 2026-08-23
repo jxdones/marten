@@ -1,5 +1,17 @@
 use crate::action::Action;
-use crate::state::Overlay;
+use crate::state::{Focus, Overlay};
+
+pub fn update(overlay: &mut Overlay, action: Action, focus: Focus) {
+    let Overlay::CommandPalette(state) = overlay else {
+        return;
+    };
+
+    match action {
+        Action::MoveDown => state.select_next(command_count(focus)),
+        Action::MoveUp => state.select_previous(command_count(focus)),
+        _ => {}
+    }
+}
 
 #[derive(Debug, Clone, Copy)]
 pub enum Section {
@@ -32,18 +44,6 @@ pub struct CommandItem {
 pub struct CommandGroup {
     pub section: Section,
     pub items: &'static [CommandItem],
-}
-
-pub fn update(overlay: &mut Overlay, action: Action) {
-    let Overlay::CommandPalette(state) = overlay else {
-        return;
-    };
-
-    match action {
-        Action::MoveDown => state.select_next(command_count()),
-        Action::MoveUp => state.select_previous(command_count()),
-        _ => {}
-    }
 }
 
 pub fn command_groups() -> &'static [CommandGroup] {
@@ -103,6 +103,18 @@ pub fn command_groups() -> &'static [CommandGroup] {
                     description: "show later columns in the diff",
                     keybind: "l / →",
                     action: Action::ScrollDiffRight,
+                },
+                CommandItem {
+                    label: "page up",
+                    description: "scroll the diff up one page",
+                    keybind: "PgUp",
+                    action: Action::PageUp,
+                },
+                CommandItem {
+                    label: "page down",
+                    description: "scroll the diff down one page",
+                    keybind: "PgDn",
+                    action: Action::PageDown,
                 },
                 CommandItem {
                     label: "edit hunk",
@@ -170,11 +182,19 @@ pub fn command_groups() -> &'static [CommandGroup] {
     ]
 }
 
-pub fn command_count() -> usize {
-    command_groups().iter().map(|group| group.items.len()).sum()
+pub fn is_available(item: &CommandItem, focus: Focus) -> bool {
+    !matches!(item.action, Action::PageUp | Action::PageDown) || focus == Focus::Diff
 }
 
-pub fn selected_action(overlay: &Overlay) -> Option<Action> {
+pub fn command_count(focus: Focus) -> usize {
+    command_groups()
+        .iter()
+        .flat_map(|group| group.items)
+        .filter(|item| is_available(item, focus))
+        .count()
+}
+
+pub fn selected_action(overlay: &Overlay, focus: Focus) -> Option<Action> {
     let Overlay::CommandPalette(state) = overlay else {
         return None;
     };
@@ -182,6 +202,7 @@ pub fn selected_action(overlay: &Overlay) -> Option<Action> {
     command_groups()
         .iter()
         .flat_map(|group| group.items)
+        .filter(|item| is_available(item, focus))
         .nth(state.selected)
         .map(|item| item.action)
 }
