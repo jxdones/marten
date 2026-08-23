@@ -117,6 +117,12 @@ pub const THEMES: &[ThemeEntry] = &[
         theme: ROSE_PINE,
     },
     ThemeEntry {
+        name: "Ayu Dark",
+        id: "ayu-dark",
+        appearance: "dark",
+        theme: AYU_DARK,
+    },
+    ThemeEntry {
         name: "GitHub",
         id: "github",
         appearance: "dark",
@@ -504,6 +510,51 @@ pub const ROSE_PINE: Theme = Theme {
     unstaged: Color::Rgb(235, 111, 146),
     untracked: Color::Rgb(235, 188, 186),
     conflict: Color::Rgb(235, 111, 146),
+};
+
+pub const AYU_DARK: Theme = Theme {
+    syntax_theme: "ayu-dark",
+    syntax_palette: Some(SyntaxPalette {
+        comment: Color::Rgb(92, 103, 115),
+        keyword: Color::Rgb(255, 143, 64),
+        function: Color::Rgb(255, 180, 84),
+        variable: Color::Rgb(230, 182, 115),
+        string: Color::Rgb(170, 217, 76),
+        number: Color::Rgb(210, 166, 255),
+        type_name: Color::Rgb(57, 186, 230),
+        operator: Color::Rgb(242, 150, 104),
+        punctuation: Color::Rgb(179, 177, 173),
+    }),
+
+    bg: Color::Rgb(10, 14, 20),
+    sidebar_bg: Color::Rgb(10, 14, 20),
+    line: Color::Rgb(45, 54, 64),
+
+    fg: Color::Rgb(179, 177, 173),
+    dim: Color::Rgb(92, 103, 115),
+
+    accent: Color::Rgb(230, 180, 80),
+    select: Color::Rgb(27, 39, 51),
+    select_hi: Color::Rgb(37, 51, 64),
+
+    file_header_bg: Color::Rgb(15, 19, 26),
+    hunk_header_bg: Color::Rgb(17, 21, 28),
+    active_file_fg: Color::Rgb(230, 180, 80),
+
+    add_bg: Color::Rgb(26, 46, 20),
+    add_inline_bg: Color::Rgb(45, 74, 25),
+    add_fg: Color::Rgb(170, 217, 76),
+    add_gutter: Color::Rgb(170, 217, 76),
+    del_bg: Color::Rgb(46, 24, 26),
+    del_inline_bg: Color::Rgb(77, 33, 38),
+    del_fg: Color::Rgb(240, 113, 120),
+    del_gutter: Color::Rgb(240, 113, 120),
+
+    staged: Color::Rgb(170, 217, 76),
+    partial: Color::Rgb(255, 180, 84),
+    unstaged: Color::Rgb(240, 113, 120),
+    untracked: Color::Rgb(255, 143, 64),
+    conflict: Color::Rgb(217, 87, 87),
 };
 
 pub const GITHUB: Theme = Theme {
