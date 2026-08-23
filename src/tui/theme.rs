@@ -111,6 +111,12 @@ pub const THEMES: &[ThemeEntry] = &[
         theme: TOKYO_NIGHT,
     },
     ThemeEntry {
+        name: "Rose Pine",
+        id: "rose-pine",
+        appearance: "dark",
+        theme: ROSE_PINE,
+    },
+    ThemeEntry {
         name: "GitHub",
         id: "github",
         appearance: "dark",
@@ -453,6 +459,51 @@ pub const TOKYO_NIGHT: Theme = Theme {
     unstaged: Color::Rgb(255, 117, 127),
     untracked: Color::Rgb(255, 150, 108),
     conflict: Color::Rgb(255, 117, 127),
+};
+
+pub const ROSE_PINE: Theme = Theme {
+    syntax_theme: "rose-pine",
+    syntax_palette: Some(SyntaxPalette {
+        comment: Color::Rgb(110, 106, 134),
+        keyword: Color::Rgb(49, 116, 143),
+        function: Color::Rgb(235, 188, 186),
+        variable: Color::Rgb(235, 111, 146),
+        string: Color::Rgb(246, 193, 119),
+        number: Color::Rgb(196, 167, 231),
+        type_name: Color::Rgb(156, 207, 216),
+        operator: Color::Rgb(144, 140, 170),
+        punctuation: Color::Rgb(144, 140, 170),
+    }),
+
+    bg: Color::Rgb(25, 23, 36),
+    sidebar_bg: Color::Rgb(25, 23, 36),
+    line: Color::Rgb(64, 61, 82),
+
+    fg: Color::Rgb(224, 222, 244),
+    dim: Color::Rgb(110, 106, 134),
+
+    accent: Color::Rgb(196, 167, 231),
+    select: Color::Rgb(33, 32, 46),
+    select_hi: Color::Rgb(64, 61, 82),
+
+    file_header_bg: Color::Rgb(31, 29, 46),
+    hunk_header_bg: Color::Rgb(33, 32, 46),
+    active_file_fg: Color::Rgb(196, 167, 231),
+
+    add_bg: Color::Rgb(26, 46, 45),
+    add_inline_bg: Color::Rgb(31, 74, 72),
+    add_fg: Color::Rgb(156, 207, 216),
+    add_gutter: Color::Rgb(156, 207, 216),
+    del_bg: Color::Rgb(46, 26, 34),
+    del_inline_bg: Color::Rgb(74, 33, 48),
+    del_fg: Color::Rgb(235, 111, 146),
+    del_gutter: Color::Rgb(235, 111, 146),
+
+    staged: Color::Rgb(156, 207, 216),
+    partial: Color::Rgb(246, 193, 119),
+    unstaged: Color::Rgb(235, 111, 146),
+    untracked: Color::Rgb(235, 188, 186),
+    conflict: Color::Rgb(235, 111, 146),
 };
 
 pub const GITHUB: Theme = Theme {
