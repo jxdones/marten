@@ -4,6 +4,8 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.14] - 2026-08-23
+
 ### Added
 
 - Add Rose Pine, Rose Pine Dawn, Ayu Dark, Ayu Light, Flexoki Dark, Gruvbox Light, Nord, and Tokyo Night Light themes.
