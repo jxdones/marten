@@ -57,16 +57,6 @@ impl DiffPanel {
                 self.select_previous_line(diff_ctx.store);
                 self.sync_files_to_selection(diff_ctx.files, diff_ctx.store);
             }
-            Action::PageDown => {
-                self.continuous_scroll_page_down(diff_ctx.store);
-                self.keep_selection_in_view(diff_ctx.store);
-                self.sync_files_to_selection(diff_ctx.files, diff_ctx.store);
-            }
-            Action::PageUp => {
-                self.continuous_scroll_page_up();
-                self.keep_selection_in_view(diff_ctx.store);
-                self.sync_files_to_selection(diff_ctx.files, diff_ctx.store);
-            }
             Action::ScrollDiffLeft => {
                 self.state.scroll_left(HORIZONTAL_SCROLL_STEP);
             }
@@ -91,6 +81,24 @@ impl DiffPanel {
             }
             Action::ScrollDiff { direction, lines } => {
                 self.continuous_scroll_by(direction, lines, diff_ctx.store);
+                self.keep_selection_in_view(diff_ctx.store);
+                self.sync_files_to_selection(diff_ctx.files, diff_ctx.store);
+            }
+            Action::PageDown => {
+                self.continuous_scroll_by(
+                    ScrollDirection::Down,
+                    self.page_scroll_amount(),
+                    diff_ctx.store,
+                );
+                self.keep_selection_in_view(diff_ctx.store);
+                self.sync_files_to_selection(diff_ctx.files, diff_ctx.store);
+            }
+            Action::PageUp => {
+                self.continuous_scroll_by(
+                    ScrollDirection::Up,
+                    self.page_scroll_amount(),
+                    diff_ctx.store,
+                );
                 self.keep_selection_in_view(diff_ctx.store);
                 self.sync_files_to_selection(diff_ctx.files, diff_ctx.store);
             }
@@ -324,22 +332,6 @@ impl DiffPanel {
                 .min(self.max_continuous_scroll_offset(store)),
             ScrollDirection::Up => self.review.continuous_scroll.saturating_sub(distance),
         };
-    }
-
-    pub fn continuous_scroll_page_down(&mut self, store: &DiffStore) {
-        let max_offset = self.max_continuous_scroll_offset(store);
-        self.review.continuous_scroll = self
-            .review
-            .continuous_scroll
-            .saturating_add(self.page_scroll_amount())
-            .min(max_offset);
-    }
-
-    pub fn continuous_scroll_page_up(&mut self) {
-        self.review.continuous_scroll = self
-            .review
-            .continuous_scroll
-            .saturating_sub(self.page_scroll_amount());
     }
 
     pub fn select_next_hunk(&mut self, store: &DiffStore) {
