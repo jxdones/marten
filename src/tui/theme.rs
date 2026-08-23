@@ -117,6 +117,12 @@ pub const THEMES: &[ThemeEntry] = &[
         theme: ROSE_PINE,
     },
     ThemeEntry {
+        name: "Rose Pine Dawn",
+        id: "rose-pine-dawn",
+        appearance: "light",
+        theme: ROSE_PINE_DAWN,
+    },
+    ThemeEntry {
         name: "Ayu Dark",
         id: "ayu-dark",
         appearance: "dark",
@@ -129,16 +135,16 @@ pub const THEMES: &[ThemeEntry] = &[
         theme: AYU_LIGHT,
     },
     ThemeEntry {
-        name: "Rose Pine Dawn",
-        id: "rose-pine-dawn",
-        appearance: "light",
-        theme: ROSE_PINE_DAWN,
-    },
-    ThemeEntry {
         name: "Flexoki Dark",
         id: "flexoki-dark",
         appearance: "dark",
         theme: FLEXOKI_DARK,
+    },
+    ThemeEntry {
+        name: "Flexoki Light",
+        id: "flexoki-light",
+        appearance: "light",
+        theme: FLEXOKI_LIGHT,
     },
     ThemeEntry {
         name: "Nord",
@@ -157,12 +163,6 @@ pub const THEMES: &[ThemeEntry] = &[
         id: "github-light",
         appearance: "light",
         theme: GITHUB_LIGHT,
-    },
-    ThemeEntry {
-        name: "Flexoki Light",
-        id: "flexoki-light",
-        appearance: "light",
-        theme: FLEXOKI_LIGHT,
     },
 ];
 
@@ -719,7 +719,7 @@ pub const FLEXOKI_DARK: Theme = Theme {
 pub const NORD: Theme = Theme {
     syntax_theme: "nord",
     syntax_palette: Some(SyntaxPalette {
-        comment: Color::Rgb(76, 86, 106),
+        comment: Color::Rgb(110, 120, 140),
         keyword: Color::Rgb(129, 161, 193),
         function: Color::Rgb(136, 192, 208),
         variable: Color::Rgb(216, 222, 233),
@@ -735,7 +735,7 @@ pub const NORD: Theme = Theme {
     line: Color::Rgb(76, 86, 106),
 
     fg: Color::Rgb(216, 222, 233),
-    dim: Color::Rgb(76, 86, 106),
+    dim: Color::Rgb(110, 120, 140),
 
     accent: Color::Rgb(136, 192, 208),
     select: Color::Rgb(59, 66, 82),
