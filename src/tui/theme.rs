@@ -123,6 +123,12 @@ pub const THEMES: &[ThemeEntry] = &[
         theme: AYU_DARK,
     },
     ThemeEntry {
+        name: "Ayu Light",
+        id: "ayu-light",
+        appearance: "light",
+        theme: AYU_LIGHT,
+    },
+    ThemeEntry {
         name: "GitHub",
         id: "github",
         appearance: "dark",
@@ -555,6 +561,51 @@ pub const AYU_DARK: Theme = Theme {
     unstaged: Color::Rgb(240, 113, 120),
     untracked: Color::Rgb(255, 143, 64),
     conflict: Color::Rgb(217, 87, 87),
+};
+
+pub const AYU_LIGHT: Theme = Theme {
+    syntax_theme: "ayu-light",
+    syntax_palette: Some(SyntaxPalette {
+        comment: Color::Rgb(140, 145, 150),
+        keyword: Color::Rgb(250, 141, 62),
+        function: Color::Rgb(242, 174, 73),
+        variable: Color::Rgb(183, 120, 19),
+        string: Color::Rgb(134, 179, 0),
+        number: Color::Rgb(163, 122, 204),
+        type_name: Color::Rgb(85, 180, 212),
+        operator: Color::Rgb(237, 147, 102),
+        punctuation: Color::Rgb(92, 97, 102),
+    }),
+
+    bg: Color::Rgb(250, 250, 250),
+    sidebar_bg: Color::Rgb(250, 250, 250),
+    line: Color::Rgb(230, 230, 230),
+
+    fg: Color::Rgb(92, 97, 102),
+    dim: Color::Rgb(140, 145, 150),
+
+    accent: Color::Rgb(250, 141, 62),
+    select: Color::Rgb(231, 232, 233),
+    select_hi: Color::Rgb(225, 227, 230),
+
+    file_header_bg: Color::Rgb(243, 243, 243),
+    hunk_header_bg: Color::Rgb(238, 238, 238),
+    active_file_fg: Color::Rgb(250, 141, 62),
+
+    add_bg: Color::Rgb(230, 240, 209),
+    add_inline_bg: Color::Rgb(208, 227, 163),
+    add_fg: Color::Rgb(134, 179, 0),
+    add_gutter: Color::Rgb(134, 179, 0),
+    del_bg: Color::Rgb(252, 228, 228),
+    del_inline_bg: Color::Rgb(248, 201, 201),
+    del_fg: Color::Rgb(240, 113, 113),
+    del_gutter: Color::Rgb(240, 113, 113),
+
+    staged: Color::Rgb(134, 179, 0),
+    partial: Color::Rgb(242, 174, 73),
+    unstaged: Color::Rgb(240, 113, 113),
+    untracked: Color::Rgb(250, 141, 62),
+    conflict: Color::Rgb(230, 80, 80),
 };
 
 pub const GITHUB: Theme = Theme {
