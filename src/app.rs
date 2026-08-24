@@ -376,6 +376,7 @@ impl App {
                     *overlay = Overlay::ThemeSelector(ThemeSelectorState {
                         selected: current,
                         original: current,
+                        ..Default::default()
                     });
                 }
 
@@ -484,7 +485,9 @@ impl App {
                 command_palette::update(overlay, action);
                 return Ok(());
             }
-            Action::MoveDown | Action::MoveUp if matches!(overlay, Overlay::ThemeSelector(_)) => {
+            Action::MoveDown | Action::MoveUp | Action::ToggleThemeFilter
+                if matches!(overlay, Overlay::ThemeSelector(_)) =>
+            {
                 theme::update(overlay, action);
 
                 if let Overlay::ThemeSelector(state) = overlay
@@ -615,6 +618,7 @@ impl App {
                 KeyCode::Down | KeyCode::Char('j') => Action::MoveDown,
                 KeyCode::Up | KeyCode::Char('k') => Action::MoveUp,
                 KeyCode::Enter => Action::SelectTheme,
+                KeyCode::Tab => Action::ToggleThemeFilter,
                 KeyCode::Esc | KeyCode::Char('q') => Action::ToggleThemeSelector,
                 _ => Action::Noop,
             };

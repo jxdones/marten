@@ -4,6 +4,10 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Filter the theme picker to dark, light, or all themes with `tab`.
+
 ## [0.1.14] - 2026-08-23
 
 ### Added

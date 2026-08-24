@@ -34,6 +34,7 @@ pub enum Action {
     ToggleSidebar,
     ToggleCommandPalette,
     ToggleThemeSelector,
+    ToggleThemeFilter,
     ToggleFileFinder,
     ToggleCommitsFinder,
     ToggleCommitsFinderFocus,

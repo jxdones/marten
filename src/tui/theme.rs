@@ -55,6 +55,14 @@ pub struct ThemeEntry {
     pub theme: Theme,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ThemeFilter {
+    #[default]
+    All,
+    Dark,
+    Light,
+}
+
 pub const THEMES: &[ThemeEntry] = &[
     ThemeEntry {
         name: "Marten",
@@ -1162,4 +1170,26 @@ impl Theme {
     pub fn hunk_header(self) -> Style {
         Style::default().fg(self.dim).bg(self.hunk_header_bg)
     }
+}
+
+impl ThemeFilter {
+    pub fn cycle(self) -> Self {
+        match self {
+            Self::All => Self::Dark,
+            Self::Dark => Self::Light,
+            Self::Light => Self::All,
+        }
+    }
+}
+
+pub fn visible_themes(filter: ThemeFilter) -> Vec<(usize, &'static ThemeEntry)> {
+    THEMES
+        .iter()
+        .enumerate()
+        .filter(|(_, e)| match filter {
+            ThemeFilter::All => true,
+            ThemeFilter::Dark => e.appearance == "dark",
+            ThemeFilter::Light => e.appearance == "light",
+        })
+        .collect()
 }

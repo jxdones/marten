@@ -12,7 +12,7 @@ use crate::{
     tui::{
         components::modal,
         layout,
-        theme::{THEMES, Theme, ThemeEntry},
+        theme::{Theme, ThemeEntry, ThemeFilter, visible_themes},
     },
 };
 
@@ -28,6 +28,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
 
     let selected = state.selected;
     let original = state.original;
+    let filter = state.filter;
 
     if layout::terminal_is_too_small(area) {
         app.dismiss_overlay();
@@ -48,8 +49,8 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
 
     modal::draw_title_bar(frame, title_area, "theme picker", active_theme);
     draw_header(frame, header_area, active_theme);
-    draw_list(frame, list_area, selected, original, active_theme);
-    draw_footer(frame, footer_area, active_theme);
+    draw_list(frame, list_area, selected, original, filter, active_theme);
+    draw_footer(frame, footer_area, filter, active_theme);
 }
 
 fn draw_header(frame: &mut Frame, area: Rect, theme: Theme) {
@@ -68,18 +69,33 @@ fn draw_header(frame: &mut Frame, area: Rect, theme: Theme) {
     frame.render_widget(Paragraph::new(header), area);
 }
 
-fn draw_list(frame: &mut Frame, area: Rect, selected: usize, original: usize, active_theme: Theme) {
-    let rows = THEMES
+fn draw_list(
+    frame: &mut Frame,
+    area: Rect,
+    selected: usize,
+    original: usize,
+    filter: ThemeFilter,
+    active_theme: Theme,
+) {
+    let visible = visible_themes(filter);
+
+    let rows = visible
         .iter()
-        .enumerate()
-        .map(|(index, entry)| theme_row(entry, index == selected, index == original, active_theme))
+        .map(|(index, entry)| {
+            theme_row(entry, *index == selected, *index == original, active_theme)
+        })
         .collect::<Vec<_>>();
+
+    let visible_position = visible
+        .iter()
+        .position(|(index, _)| *index == selected)
+        .unwrap_or(0);
 
     let list = List::new(rows)
         .style(Style::default().fg(active_theme.fg).bg(active_theme.bg))
         .highlight_style(Style::default());
 
-    let mut state = ListState::default().with_selected(Some(selected));
+    let mut state = ListState::default().with_selected(Some(visible_position));
     frame.render_stateful_widget(list, area, &mut state);
 }
 
@@ -143,7 +159,7 @@ fn fit_to_width(text: &str, width: usize) -> String {
     output
 }
 
-fn draw_footer(frame: &mut Frame, area: Rect, theme: Theme) {
+fn draw_footer(frame: &mut Frame, area: Rect, filter: ThemeFilter, theme: Theme) {
     let block = Block::default()
         .borders(Borders::TOP)
         .border_style(theme.panel_border())
@@ -151,11 +167,19 @@ fn draw_footer(frame: &mut Frame, area: Rect, theme: Theme) {
     let inner = block.inner(area);
     frame.render_widget(block, area);
 
+    let filter_label = match filter {
+        ThemeFilter::All => "all",
+        ThemeFilter::Dark => "dark",
+        ThemeFilter::Light => "light",
+    };
+
     let left = vec![
-        Span::styled(" ↓↑/jk ", theme.accent()),
-        Span::styled("preview ", theme.muted()),
+        Span::styled("↓↑/jk ", theme.accent()),
+        Span::styled("preview", theme.muted()),
         Span::styled("  enter ", theme.accent()),
         Span::styled("save", theme.muted()),
+        Span::styled("  tab ", theme.accent()),
+        Span::styled(filter_label, theme.muted()),
     ];
     frame.render_widget(
         Paragraph::new(Line::from(left)).alignment(Alignment::Center),

@@ -1,3 +1,5 @@
+use crate::tui::theme::ThemeFilter;
+
 #[derive(Debug, Clone)]
 pub enum Overlay {
     None,
@@ -16,6 +18,7 @@ pub struct CommandPaletteState {
 pub struct ThemeSelectorState {
     pub selected: usize,
     pub original: usize,
+    pub filter: ThemeFilter,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -39,22 +42,6 @@ pub enum CommitsFinderFocus {
 }
 
 impl CommandPaletteState {
-    pub const fn select_next(&mut self, len: usize) {
-        if len == 0 {
-            return;
-        }
-        self.selected = (self.selected + 1) % len;
-    }
-
-    pub const fn select_previous(&mut self, len: usize) {
-        if len == 0 {
-            return;
-        }
-        self.selected = (self.selected + len - 1) % len;
-    }
-}
-
-impl ThemeSelectorState {
     pub const fn select_next(&mut self, len: usize) {
         if len == 0 {
             return;
