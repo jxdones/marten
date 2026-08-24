@@ -7,6 +7,7 @@ All notable changes to Marten will be documented in this file.
 ### Added
 
 - Filter the theme picker to dark, light, or all themes with `tab`.
+- Control whether line numbers are shown at startup with `[diff] show_line_numbers` in the config file. It defaults to `true`; press `L` while Marten is running to toggle it.
 
 ## [0.1.14] - 2026-08-23
 

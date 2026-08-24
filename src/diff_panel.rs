@@ -7,7 +7,7 @@ use crate::files_panel::FilesPanel;
 use crate::git::repository::{self, DiffSource, FileEntry};
 use crate::state::review::RenderedRow;
 use crate::state::review::ReviewState;
-use crate::state::{Diff, DiffLayout, DiffLoadState, FileKey, Focus, LineIndex};
+use crate::state::{Diff, DiffLayout, DiffLoadState, DiffOptions, FileKey, Focus, LineIndex};
 use crate::store::DiffStore;
 
 const SCROLL_STEP: usize = 1;
@@ -28,9 +28,9 @@ pub struct DiffContext<'a> {
 }
 
 impl DiffPanel {
-    pub fn new(tab_width: usize, layout_override: Option<DiffLayout>) -> Self {
+    pub fn new(options: DiffOptions) -> Self {
         Self {
-            state: Diff::new(tab_width, layout_override),
+            state: Diff::new(options),
             review: ReviewState::default(),
         }
     }
@@ -705,7 +705,11 @@ mod tests {
     #[test]
     fn line_navigation_skips_headers_and_scrolls_near_the_viewport_edge() {
         let store = store_with_lines(6);
-        let mut panel = DiffPanel::new(DEFAULT_TAB_WIDTH, None);
+        let mut panel = DiffPanel::new(DiffOptions {
+            tab_width: DEFAULT_TAB_WIDTH,
+            layout_override: None,
+            show_line_numbers: true,
+        });
         panel.set_viewport_height(8);
         panel.sync_continuous_scroll_to_file(Some(0), &store);
 
@@ -737,7 +741,11 @@ mod tests {
     #[test]
     fn hunk_navigation_anchors_the_hunk_header_at_the_viewport_top() {
         let store = store_with_hunks(&[2, 2]);
-        let mut panel = DiffPanel::new(DEFAULT_TAB_WIDTH, None);
+        let mut panel = DiffPanel::new(DiffOptions {
+            tab_width: DEFAULT_TAB_WIDTH,
+            layout_override: None,
+            show_line_numbers: true,
+        });
         panel.set_viewport_height(8);
         panel.sync_continuous_scroll_to_file(Some(0), &store);
 

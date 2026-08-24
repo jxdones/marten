@@ -39,6 +39,7 @@ pub struct Diff {
     pub ignore_whitespace: bool,
     pub tab_width: usize,
     pub layout: DiffLayoutSetting,
+    pub show_line_numbers: bool,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -118,6 +119,7 @@ impl Default for Diff {
             ignore_whitespace: false,
             tab_width: DEFAULT_TAB_WIDTH,
             layout: DiffLayoutSetting::Auto,
+            show_line_numbers: true,
         }
     }
 }

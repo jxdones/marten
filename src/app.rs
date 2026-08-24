@@ -17,8 +17,8 @@ use crate::files_panel::FilesPanel;
 use crate::git::repository::{self, CommitInfo, DiffSource, RevisionData};
 use crate::state::{
     CommandPaletteState, CommitsFinderFocus, CommitsFinderState, ContinuousDiff, Diff, DiffLayout,
-    FileFinderState, FileSlot, Files, Focus, Overlay, ReviewState, Screen, ThemeSelectorState,
-    TreeRow,
+    DiffOptions, FileFinderState, FileSlot, Files, Focus, Overlay, ReviewState, Screen,
+    ThemeSelectorState, TreeRow,
 };
 use crate::store::DiffStore;
 use crate::tui::layout;
@@ -106,7 +106,11 @@ impl App {
         files.ensure_rows(&store);
         files.select_first();
 
-        let mut diff = DiffPanel::new(config.diff.tab_width, config.diff.layout.as_override());
+        let mut diff = DiffPanel::new(DiffOptions {
+            tab_width: config.diff.tab_width,
+            layout_override: config.diff.layout.as_override(),
+            show_line_numbers: config.diff.show_line_numbers,
+        });
         diff.refresh(&mut DiffContext {
             files: &mut files,
             store: &mut store,

@@ -1,5 +1,3 @@
-use crate::config::DEFAULT_TAB_WIDTH;
-
 pub const SIDE_BY_SIDE_MIN_WIDTH: usize = 100;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -18,6 +16,13 @@ impl DiffLayout {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct DiffOptions {
+    pub tab_width: usize,
+    pub layout_override: Option<DiffLayout>,
+    pub show_line_numbers: bool,
+}
+
 #[derive(Debug)]
 pub struct Diff {
     pub viewport_width: usize,
@@ -30,29 +35,15 @@ pub struct Diff {
 }
 
 impl Diff {
-    pub fn new(tab_width: usize, layout_override: Option<DiffLayout>) -> Self {
+    pub fn new(options: DiffOptions) -> Self {
         Self {
             viewport_width: 1,
             viewport_height: 1,
-            show_line_numbers: true,
+            show_line_numbers: options.show_line_numbers,
             horizontal_scroll: 0,
-            tab_width,
+            tab_width: options.tab_width,
             max_horizontal_scroll: 0,
-            layout_override,
-        }
-    }
-}
-
-impl Default for Diff {
-    fn default() -> Self {
-        Self {
-            viewport_width: 1,
-            viewport_height: 1,
-            show_line_numbers: true,
-            horizontal_scroll: 0,
-            tab_width: DEFAULT_TAB_WIDTH,
-            max_horizontal_scroll: 0,
-            layout_override: None,
+            layout_override: options.layout_override,
         }
     }
 }
