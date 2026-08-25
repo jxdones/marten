@@ -1,4 +1,8 @@
-use std::{env, fs, io::ErrorKind, path::PathBuf};
+use std::{
+    env, fs,
+    io::{ErrorKind, Write},
+    path::{Path, PathBuf},
+};
 
 use serde::Deserialize;
 
@@ -57,6 +61,14 @@ impl DiffLayoutSetting {
             Self::Auto => None,
             Self::Split => Some(DiffLayout::SideBySide),
             Self::Unified => Some(DiffLayout::Unified),
+        }
+    }
+
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Auto => "auto",
+            Self::Split => "split",
+            Self::Unified => "unified",
         }
     }
 }
@@ -129,7 +141,77 @@ pub fn load() -> Result<Config, ConfigError> {
         return Ok(Config::default());
     };
 
+    let _ = ensure_default_file(&path);
     load_from(path)
+}
+
+fn ensure_default_file(path: &Path) -> Result<bool, ConfigError> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|source| ConfigError::CreateDirectory {
+            path: parent.to_path_buf(),
+            source,
+        })?;
+    }
+
+    let file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path);
+
+    let mut file = match file {
+        Ok(file) => file,
+        Err(source) if source.kind() == ErrorKind::AlreadyExists => return Ok(false),
+        Err(source) => {
+            return Err(ConfigError::Write {
+                path: path.to_path_buf(),
+                source,
+            });
+        }
+    };
+
+    file.write_all(default_template().as_bytes())
+        .map_err(|source| ConfigError::Write {
+            path: path.to_path_buf(),
+            source,
+        })?;
+
+    Ok(true)
+}
+
+fn default_template() -> String {
+    let ui = UI::default();
+    let diff = Diff::default();
+
+    format!(
+        r#"# marten configuration
+#
+# Every setting below is commented out and shown with its default value.
+# Uncomment a line and change its value to override the default.
+# This file is safe to delete -- marten regenerates it with defaults on the next run.
+
+[ui]
+# theme = "{theme}"
+# show_sidebar = true          # default: shown automatically above 120 terminal columns
+# transparent_background = {transparent_background}
+# nerd_fonts = {nerd_fonts}    # default: true
+
+[review]
+# ignore = ["*.lock", "generated/**"]
+
+[diff]
+# ignore_whitespace = {ignore_whitespace}
+# tab_width = {tab_width}
+# layout = "{layout}"          # auto | split | unified
+# show_line_numbers = {show_line_numbers}
+"#,
+        theme = ui.theme,
+        transparent_background = ui.transparent_background,
+        nerd_fonts = ui.nerd_fonts,
+        ignore_whitespace = diff.ignore_whitespace,
+        tab_width = diff.tab_width,
+        layout = diff.layout.as_str(),
+        show_line_numbers = diff.show_line_numbers,
+    )
 }
 
 pub fn save_theme(entry: &theme::ThemeEntry) -> Result<(), ConfigError> {
@@ -192,6 +274,7 @@ fn save_theme_to(path: PathBuf, theme_id: &str) -> Result<(), ConfigError> {
         Err(source) if source.kind() == ErrorKind::NotFound => String::new(),
         Err(source) => return Err(ConfigError::Read { path, source }),
     };
+
     let mut document =
         toml::from_str::<toml::Table>(&contents).map_err(|source| ConfigError::Parse {
             path: path.clone(),
@@ -443,6 +526,52 @@ mod tests {
         assert_eq!(document["custom"].as_str(), Some("kept"));
         assert_eq!(document["ui"]["show_sidebar"].as_bool(), Some(true));
         assert_eq!(document["ui"]["theme"].as_str(), Some("ermine"));
+    }
+
+    #[test]
+    fn first_run_creates_a_commented_default_file() {
+        let directory = tempdir().unwrap();
+        let path = directory.path().join("config.toml");
+
+        let created = ensure_default_file(&path).unwrap();
+        assert!(created);
+        assert!(path.exists());
+
+        let contents = fs::read_to_string(&path).unwrap();
+        assert!(contents.contains("# theme ="));
+        assert!(contents.contains("# tab_width = 4"));
+    }
+
+    #[test]
+    fn default_template_parses_to_defaults() {
+        let config: Config = toml::from_str(&default_template()).unwrap();
+
+        assert_eq!(config.ui.theme, Config::default().ui.theme);
+        assert_eq!(config.diff.tab_width, DEFAULT_TAB_WIDTH);
+        assert_eq!(config.diff.layout, DiffLayoutSetting::Auto);
+    }
+
+    #[test]
+    fn ensure_default_file_does_not_overwrite_an_existing_file() {
+        let directory = tempdir().unwrap();
+        let path = directory.path().join("config.toml");
+        fs::write(&path, "[ui]\ntheme = 'ermine'\n").unwrap();
+
+        let created = ensure_default_file(&path).unwrap();
+        assert!(!created);
+
+        let config = load_from(path).unwrap();
+        assert_eq!(config.ui.theme, "ermine");
+    }
+
+    #[test]
+    fn ensure_default_file_creates_missing_parent_directories() {
+        let directory = tempdir().unwrap();
+        let path = directory.path().join("nested").join("config.toml");
+
+        ensure_default_file(&path).unwrap();
+
+        assert!(path.exists());
     }
 
     #[test]
