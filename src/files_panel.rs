@@ -260,12 +260,12 @@ impl FilesPanel {
             return Some(file_idx);
         }
 
-        self.state.selected = Some(
-            self.state
-                .selected
-                .unwrap_or(0)
-                .min(self.cached_rows.len() - 1),
-        );
+        self.state.selected = self
+            .cached_rows
+            .iter()
+            .enumerate()
+            .find(|(_, row)| matches!(row, TreeRow::File(..)))
+            .map(|(i, _)| i);
         self.selected_file_idx()
     }
 

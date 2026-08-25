@@ -134,15 +134,7 @@ impl DiffPanel {
     }
 
     pub fn load_source(&mut self, diff_ctx: &mut DiffContext, entries: Vec<FileEntry>) {
-        let selected_key = diff_ctx
-            .files
-            .selected_file(diff_ctx.store)
-            .map(|file| FileKey {
-                path: file.path.clone(),
-                status: file.status,
-            });
-
-        self.replace_entries(diff_ctx, entries, selected_key);
+        self.replace_entries(diff_ctx, entries, None);
     }
 
     fn replace_entries(
