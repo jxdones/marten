@@ -84,6 +84,10 @@ pub enum ConfigError {
         path: PathBuf,
         source: toml::de::Error,
     },
+    ParseDocument {
+        path: PathBuf,
+        source: toml_edit::TomlError,
+    },
     Invalid {
         path: PathBuf,
         message: String,
@@ -91,10 +95,6 @@ pub enum ConfigError {
     CreateDirectory {
         path: PathBuf,
         source: std::io::Error,
-    },
-    Serialize {
-        path: PathBuf,
-        source: toml::ser::Error,
     },
     Write {
         path: PathBuf,
@@ -275,33 +275,29 @@ fn save_theme_to(path: PathBuf, theme_id: &str) -> Result<(), ConfigError> {
         Err(source) => return Err(ConfigError::Read { path, source }),
     };
 
-    let mut document =
-        toml::from_str::<toml::Table>(&contents).map_err(|source| ConfigError::Parse {
+    let mut document = contents
+        .parse::<toml_edit::DocumentMut>()
+        .map_err(|source| ConfigError::ParseDocument {
             path: path.clone(),
             source,
         })?;
-    let ui = document
-        .entry("ui")
-        .or_insert_with(|| toml::Value::Table(toml::Table::new()))
-        .as_table_mut()
+
+    let ui = document["ui"]
+        .or_insert(toml_edit::table())
+        .as_table_like_mut()
         .ok_or_else(|| ConfigError::Invalid {
             path: path.clone(),
             message: "`ui` must be a table".into(),
         })?;
-    ui.insert("theme".into(), toml::Value::String(theme_id.into()));
+    ui.insert("theme", toml_edit::value(theme_id));
 
-    let serialized =
-        toml::to_string_pretty(&document).map_err(|source| ConfigError::Serialize {
-            path: path.clone(),
-            source,
-        })?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|source| ConfigError::CreateDirectory {
             path: parent.to_path_buf(),
             source,
         })?;
     }
-    fs::write(&path, serialized).map_err(|source| ConfigError::Write { path, source })
+    fs::write(&path, document.to_string()).map_err(|source| ConfigError::Write { path, source })
 }
 
 impl std::fmt::Display for ConfigError {
@@ -319,18 +315,14 @@ impl std::fmt::Display for ConfigError {
             Self::Parse { path, source } => {
                 write!(formatter, "could not parse {}: {source}", path.display())
             }
+            Self::ParseDocument { path, source } => {
+                write!(formatter, "could not parse {}: {source}", path.display())
+            }
             Self::Invalid { path, message } => {
                 write!(formatter, "invalid config at {}: {message}", path.display())
             }
             Self::CreateDirectory { path, source } => {
                 write!(formatter, "could not create {}: {source}", path.display())
-            }
-            Self::Serialize { path, source } => {
-                write!(
-                    formatter,
-                    "could not serialize {}: {source}",
-                    path.display()
-                )
             }
             Self::Write { path, source } => {
                 write!(formatter, "could not write {}: {source}", path.display())
@@ -347,7 +339,7 @@ impl std::error::Error for ConfigError {
             | Self::CreateDirectory { source, .. }
             | Self::Write { source, .. } => Some(source),
             Self::Parse { source, .. } => Some(source),
-            Self::Serialize { source, .. } => Some(source),
+            Self::ParseDocument { source, .. } => Some(source),
             Self::Invalid { .. } => None,
         }
     }
@@ -496,6 +488,22 @@ mod tests {
         let error = load_from(path.clone()).unwrap_err();
 
         assert!(error.to_string().contains(&path.display().to_string()));
+    }
+
+    #[test]
+    fn saving_theme_preserves_comments_in_the_default_template() {
+        let directory = tempdir().unwrap();
+        let path = directory.path().join("config.toml");
+        fs::write(&path, default_template()).unwrap();
+
+        save_theme_to(path.clone(), "ermine").unwrap();
+
+        let saved = fs::read_to_string(&path).unwrap();
+        assert!(saved.contains("# Every setting below is commented out"));
+        assert!(saved.contains("# tab_width = 4"));
+
+        let config = load_from(path).unwrap();
+        assert_eq!(config.ui.theme, "ermine");
     }
 
     #[test]
