@@ -106,7 +106,7 @@ marten diff main...feature-branch
 
 ## Configuration
 
-Marten reads its configuration from `~/.config/marten/config.toml` on macOS and Linux. The file is optional; when it is missing or empty, Marten uses its defaults.
+Marten reads its configuration from `~/.config/marten/config.toml` on macOS and Linux. On first run, Marten creates this file for you with every setting commented out and documented alongside its default value. Edit it in place to customize, or leave it as-is to use the defaults.
 
 ```toml
 [ui]
