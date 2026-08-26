@@ -5,7 +5,6 @@ Set FontFamily "JetBrainsMono Nerd Font"
 Set FontSize 12
 Set Width 1400
 Set Height 800
-Set WindowBar Rings
 Set Padding 10
 Set BorderRadius 10
 Set Framerate 24
