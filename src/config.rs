@@ -28,6 +28,7 @@ pub struct UI {
     pub theme: String,
     pub show_sidebar: Option<bool>,
     pub transparent_background: bool,
+    pub sync_to_terminal_background: bool,
     pub nerd_fonts: bool,
 }
 
@@ -120,6 +121,7 @@ impl Default for UI {
             theme: theme::default_entry().id.into(),
             show_sidebar: None,
             transparent_background: false,
+            sync_to_terminal_background: false,
             nerd_fonts: true,
         }
     }
@@ -193,6 +195,7 @@ fn default_template() -> String {
 # theme = "{theme}"
 # show_sidebar = true          # default: shown automatically above 120 terminal columns
 # transparent_background = {transparent_background}
+# sync_to_terminal_background = {sync_to_terminal_background}
 # nerd_fonts = {nerd_fonts}    # default: true
 
 [review]
@@ -206,6 +209,7 @@ fn default_template() -> String {
 "#,
         theme = ui.theme,
         transparent_background = ui.transparent_background,
+        sync_to_terminal_background = ui.sync_to_terminal_background,
         nerd_fonts = ui.nerd_fonts,
         ignore_whitespace = diff.ignore_whitespace,
         tab_width = diff.tab_width,
@@ -406,6 +410,15 @@ mod tests {
     fn set_transparent_background_to_true() {
         let config: Config = toml::from_str("[ui]\ntransparent_background = true").unwrap();
         assert!(config.ui.transparent_background);
+    }
+
+    #[test]
+    fn sync_to_terminal_background_defaults_to_false_and_can_be_enabled() {
+        let config = Config::default();
+        assert!(!config.ui.sync_to_terminal_background);
+
+        let config: Config = toml::from_str("[ui]\nsync_to_terminal_background = true").unwrap();
+        assert!(config.ui.sync_to_terminal_background);
     }
 
     #[test]

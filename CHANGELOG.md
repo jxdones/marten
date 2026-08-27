@@ -4,6 +4,10 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Match the background color of supported terminals' window padding and rounded corners to the active theme with `[ui] sync_to_terminal_background = true`.
+
 ### Fixed
 
 - Switching commits from the commit picker no longer sometimes selects the wrong file (or a folder) in the sidebar instead of the first file.

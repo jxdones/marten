@@ -1,5 +1,5 @@
 use std::{
-    io,
+    io::{self, Write},
     time::{Duration, Instant},
 };
 
@@ -12,7 +12,9 @@ use crossterm::{
     },
 };
 
-use ratatui::{DefaultTerminal, TerminalOptions, Viewport, prelude::CrosstermBackend};
+use ratatui::{
+    DefaultTerminal, TerminalOptions, Viewport, prelude::CrosstermBackend, style::Color,
+};
 
 use crate::{
     action::Action,
@@ -25,8 +27,9 @@ use crate::{
 
 pub fn run(app: &mut App) -> AppResult<()> {
     let mut terminal = init_terminal()?;
-    let result = run_loop(&mut terminal, app);
-    restore_terminal(terminal)?;
+    let mut terminal_background = None;
+    let result = run_loop(&mut terminal, app, &mut terminal_background);
+    restore_terminal(terminal, terminal_background.is_some())?;
     result
 }
 
@@ -48,7 +51,11 @@ fn init_terminal() -> io::Result<DefaultTerminal> {
 // how often we actually repaint.
 const FRAME_BUDGET: Duration = Duration::from_millis(16);
 
-fn run_loop(terminal: &mut DefaultTerminal, app: &mut App) -> AppResult<()> {
+fn run_loop(
+    terminal: &mut DefaultTerminal,
+    app: &mut App,
+    terminal_background: &mut Option<(u8, u8, u8)>,
+) -> AppResult<()> {
     let mut needs_draw = true;
     let mut last_draw = Instant::now();
     // Draining a resize burst requires reading one event past its end. Keep
@@ -61,7 +68,7 @@ fn run_loop(terminal: &mut DefaultTerminal, app: &mut App) -> AppResult<()> {
         }
 
         if needs_draw && last_draw.elapsed() >= FRAME_BUDGET {
-            draw(terminal, app)?;
+            draw(terminal, app, terminal_background)?;
             needs_draw = false;
             last_draw = Instant::now();
         }
@@ -99,7 +106,7 @@ fn run_loop(terminal: &mut DefaultTerminal, app: &mut App) -> AppResult<()> {
                     app.update(action)?;
                     // Paint immediately so there's no gap between the terminal
                     // reflowing and marten repainting.
-                    draw(terminal, app)?;
+                    draw(terminal, app, terminal_background)?;
                     needs_draw = false;
                     last_draw = Instant::now();
                 }
@@ -108,6 +115,9 @@ fn run_loop(terminal: &mut DefaultTerminal, app: &mut App) -> AppResult<()> {
                     app.update(action)?;
 
                     if let Some((path, line)) = app.take_pending_editor() {
+                        if terminal_background.take().is_some() {
+                            reset_terminal_background(terminal.backend_mut())?;
+                        }
                         disable_raw_mode()?;
                         execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
                         editor::command(&path, line as usize)
@@ -137,7 +147,16 @@ fn run_loop(terminal: &mut DefaultTerminal, app: &mut App) -> AppResult<()> {
     Ok(())
 }
 
-fn draw(terminal: &mut DefaultTerminal, app: &mut App) -> io::Result<()> {
+fn draw(
+    terminal: &mut DefaultTerminal,
+    app: &mut App,
+    terminal_background: &mut Option<(u8, u8, u8)>,
+) -> io::Result<()> {
+    sync_to_terminal_background(
+        terminal.backend_mut(),
+        app.terminal_background(),
+        terminal_background,
+    )?;
     // use synchronization mode to avoid the tearing effect when resizing
     execute!(io::stdout(), BeginSynchronizedUpdate)?;
     let res = terminal.draw(|frame| tui::draw(frame, app));
@@ -146,8 +165,11 @@ fn draw(terminal: &mut DefaultTerminal, app: &mut App) -> io::Result<()> {
     Ok(())
 }
 
-fn restore_terminal(mut terminal: DefaultTerminal) -> io::Result<()> {
+fn restore_terminal(mut terminal: DefaultTerminal, reset_background: bool) -> io::Result<()> {
     disable_raw_mode()?;
+    if reset_background {
+        reset_terminal_background(terminal.backend_mut())?;
+    }
     execute!(
         terminal.backend_mut(),
         DisableMouseCapture,
@@ -155,4 +177,86 @@ fn restore_terminal(mut terminal: DefaultTerminal) -> io::Result<()> {
         SetTitle("")
     )?;
     Ok(())
+}
+
+fn sync_to_terminal_background<W: Write>(
+    writer: &mut W,
+    color: Option<Color>,
+    current: &mut Option<(u8, u8, u8)>,
+) -> io::Result<()> {
+    let Some(Color::Rgb(red, green, blue)) = color else {
+        if current.take().is_some() {
+            reset_terminal_background(writer)?;
+        }
+        return Ok(());
+    };
+
+    let rgb = (red, green, blue);
+    if *current == Some(rgb) {
+        return Ok(());
+    }
+
+    // OSC 11 changes the terminal emulator's default background color. Some
+    // terminals also use that color for padding outside the addressable cell
+    // grid. The final `\x1b\\` encodes ST: an ESC byte followed by `\`.
+    write!(writer, "\x1b]11;#{red:02x}{green:02x}{blue:02x}\x1b\\")?;
+    writer.flush()?;
+    *current = Some(rgb);
+    Ok(())
+}
+
+fn reset_terminal_background<W: Write>(writer: &mut W) -> io::Result<()> {
+    // OSC 111 restores the terminal's configured default background, undoing
+    // the temporary OSC 11 override. The final `\x1b\\` is the ST terminator.
+    writer.write_all(b"\x1b]111\x1b\\")?;
+    writer.flush()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn osc_11_uses_the_rgb_theme_background() {
+        let mut output = Vec::new();
+        let mut current = None;
+
+        sync_to_terminal_background(&mut output, Some(Color::Rgb(245, 239, 228)), &mut current)
+            .unwrap();
+
+        assert_eq!(output, b"\x1b]11;#f5efe4\x1b\\");
+        assert_eq!(current, Some((245, 239, 228)));
+    }
+
+    #[test]
+    fn unchanged_background_is_not_emitted_again() {
+        let mut output = Vec::new();
+        let mut current = Some((22, 17, 13));
+
+        sync_to_terminal_background(&mut output, Some(Color::Rgb(22, 17, 13)), &mut current)
+            .unwrap();
+
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn disabled_background_sync_emits_nothing() {
+        let mut output = Vec::new();
+        let mut current = None;
+
+        sync_to_terminal_background(&mut output, None, &mut current).unwrap();
+
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn reset_color_restores_a_previously_changed_background() {
+        let mut output = Vec::new();
+        let mut current = Some((22, 17, 13));
+
+        sync_to_terminal_background(&mut output, None, &mut current).unwrap();
+
+        assert_eq!(output, b"\x1b]111\x1b\\");
+        assert_eq!(current, None);
+    }
 }

@@ -113,6 +113,7 @@ Marten reads its configuration from `~/.config/marten/config.toml` on macOS and 
 theme = "marten"
 show_sidebar = true
 transparent_background = false
+sync_to_terminal_background = false
 nerd_fonts = true
 
 [review]
@@ -130,6 +131,8 @@ show_line_numbers = true
 `show_sidebar` controls whether the sidebar is visible at startup. When omitted, Marten shows it automatically when the terminal is wider than 120 columns. The sidebar can still be toggled while Marten is running.
 
 `transparent_background` lets your terminal's own background (and any background image or blur it applies) show through the base panels, sidebar, popups, and file/hunk headers. Diff add/delete backgrounds and selection highlights stay opaque for legibility. It defaults to `false`.
+
+`sync_to_terminal_background` temporarily sets the terminal's default background to the active Marten theme using OSC 11, which can make terminal padding and rounded corners match the TUI. Marten restores the terminal's configured background on exit. Support depends on the terminal emulator. It defaults to `false`.
 
 `nerd_fonts` swaps the diff layout indicator in the top bar for Nerd Font glyphs instead of plain ASCII/Unicode. It defaults to `true`; set it to `false` if your terminal font isn't a [Nerd Font](https://www.nerdfonts.com/).
 

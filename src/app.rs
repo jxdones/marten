@@ -32,6 +32,8 @@ pub struct App {
     focus: Focus,
     theme: Theme,
     transparent_background: bool,
+    terminal_background: Color,
+    sync_to_terminal_background: bool,
     nerd_fonts: bool,
     repo: Repository,
 
@@ -130,6 +132,7 @@ impl App {
         let overlay = Overlay::None;
 
         let transparent_background = config.ui.transparent_background;
+        let terminal_background = config.ui.theme().bg;
         let theme = apply_transparency(config.ui.theme(), transparent_background);
 
         Ok(Self {
@@ -140,6 +143,8 @@ impl App {
             store,
             theme,
             transparent_background,
+            terminal_background,
+            sync_to_terminal_background: config.ui.sync_to_terminal_background,
             nerd_fonts: config.ui.nerd_fonts,
             repo,
             should_quit: false,
@@ -167,6 +172,14 @@ impl App {
 
     pub const fn theme(&self) -> Theme {
         self.theme
+    }
+
+    pub const fn terminal_background(&self) -> Option<Color> {
+        if self.sync_to_terminal_background {
+            Some(self.terminal_background)
+        } else {
+            None
+        }
     }
 
     pub const fn should_quit(&self) -> bool {
@@ -287,6 +300,7 @@ impl App {
             focus,
             theme: active_theme,
             transparent_background,
+            terminal_background,
             files,
             diff,
             store,
@@ -365,6 +379,7 @@ impl App {
                 if let Some(original) = original {
                     if let Some(entry) = THEMES.get(original) {
                         *active_theme = apply_transparency(entry.theme, *transparent_background);
+                        *terminal_background = entry.theme.bg;
                     }
 
                     *overlay = Overlay::None;
@@ -498,6 +513,7 @@ impl App {
                     && let Some(entry) = THEMES.get(state.selected)
                 {
                     *active_theme = apply_transparency(entry.theme, *transparent_background);
+                    *terminal_background = entry.theme.bg;
                 }
                 return Ok(());
             }
