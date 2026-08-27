@@ -9,7 +9,7 @@ use ratatui::{
 use crate::{
     app::App,
     command_palette::{self, CommandItem},
-    state::{Focus, Overlay},
+    state::Overlay,
     tui::{components::modal, layout, theme::Theme},
 };
 
@@ -41,16 +41,15 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
     .areas(modal.inner());
 
     modal::draw_title_bar(frame, title_area, "command palette", theme);
-    draw_list(frame, list_area, selected, app.focus(), theme);
+    draw_list(frame, list_area, selected, theme);
     draw_footer(frame, footer_area, theme);
 }
 
-fn draw_list(frame: &mut Frame, area: Rect, selected: usize, focus: Focus, theme: Theme) {
+fn draw_list(frame: &mut Frame, area: Rect, selected: usize, theme: Theme) {
     let groups = command_palette::command_groups();
     let key_width = groups
         .iter()
         .flat_map(|group| group.items)
-        .filter(|item| command_palette::is_available(item, focus))
         .map(|item| Line::raw(item.keybind).width())
         .max()
         .unwrap_or(0);
@@ -66,9 +65,6 @@ fn draw_list(frame: &mut Frame, area: Rect, selected: usize, focus: Focus, theme
         ))));
 
         for item in group.items {
-            if !command_palette::is_available(item, focus) {
-                continue;
-            }
             if command_index == selected {
                 selected_row = Some(rows.len());
             }

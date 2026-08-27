@@ -270,7 +270,7 @@ impl App {
 
     pub fn update(&mut self, action: Action) -> AppResult<()> {
         if action == Action::RunSelectedCommand {
-            let selected_action = command_palette::selected_action(&self.overlay, self.focus);
+            let selected_action = command_palette::selected_action(&self.overlay);
             self.overlay = Overlay::None;
 
             return match selected_action {
@@ -481,7 +481,7 @@ impl App {
                 return Ok(());
             }
             Action::MoveDown | Action::MoveUp if matches!(overlay, Overlay::CommandPalette(_)) => {
-                command_palette::update(overlay, action, *focus);
+                command_palette::update(overlay, action);
                 return Ok(());
             }
             Action::MoveDown | Action::MoveUp if matches!(overlay, Overlay::ThemeSelector(_)) => {

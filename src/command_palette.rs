@@ -1,5 +1,5 @@
 use crate::action::Action;
-use crate::state::{Focus, Overlay};
+use crate::state::Overlay;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Section {
@@ -34,14 +34,14 @@ pub struct CommandGroup {
     pub items: &'static [CommandItem],
 }
 
-pub fn update(overlay: &mut Overlay, action: Action, focus: Focus) {
+pub fn update(overlay: &mut Overlay, action: Action) {
     let Overlay::CommandPalette(state) = overlay else {
         return;
     };
 
     match action {
-        Action::MoveDown => state.select_next(command_count(focus)),
-        Action::MoveUp => state.select_previous(command_count(focus)),
+        Action::MoveDown => state.select_next(command_count()),
+        Action::MoveUp => state.select_previous(command_count()),
         _ => {}
     }
 }
@@ -182,19 +182,14 @@ pub fn command_groups() -> &'static [CommandGroup] {
     ]
 }
 
-pub fn is_available(item: &CommandItem, focus: Focus) -> bool {
-    !matches!(item.action, Action::PageUp | Action::PageDown) || focus == Focus::Diff
-}
-
-pub fn command_count(focus: Focus) -> usize {
+pub fn command_count() -> usize {
     command_groups()
         .iter()
         .flat_map(|group| group.items)
-        .filter(|item| is_available(item, focus))
         .count()
 }
 
-pub fn selected_action(overlay: &Overlay, focus: Focus) -> Option<Action> {
+pub fn selected_action(overlay: &Overlay) -> Option<Action> {
     let Overlay::CommandPalette(state) = overlay else {
         return None;
     };
@@ -202,7 +197,6 @@ pub fn selected_action(overlay: &Overlay, focus: Focus) -> Option<Action> {
     command_groups()
         .iter()
         .flat_map(|group| group.items)
-        .filter(|item| is_available(item, focus))
         .nth(state.selected)
         .map(|item| item.action)
 }
