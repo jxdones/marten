@@ -11,7 +11,8 @@ use crate::state::{Diff, DiffLayout, DiffLoadState, FileKey, Focus, LineIndex};
 use crate::store::DiffStore;
 
 const SCROLL_STEP: usize = 1;
-const PAGE_SCROLL_CONTEXT: usize = 3;
+/// Amount of lines that are kept in the screen after a page scroll.
+const PAGE_SCROLL_LINES_KEPT: usize = 3;
 const HORIZONTAL_SCROLL_STEP: usize = 4;
 const GUTTER_WIDTH: usize = 1;
 const VERTICAL_SCROLL_MARGIN: usize = 2;
@@ -567,7 +568,7 @@ impl DiffPanel {
         // Keep three overlapping lines visible between pages to preserve reading context.
         self.state
             .viewport_height
-            .saturating_sub(PAGE_SCROLL_CONTEXT)
+            .saturating_sub(PAGE_SCROLL_LINES_KEPT)
     }
 
     fn max_horizontal_scroll(&self, store: &DiffStore) -> usize {
