@@ -568,6 +568,9 @@ impl DiffPanel {
         // Keep three overlapping lines visible between pages to preserve reading context.
         self.state
             .viewport_height
+            // minus the dedicated header row
+            .saturating_sub(1)
+            // minus the lines to keep from previous page
             .saturating_sub(PAGE_SCROLL_LINES_KEPT)
     }
 
