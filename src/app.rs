@@ -708,6 +708,8 @@ impl App {
             KeyCode::Char('1') => Action::FocusPanel(Focus::Files),
             KeyCode::Down | KeyCode::Char('j') => Action::MoveDown,
             KeyCode::Up | KeyCode::Char('k') => Action::MoveUp,
+            KeyCode::PageDown => Action::PageDown,
+            KeyCode::PageUp => Action::PageUp,
             KeyCode::Left | KeyCode::Char('h') if self.focus == Focus::Diff => {
                 Action::ScrollDiffLeft
             }

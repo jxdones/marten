@@ -11,6 +11,8 @@ use crate::state::{Diff, DiffLayout, DiffLoadState, DiffOptions, FileKey, Focus,
 use crate::store::DiffStore;
 
 const SCROLL_STEP: usize = 1;
+/// Amount of lines that are kept in the screen after a page scroll.
+const PAGE_SCROLL_LINES_KEPT: usize = 3;
 const HORIZONTAL_SCROLL_STEP: usize = 4;
 const GUTTER_WIDTH: usize = 1;
 const VERTICAL_SCROLL_MARGIN: usize = 2;
@@ -80,6 +82,24 @@ impl DiffPanel {
             }
             Action::ScrollDiff { direction, lines } => {
                 self.continuous_scroll_by(direction, lines, diff_ctx.store);
+                self.keep_selection_in_view(diff_ctx.store);
+                self.sync_files_to_selection(diff_ctx.files, diff_ctx.store);
+            }
+            Action::PageDown => {
+                self.continuous_scroll_by(
+                    ScrollDirection::Down,
+                    self.page_scroll_amount(),
+                    diff_ctx.store,
+                );
+                self.keep_selection_in_view(diff_ctx.store);
+                self.sync_files_to_selection(diff_ctx.files, diff_ctx.store);
+            }
+            Action::PageUp => {
+                self.continuous_scroll_by(
+                    ScrollDirection::Up,
+                    self.page_scroll_amount(),
+                    diff_ctx.store,
+                );
                 self.keep_selection_in_view(diff_ctx.store);
                 self.sync_files_to_selection(diff_ctx.files, diff_ctx.store);
             }
@@ -534,6 +554,16 @@ impl DiffPanel {
 
     fn max_continuous_scroll_offset(&self, store: &DiffStore) -> usize {
         store.continuous_diff.index.total_rows.saturating_sub(1)
+    }
+
+    fn page_scroll_amount(&self) -> usize {
+        // Keep three overlapping lines visible between pages to preserve reading context.
+        self.state
+            .viewport_height
+            // minus the dedicated header row
+            .saturating_sub(1)
+            // minus the lines to keep from previous page
+            .saturating_sub(PAGE_SCROLL_LINES_KEPT)
     }
 
     fn max_horizontal_scroll(&self, store: &DiffStore) -> usize {

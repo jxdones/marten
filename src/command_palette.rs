@@ -105,6 +105,18 @@ pub fn command_groups() -> &'static [CommandGroup] {
                     action: Action::ScrollDiffRight,
                 },
                 CommandItem {
+                    label: "page up",
+                    description: "scroll the diff up one page",
+                    keybind: "PgUp",
+                    action: Action::PageUp,
+                },
+                CommandItem {
+                    label: "page down",
+                    description: "scroll the diff down one page",
+                    keybind: "PgDn",
+                    action: Action::PageDown,
+                },
+                CommandItem {
                     label: "edit hunk",
                     description: "edit hunk on your editor",
                     keybind: "e",
@@ -171,7 +183,10 @@ pub fn command_groups() -> &'static [CommandGroup] {
 }
 
 pub fn command_count() -> usize {
-    command_groups().iter().map(|group| group.items.len()).sum()
+    command_groups()
+        .iter()
+        .flat_map(|group| group.items)
+        .count()
 }
 
 pub fn selected_action(overlay: &Overlay) -> Option<Action> {
