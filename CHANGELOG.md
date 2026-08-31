@@ -4,6 +4,8 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.16] - 2026-08-31
+
 ### Added
 
 - Match the background color of supported terminals' window padding and rounded corners to the active theme with `[ui] sync_to_terminal_background = true`.
