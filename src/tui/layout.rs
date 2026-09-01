@@ -51,7 +51,7 @@ pub const fn terminal_is_too_small(area: Rect) -> bool {
 
 fn sidebar_percentage(sidebar_width: u16) -> u16 {
     match sidebar_width {
-        width if width <= MIN_TERMINAL_WIDTH => 0,
+        width if width < MIN_TERMINAL_WIDTH => 0,
         width if width <= SIDEBAR_NARROW_MAX => 25,
         _ => 15,
     }
@@ -62,23 +62,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn sidebar_hidden_at_min_width_even_when_requested() {
-        let area = Rect::new(0, 0, MIN_TERMINAL_WIDTH, 24);
+    fn sidebar_hidden_below_min_width_even_when_requested() {
+        let area = Rect::new(0, 0, MIN_TERMINAL_WIDTH - 1, 24);
 
         let result = home(area, true);
         assert_eq!(result.left_sidebar.width, 0);
     }
 
     #[test]
-    fn sidebar_shown_above_min_width_when_requested() {
-        let area = Rect::new(0, 0, MIN_TERMINAL_WIDTH + 1, 24);
+    fn sidebar_shown_at_min_width_when_requested() {
+        let area = Rect::new(0, 0, MIN_TERMINAL_WIDTH, 24);
         let result = home(area, true);
         assert_eq!(result.left_sidebar.width, 20);
     }
 
     #[test]
     fn sidebar_hidden_when_not_requested() {
-        let area = Rect::new(0, 0, MIN_TERMINAL_WIDTH + 1, 24);
+        let area = Rect::new(0, 0, MIN_TERMINAL_WIDTH, 24);
         let result = home(area, false);
         assert_eq!(result.left_sidebar.width, 0);
     }

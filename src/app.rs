@@ -123,7 +123,7 @@ impl App {
         let (width, height) = crossterm::terminal::size().unwrap_or((0, 0));
 
         let show_sidebar = config.ui.show_sidebar(width);
-        let focus = if show_sidebar {
+        let focus = if show_sidebar && !store.continuous_diff.files.is_empty() {
             Focus::Files
         } else {
             Focus::Diff
@@ -186,8 +186,8 @@ impl App {
         self.should_quit
     }
 
-    pub const fn show_sidebar(&self) -> bool {
-        self.show_sidebar
+    pub fn show_sidebar(&self) -> bool {
+        self.show_sidebar && !self.files().is_empty()
     }
 
     pub const fn overlay(&self) -> &Overlay {
@@ -321,14 +321,21 @@ impl App {
                 return Ok(());
             }
             Action::NextFocus => {
-                *focus = focus.next();
+                if *show_sidebar && !store.continuous_diff.files.is_empty() {
+                    *focus = focus.next();
+                }
                 return Ok(());
             }
             Action::PreviousFocus => {
-                *focus = focus.previous();
+                if *show_sidebar && !store.continuous_diff.files.is_empty() {
+                    *focus = focus.previous();
+                }
                 return Ok(());
             }
             Action::FocusPanel(f) => {
+                if f == Focus::Files && (!*show_sidebar || store.continuous_diff.files.is_empty()) {
+                    return Ok(());
+                }
                 *focus = f;
                 return Ok(());
             }
@@ -352,10 +359,13 @@ impl App {
                     repo,
                     diff_source,
                 })?;
+                if store.continuous_diff.files.is_empty() {
+                    *focus = Focus::Diff;
+                }
             }
             Action::ToggleSidebar => {
                 *show_sidebar = !*show_sidebar;
-                *focus = if *show_sidebar {
+                *focus = if *show_sidebar && !store.continuous_diff.files.is_empty() {
                     Focus::Files
                 } else {
                     Focus::Diff
@@ -592,7 +602,7 @@ impl App {
             return Action::Noop;
         }
 
-        let main_screen = layout::home(self.terminal_area, self.show_sidebar);
+        let main_screen = layout::home(self.terminal_area, self.show_sidebar());
         let position = Position::new(mouse.column, mouse.row);
 
         match mouse.kind {

@@ -4,6 +4,11 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Do not focus the hidden files sidebar at startup when a repository has no changed files, keeping focus on the diff panel instead.
+- Allow the sidebar to display at the minimum terminal width of 80 columns instead of requiring 81 columns.
+
 ## [0.1.16] - 2026-08-31
 
 ### Added

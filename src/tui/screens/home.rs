@@ -21,7 +21,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &mut App) {
         return;
     }
 
-    let show_sidebar = app.show_sidebar() && !app.files().is_empty();
+    let show_sidebar = app.show_sidebar();
     let layout = layout::home(area, show_sidebar);
     let focus = app.focus();
 
