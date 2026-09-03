@@ -103,29 +103,18 @@ impl DiffPanel {
                 self.keep_selection_in_view(diff_ctx.store);
                 self.sync_files_to_selection(diff_ctx.files, diff_ctx.store);
             }
-            Action::ToggleReviewed => {
-                if let Some(file_idx) = self.current_continuous_file_idx(diff_ctx.store) {
-                    if diff_ctx.store.continuous_diff.files[file_idx].ignored {
-                        return;
+            Action::ToggleReviewed => match focus {
+                Focus::Files => {
+                    if let Some(file_idx) = diff_ctx.files.selected_file_idx() {
+                        self.toggle_file_reviewed(file_idx, diff_ctx);
                     }
-                    let will_be_reviewed = !diff_ctx.store.continuous_diff.files[file_idx].reviewed;
-                    diff_ctx.store.continuous_diff.toggle_reviewed(file_idx);
-                    diff_ctx.store.continuous_diff.rebuild_index();
-                    diff_ctx.store.continuous_diff.index_dirty = false;
-
-                    let anchor = if will_be_reviewed {
-                        diff_ctx
-                            .store
-                            .continuous_diff
-                            .next_unreviewed_after(file_idx)
-                            .or(Some(file_idx))
-                    } else {
-                        Some(file_idx)
-                    };
-                    self.sync_continuous_scroll_to_file(anchor, diff_ctx.store);
-                    self.sync_files_to_selection(diff_ctx.files, diff_ctx.store);
                 }
-            }
+                Focus::Diff => {
+                    if let Some(file_idx) = self.current_continuous_file_idx(diff_ctx.store) {
+                        self.toggle_file_reviewed(file_idx, diff_ctx);
+                    }
+                }
+            },
             _ => {}
         }
     }
@@ -627,6 +616,28 @@ impl DiffPanel {
         }
 
         max_scroll
+    }
+
+    fn toggle_file_reviewed(&mut self, file_idx: usize, diff_ctx: &mut DiffContext) {
+        if diff_ctx.store.continuous_diff.files[file_idx].ignored {
+            return;
+        }
+        let will_be_reviewed = !diff_ctx.store.continuous_diff.files[file_idx].reviewed;
+        diff_ctx.store.continuous_diff.toggle_reviewed(file_idx);
+        diff_ctx.store.continuous_diff.rebuild_index();
+        diff_ctx.store.continuous_diff.index_dirty = false;
+
+        let anchor = if will_be_reviewed {
+            diff_ctx
+                .store
+                .continuous_diff
+                .next_unreviewed_after(file_idx)
+                .or(Some(file_idx))
+        } else {
+            Some(file_idx)
+        };
+        self.sync_continuous_scroll_to_file(anchor, diff_ctx.store);
+        self.sync_files_to_selection(diff_ctx.files, diff_ctx.store);
     }
 }
 
