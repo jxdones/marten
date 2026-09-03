@@ -185,6 +185,7 @@ fn build_continuous_diff(
             load: DiffLoadState::NotLoaded,
             reviewed: false,
             ignored,
+            collapsed: false,
         });
     }
 

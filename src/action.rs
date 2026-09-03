@@ -55,4 +55,5 @@ pub enum Action {
     FileFinderBackspace,
     FileFinderClear,
     ToggleReviewed,
+    ToggleFileCollapse,
 }

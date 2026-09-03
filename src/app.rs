@@ -752,6 +752,9 @@ impl App {
             KeyCode::Char('m') if self.focus == Focus::Diff || self.focus == Focus::Files => {
                 Action::ToggleReviewed
             }
+            KeyCode::Char('z') if self.focus == Focus::Diff || self.focus == Focus::Files => {
+                Action::ToggleFileCollapse
+            }
             KeyCode::Char('n') if key.modifiers.is_empty() => Action::NextFile,
             KeyCode::Char('p') if key.modifiers.is_empty() => Action::PreviousFile,
             KeyCode::Char('L') => Action::ToggleDiffLineNumbers,

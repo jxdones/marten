@@ -186,6 +186,7 @@ fn render_continuous_diff(
                 theme,
                 position.for_file(file_idx),
                 is_focused && Some(file_idx) == pinned_file_idx,
+                slot.is_collapsed(),
                 slot.reviewed,
                 slot.ignored,
             )]
@@ -208,6 +209,7 @@ fn render_continuous_diff(
                             theme,
                             position.for_file(file_idx),
                             is_focused && Some(file_idx) == pinned_file_idx,
+                            slot.is_collapsed(),
                             slot.reviewed,
                             slot.ignored,
                         )]
@@ -313,6 +315,7 @@ fn render_file_header(
     theme: Theme,
     position: Option<HunkPosition>,
     is_selected: bool,
+    is_collapsed: bool,
     is_reviewed: bool,
     is_ignored: bool,
 ) -> Line<'static> {
@@ -320,7 +323,7 @@ fn render_file_header(
         return render_type_change_header(width, file, type_change, theme, is_selected);
     }
 
-    let collapse_symbol = if is_reviewed || is_ignored {
+    let collapse_symbol = if is_collapsed || is_ignored {
         COLLAPSED_SYMBOL
     } else {
         EXPANDED_SYMBOL

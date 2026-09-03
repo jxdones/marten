@@ -128,6 +128,12 @@ pub fn command_groups() -> &'static [CommandGroup] {
                     keybind: "m",
                     action: Action::ToggleReviewed,
                 },
+                CommandItem {
+                    label: "toggle collapse",
+                    description: "collapse or expand file diff",
+                    keybind: "z",
+                    action: Action::ToggleFileCollapse,
+                },
             ],
         },
         CommandGroup {

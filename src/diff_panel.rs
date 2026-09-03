@@ -115,6 +115,18 @@ impl DiffPanel {
                     }
                 }
             },
+            Action::ToggleFileCollapse => match focus {
+                Focus::Files => {
+                    if let Some(file_idx) = diff_ctx.files.selected_file_idx() {
+                        self.toggle_file_collapsed(file_idx, diff_ctx);
+                    }
+                }
+                Focus::Diff => {
+                    if let Some(file_idx) = self.current_continuous_file_idx(diff_ctx.store) {
+                        self.toggle_file_collapsed(file_idx, diff_ctx);
+                    }
+                }
+            },
             _ => {}
         }
     }
@@ -473,7 +485,7 @@ impl DiffPanel {
             .iter()
             .enumerate()
             .flat_map(|(file_idx, slot)| {
-                if slot.reviewed {
+                if slot.is_collapsed() {
                     return vec![];
                 }
                 let file_start = store
@@ -631,7 +643,29 @@ impl DiffPanel {
             diff_ctx
                 .store
                 .continuous_diff
-                .next_unreviewed_after(file_idx)
+                .next_file_after(file_idx, |file| !file.reviewed)
+                .or(Some(file_idx))
+        } else {
+            Some(file_idx)
+        };
+        self.sync_continuous_scroll_to_file(anchor, diff_ctx.store);
+        self.sync_files_to_selection(diff_ctx.files, diff_ctx.store);
+    }
+
+    fn toggle_file_collapsed(&mut self, file_idx: usize, diff_ctx: &mut DiffContext) {
+        if diff_ctx.store.continuous_diff.files[file_idx].ignored {
+            return;
+        }
+        let will_be_collapsed = !diff_ctx.store.continuous_diff.files[file_idx].is_collapsed();
+        diff_ctx.store.continuous_diff.toggle_collapsed(file_idx);
+        diff_ctx.store.continuous_diff.rebuild_index();
+        diff_ctx.store.continuous_diff.index_dirty = false;
+
+        let anchor = if will_be_collapsed {
+            diff_ctx
+                .store
+                .continuous_diff
+                .next_file_after(file_idx, |file| !file.is_collapsed())
                 .or(Some(file_idx))
         } else {
             Some(file_idx)

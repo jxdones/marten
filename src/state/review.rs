@@ -32,6 +32,7 @@ pub struct FileSlot {
     pub load: DiffLoadState,
     pub reviewed: bool,
     pub ignored: bool,
+    pub collapsed: bool,
 }
 
 #[derive(Debug, Default)]
@@ -106,8 +107,12 @@ impl ReviewIndex {
 }
 
 impl FileSlot {
+    pub fn is_collapsed(&self) -> bool {
+        self.collapsed || self.ignored
+    }
+
     pub fn row_count(&self, layout: DiffLayout) -> usize {
-        if self.reviewed || self.ignored {
+        if self.is_collapsed() {
             return HEADER_ROW;
         }
         match &self.load {
@@ -218,14 +223,92 @@ impl ContinuousDiff {
     pub fn toggle_reviewed(&mut self, file_idx: usize) {
         if let Some(file) = self.files.get_mut(file_idx) {
             file.reviewed = !file.reviewed;
+            file.collapsed = file.reviewed;
         }
     }
 
-    pub fn next_unreviewed_after(&self, file_idx: usize) -> Option<usize> {
+    pub fn toggle_collapsed(&mut self, file_idx: usize) {
+        if let Some(file) = self.files.get_mut(file_idx) {
+            file.collapsed = !file.collapsed;
+        }
+    }
+
+    pub fn next_file_after(
+        &self,
+        file_idx: usize,
+        predicate: impl Fn(&FileSlot) -> bool,
+    ) -> Option<usize> {
         self.files
             .get(file_idx + 1..)?
             .iter()
-            .position(|file| !file.reviewed)
+            .position(predicate)
             .map(|offset| file_idx + 1 + offset)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::git::repository::FileStatus;
+
+    fn sample_slot() -> FileSlot {
+        FileSlot {
+            entry: FileEntry {
+                path: "foo.rs".to_string(),
+                previous_path: None,
+                status: FileStatus::Unstaged,
+                change: None,
+                type_change: None,
+                insertions: 5,
+                deletions: 2,
+            },
+            load: DiffLoadState::Binary,
+            reviewed: false,
+            ignored: false,
+            collapsed: false,
+        }
+    }
+
+    #[test]
+    fn collapse_state_is_independent_of_reviewed() {
+        let mut continuous_diff = ContinuousDiff {
+            files: vec![sample_slot()],
+            by_key: HashMap::new(),
+            index: ReviewIndex::default(),
+            index_dirty: false,
+            generation: 0,
+            layout: DiffLayout::Unified,
+        };
+
+        assert!(!continuous_diff.files[0].is_collapsed());
+
+        // Toggle collapse on unreviewed file
+        continuous_diff.toggle_collapsed(0);
+        assert!(continuous_diff.files[0].collapsed);
+        assert!(!continuous_diff.files[0].reviewed);
+        assert!(continuous_diff.files[0].is_collapsed());
+
+        // Uncollapse again
+        continuous_diff.toggle_collapsed(0);
+        assert!(!continuous_diff.files[0].collapsed);
+        assert!(!continuous_diff.files[0].is_collapsed());
+
+        // Mark reviewed -> automatically collapses
+        continuous_diff.toggle_reviewed(0);
+        assert!(continuous_diff.files[0].reviewed);
+        assert!(continuous_diff.files[0].collapsed);
+        assert!(continuous_diff.files[0].is_collapsed());
+
+        // Uncollapse reviewed file -> remains reviewed, but expanded
+        continuous_diff.toggle_collapsed(0);
+        assert!(continuous_diff.files[0].reviewed);
+        assert!(!continuous_diff.files[0].collapsed);
+        assert!(!continuous_diff.files[0].is_collapsed());
+
+        // Unmark reviewed -> resets both
+        continuous_diff.toggle_reviewed(0);
+        assert!(!continuous_diff.files[0].reviewed);
+        assert!(!continuous_diff.files[0].collapsed);
+        assert!(!continuous_diff.files[0].is_collapsed());
     }
 }

@@ -43,12 +43,17 @@ fn shortcuts(app: &App) -> Vec<(&'static str, &'static str)> {
 
     match app.focus() {
         Focus::Files => {
-            shortcuts.extend([("j/k", "navigate"), ("m", "mark reviewed")]);
+            shortcuts.extend([
+                ("j/k", "navigate"),
+                ("z", "collapse"),
+                ("m", "mark reviewed"),
+            ]);
         }
         Focus::Diff => {
             shortcuts.extend([
                 ("h/j/k/l", "scroll"),
                 ("[/]", "hunk"),
+                ("z", "collapse"),
                 ("m", "mark reviewed"),
                 ("e", "edit hunk"),
             ]);
