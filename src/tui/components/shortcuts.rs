@@ -9,6 +9,8 @@ use ratatui::{
 use crate::app::App;
 use crate::state::Focus;
 
+const GAP: &str = "   ";
+
 pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
     let theme = app.theme();
     let bg_style = Style::default().bg(theme.bg);
@@ -23,8 +25,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
         return;
     }
 
-    let left = shortcut_spans(shortcuts(app), app);
-    let right = quit_spans(app);
+    let right = right_spans(app);
     let right_width = u16::try_from(spans_width(&right)).expect("terminal width exceeded u16::MAX");
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
@@ -34,46 +35,56 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
         ])
         .split(inner);
 
+    let left = shortcut_spans(&shortcuts(app), chunks[0].width as usize, app);
+
     frame.render_widget(Paragraph::new(Line::from(left)).style(bg_style), chunks[0]);
     frame.render_widget(Paragraph::new(Line::from(right)).style(bg_style), chunks[1]);
 }
 
 fn shortcuts(app: &App) -> Vec<(&'static str, &'static str)> {
-    let mut shortcuts = vec![("tab", "focus")];
-
     match app.focus() {
-        Focus::Files => {
-            shortcuts.extend([
-                ("j/k", "navigate"),
-                ("z", "collapse"),
-                ("m", "mark reviewed"),
-            ]);
-        }
-        Focus::Diff => {
-            shortcuts.extend([
-                ("h/j/k/l", "scroll"),
-                ("[/]", "hunk"),
-                ("z", "collapse"),
-                ("m", "mark reviewed"),
-                ("e", "edit hunk"),
-            ]);
-        }
+        Focus::Files => vec![
+            ("j/k", "navigate"),
+            ("z", "collapse"),
+            ("m", "review"),
+        ],
+        Focus::Diff => vec![
+            ("[/]", "hunk"),
+            ("z", "collapse"),
+            ("m", "review"),
+            ("e", "edit"),
+        ],
     }
-
-    shortcuts.push(("?", "commands"));
-
-    shortcuts
 }
 
-fn shortcut_spans(shortcuts: Vec<(&'static str, &'static str)>, app: &App) -> Vec<Span<'static>> {
+fn shortcut_spans(
+    shortcuts: &[(&'static str, &'static str)],
+    max_width: usize,
+    app: &App,
+) -> Vec<Span<'static>> {
     let theme = app.theme();
     let mut spans = Vec::new();
+    let mut current_width = 0;
 
-    for (idx, (key, label)) in shortcuts.into_iter().enumerate() {
-        if idx > 0 {
-            spans.push(Span::raw(" "));
+    for (idx, &(key, label)) in shortcuts.iter().enumerate() {
+        let needed = if idx == 0 {
+            1 + item_width(key, label)
+        } else {
+            GAP.len() + item_width(key, label)
+        };
+
+        if current_width + needed > max_width {
+            break;
         }
-        spans.push(Span::styled(" ", theme.accent()));
+
+        if idx == 0 {
+            spans.push(Span::raw(" "));
+            current_width += 1;
+        } else {
+            spans.push(Span::raw(GAP));
+            current_width += GAP.len();
+        }
+
         for ch in key.chars() {
             let style = if ch == '/' {
                 theme.muted()
@@ -82,18 +93,30 @@ fn shortcut_spans(shortcuts: Vec<(&'static str, &'static str)>, app: &App) -> Ve
             };
             spans.push(Span::styled(ch.to_string(), style));
         }
-        spans.push(Span::styled(" ", theme.accent()));
-        spans.push(Span::styled(format!("{label} "), theme.muted()));
+        spans.push(Span::raw(" "));
+        spans.push(Span::styled(label, theme.muted()));
+        current_width += item_width(key, label);
     }
 
     spans
 }
 
-fn quit_spans(app: &App) -> Vec<Span<'static>> {
+fn item_width(key: &str, label: &str) -> usize {
+    key.chars().count() + 1 + label.chars().count()
+}
+
+
+fn right_spans(app: &App) -> Vec<Span<'static>> {
     let theme = app.theme();
     vec![
-        Span::styled(" q ", theme.danger()),
-        Span::styled("quit ", theme.muted()),
+        Span::styled("?", theme.accent()),
+        Span::raw(" "),
+        Span::styled("commands", theme.muted()),
+        Span::raw("   "),
+        Span::styled("q", theme.danger()),
+        Span::raw(" "),
+        Span::styled("quit", theme.muted()),
+        Span::raw(" "),
     ]
 }
 

@@ -9,6 +9,10 @@ All notable changes to Marten will be documented in this file.
 - Mark files as reviewed with `m` directly from the files sidebar without needing to switch focus to the diff panel.
 - Collapse and expand files with `z` from either the diff view or the files list, independent of review status.
 
+### Changed
+
+- Update shortcuts footer to focus on core review actions with uniform spacing, and pin `? commands` to the right alongside `q quit`.
+
 ### Fixed
 
 - Do not focus the hidden files sidebar at startup when a repository has no changed files, keeping focus on the diff panel instead.
