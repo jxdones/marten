@@ -43,11 +43,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
 
 fn shortcuts(app: &App) -> Vec<(&'static str, &'static str)> {
     match app.focus() {
-        Focus::Files => vec![
-            ("j/k", "navigate"),
-            ("z", "collapse"),
-            ("m", "review"),
-        ],
+        Focus::Files => vec![("j/k", "navigate"), ("z", "collapse"), ("m", "review")],
         Focus::Diff => vec![
             ("[/]", "hunk"),
             ("z", "collapse"),
@@ -104,7 +100,6 @@ fn shortcut_spans(
 fn item_width(key: &str, label: &str) -> usize {
     key.chars().count() + 1 + label.chars().count()
 }
-
 
 fn right_spans(app: &App) -> Vec<Span<'static>> {
     let theme = app.theme();

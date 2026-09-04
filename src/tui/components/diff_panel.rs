@@ -11,7 +11,7 @@ use crate::git::repository::{
 };
 use crate::inline_diff::{self, Range};
 use crate::state::review::RenderedRow;
-use crate::state::{ContinuousDiff, DiffLayout, DiffLoadState};
+use crate::state::{ContinuousDiff, DiffLayout, DiffLoadState, FileSlot};
 use crate::syntax;
 use crate::tui::theme::Theme;
 
@@ -175,6 +175,10 @@ fn render_continuous_diff(
         .index
         .file_at_row(scroll_offset)
         .map(|(i, _)| i);
+    let selected_file_idx = continuous_diff
+        .index
+        .file_at_row(selected_row)
+        .map(|(i, _)| i);
     let mut lines: Vec<Line<'static>> = if let Some(file_idx) = pinned_file_idx {
         let slot = &continuous_diff.files[file_idx];
         if matches!(slot.load, DiffLoadState::Binary) {
@@ -182,13 +186,10 @@ fn render_continuous_diff(
         } else {
             vec![render_file_header(
                 row_width,
-                &slot.entry,
+                slot,
                 theme,
                 position.for_file(file_idx),
-                is_focused && Some(file_idx) == pinned_file_idx,
-                slot.is_collapsed(),
-                slot.reviewed,
-                slot.ignored,
+                is_focused && Some(file_idx) == selected_file_idx,
             )]
         }
     } else {
@@ -205,13 +206,10 @@ fn render_continuous_diff(
                         let slot = &continuous_diff.files[file_idx];
                         vec![render_file_header(
                             row_width,
-                            &slot.entry,
+                            slot,
                             theme,
                             position.for_file(file_idx),
-                            is_focused && Some(file_idx) == pinned_file_idx,
-                            slot.is_collapsed(),
-                            slot.reviewed,
-                            slot.ignored,
+                            is_focused && Some(file_idx) == selected_file_idx,
                         )]
                     }
                 }
@@ -294,7 +292,7 @@ fn render_continuous_diff(
                         row_width,
                         entry,
                         theme,
-                        is_focused && Some(file_idx) == pinned_file_idx,
+                        is_focused && Some(file_idx) == selected_file_idx,
                     )]
                 }
                 Some(RenderedRow::Error { msg, .. }) => vec![Line::from(Span::styled(
@@ -311,18 +309,19 @@ fn render_continuous_diff(
 
 fn render_file_header(
     width: usize,
-    file: &FileEntry,
+    slot: &FileSlot,
     theme: Theme,
     position: Option<HunkPosition>,
     is_selected: bool,
-    is_collapsed: bool,
-    is_reviewed: bool,
-    is_ignored: bool,
 ) -> Line<'static> {
+    let file = &slot.entry;
     if let Some(type_change) = file.type_change {
         return render_type_change_header(width, file, type_change, theme, is_selected);
     }
 
+    let is_collapsed = slot.is_collapsed();
+    let is_reviewed = slot.reviewed;
+    let is_ignored = slot.ignored;
     let collapse_symbol = if is_collapsed || is_ignored {
         COLLAPSED_SYMBOL
     } else {

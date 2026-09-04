@@ -425,10 +425,16 @@ impl DiffPanel {
     }
 
     fn is_selectable_row(store: &DiffStore, row: usize) -> bool {
-        matches!(
-            store.continuous_diff.lookup_row(row),
-            Some(RenderedRow::DiffRow { .. })
-        )
+        match store.continuous_diff.lookup_row(row) {
+            Some(RenderedRow::DiffRow { .. }) => true,
+            Some(RenderedRow::FileHeader { file_idx }) => {
+                store.continuous_diff.files[file_idx].is_collapsed()
+                    || store.continuous_diff.files[file_idx].row_count(store.continuous_diff.layout)
+                        == 1
+            }
+            Some(RenderedRow::Binary { .. }) => true,
+            _ => false,
+        }
     }
 
     fn next_selectable_row(store: &DiffStore, current: usize) -> Option<usize> {
