@@ -706,6 +706,9 @@ impl App {
         }
 
         match key.code {
+            KeyCode::Esc if matches!(self.diff_source, DiffSource::Revision(_)) => {
+                Action::ResetToCurrentChanges
+            }
             KeyCode::Char('q') => Action::Quit,
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => Action::Quit,
             KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => {

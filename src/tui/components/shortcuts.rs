@@ -7,6 +7,7 @@ use ratatui::{
 };
 
 use crate::app::App;
+use crate::git::repository::DiffSource;
 use crate::state::Focus;
 
 const GAP: &str = "   ";
@@ -42,7 +43,7 @@ pub fn draw(frame: &mut Frame, area: Rect, app: &App) {
 }
 
 fn shortcuts(app: &App) -> Vec<(&'static str, &'static str)> {
-    match app.focus() {
+    let mut shortcuts = match app.focus() {
         Focus::Files => vec![("j/k", "navigate"), ("z", "collapse"), ("m", "review")],
         Focus::Diff => vec![
             ("[/]", "hunk"),
@@ -50,7 +51,11 @@ fn shortcuts(app: &App) -> Vec<(&'static str, &'static str)> {
             ("m", "review"),
             ("e", "edit"),
         ],
+    };
+    if matches!(app.diff_source(), DiffSource::Revision(_)) {
+        shortcuts.insert(0, ("esc", "reset"));
     }
+    shortcuts
 }
 
 fn shortcut_spans(
