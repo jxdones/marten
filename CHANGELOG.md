@@ -4,6 +4,8 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.18] - 2026-09-09
+
 ### Added
 
 - Return to current working-tree changes with `Esc` when viewing a commit, with a shortcut hint in the footer. Open dialogs close first.
