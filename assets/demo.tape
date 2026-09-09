@@ -72,6 +72,16 @@ Up
 Sleep 900ms
 Enter
 Sleep 2000ms
+
+Type "H"
+Sleep 400ms
+Enter
+Sleep 700ms
+Type@300ms "]]]"
+Sleep 300ms
+Escape
+Sleep 400ms
+
 Ctrl+P
 Sleep 400ms
 Type "ci"
