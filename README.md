@@ -152,6 +152,20 @@ Files containing only whitespace changes remain listed because Git still conside
 
 `show_line_numbers` controls whether line numbers are shown in the diff view at startup. It defaults to `true`. Press `L` while Marten is running to toggle it.
 
+### Editor
+
+Pressing `e` in the diff view opens the current line in your editor. Marten uses `$VISUAL`, falls back to `$EDITOR`, and finally to `vi`. Set it in your shell profile (`~/.zshrc`, `~/.bashrc`):
+
+```bash
+export EDITOR='nvim'
+```
+
+The value must be a plain executable available in your `PATH`:
+
+- Shell aliases and functions don't work: Marten runs the editor directly, without a shell, so an alias like `alias vim=nvim` is invisible to it.
+- Arguments aren't supported: `EDITOR='code -w'` is treated as a single command name and fails to launch.
+- The `vi` fallback only works if `vi` is actually installed.
+
 ## Development
 
 ```bash

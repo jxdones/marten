@@ -25,6 +25,11 @@ pub enum AppError {
         operation: &'static str,
         source: std::io::Error,
     },
+    Editor {
+        editor: String,
+        origin: crate::editor::Source,
+        source: std::io::Error,
+    },
 }
 
 pub type AppResult<T> = Result<T, AppError>;
@@ -32,6 +37,18 @@ pub type AppResult<T> = Result<T, AppError>;
 impl AppError {
     pub const fn git(operation: &'static str, source: git2::Error) -> Self {
         Self::Git { operation, source }
+    }
+
+    pub const fn editor(
+        editor: String,
+        origin: crate::editor::Source,
+        source: std::io::Error,
+    ) -> Self {
+        Self::Editor {
+            editor,
+            origin,
+            source,
+        }
     }
 
     pub fn with_operation(self, operation: &'static str) -> Self {
@@ -97,6 +114,24 @@ impl std::fmt::Display for AppError {
             Self::Io { operation, source } => {
                 write!(formatter, "could not {operation}: {source}")
             }
+            Self::Editor {
+                editor,
+                origin,
+                source,
+            } if source.kind() == std::io::ErrorKind::NotFound => match origin {
+                crate::editor::Source::Fallback => write!(
+                    formatter,
+                    "could not open editor: $VISUAL and $EDITOR are not set and the fallback \
+                     '{editor}' was not found in PATH"
+                ),
+                crate::editor::Source::Variable(variable) => write!(
+                    formatter,
+                    "could not open editor: '{editor}' from ${variable} was not found in PATH"
+                ),
+            },
+            Self::Editor { editor, source, .. } => {
+                write!(formatter, "could not open editor '{editor}': {source}")
+            }
         }
     }
 }
@@ -110,7 +145,7 @@ impl std::error::Error for AppError {
             | Self::RevisionNotCommit { source, .. }
             | Self::Git { source, .. } => Some(source),
             Self::InvalidRange { .. } => None,
-            Self::Io { source, .. } => Some(source),
+            Self::Io { source, .. } | Self::Editor { source, .. } => Some(source),
         }
     }
 }
