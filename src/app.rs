@@ -706,7 +706,12 @@ impl App {
         }
 
         match key.code {
-            KeyCode::Esc if matches!(self.diff_source, DiffSource::Revision(_)) => {
+            KeyCode::Esc
+                if matches!(
+                    self.diff_source,
+                    DiffSource::Revision(_) | DiffSource::Range(_)
+                ) =>
+            {
                 Action::ResetToCurrentChanges
             }
             KeyCode::Char('q') => Action::Quit,

@@ -52,7 +52,10 @@ fn shortcuts(app: &App) -> Vec<(&'static str, &'static str)> {
             ("e", "edit"),
         ],
     };
-    if matches!(app.diff_source(), DiffSource::Revision(_)) {
+    if matches!(
+        app.diff_source(),
+        DiffSource::Revision(_) | DiffSource::Range(_)
+    ) {
         shortcuts.insert(0, ("esc", "reset"));
     }
     shortcuts
