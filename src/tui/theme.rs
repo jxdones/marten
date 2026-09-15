@@ -190,6 +190,12 @@ pub const THEMES: &[ThemeEntry] = &[
         appearance: "dark",
         theme: KANAGAWA_WAVE,
     },
+    ThemeEntry {
+        name: "Kanagawa Lotus",
+        id: "kanagawa-lotus",
+        appearance: "light",
+        theme: KANAGAWA_LOTUS,
+    },
 ];
 
 pub fn entry_by_id(id: &str) -> Option<&'static ThemeEntry> {
@@ -1145,6 +1151,51 @@ pub const KANAGAWA_WAVE: Theme = Theme {
     unstaged: Color::Rgb(228, 104, 118),
     untracked: Color::Rgb(255, 160, 102),
     conflict: Color::Rgb(232, 36, 36),
+};
+
+pub const KANAGAWA_LOTUS: Theme = Theme {
+    syntax_theme: "kanagawa-lotus",
+    syntax_palette: Some(SyntaxPalette {
+        comment: Color::Rgb(119, 117, 108),
+        keyword: Color::Rgb(124, 94, 158),
+        function: Color::Rgb(77, 105, 155),
+        variable: Color::Rgb(163, 74, 99),
+        string: Color::Rgb(108, 140, 93),
+        number: Color::Rgb(168, 128, 44),
+        type_name: Color::Rgb(69, 128, 129),
+        operator: Color::Rgb(90, 99, 99),
+        punctuation: Color::Rgb(140, 134, 108),
+    }),
+
+    bg: Color::Rgb(242, 236, 188),
+    sidebar_bg: Color::Rgb(242, 236, 188),
+    line: Color::Rgb(216, 208, 172),
+
+    fg: Color::Rgb(84, 84, 100),
+    dim: Color::Rgb(119, 117, 108),
+
+    accent: Color::Rgb(77, 105, 155),
+    select: Color::Rgb(230, 223, 176),
+    select_hi: Color::Rgb(220, 212, 164),
+
+    file_header_bg: Color::Rgb(233, 226, 180),
+    hunk_header_bg: Color::Rgb(225, 217, 168),
+    active_file_fg: Color::Rgb(77, 105, 155),
+
+    add_bg: Color::Rgb(225, 230, 196),
+    add_inline_bg: Color::Rgb(205, 216, 165),
+    add_fg: Color::Rgb(108, 140, 93),
+    add_gutter: Color::Rgb(118, 148, 106),
+    del_bg: Color::Rgb(245, 222, 214),
+    del_inline_bg: Color::Rgb(232, 196, 184),
+    del_fg: Color::Rgb(176, 58, 61),
+    del_gutter: Color::Rgb(195, 64, 67),
+
+    staged: Color::Rgb(108, 140, 93),
+    partial: Color::Rgb(168, 128, 44),
+    unstaged: Color::Rgb(176, 58, 61),
+    untracked: Color::Rgb(198, 106, 58),
+    conflict: Color::Rgb(196, 42, 42),
 };
 
 impl Theme {

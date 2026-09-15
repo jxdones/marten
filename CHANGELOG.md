@@ -4,6 +4,10 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Add Kanagawa Wave and Kanagawa Lotus themes.
+
 ### Fixed
 
 - `Esc` now also returns to current working-tree changes when viewing a revision range (`marten diff A..B`), not just a single commit.
