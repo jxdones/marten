@@ -184,6 +184,12 @@ pub const THEMES: &[ThemeEntry] = &[
         appearance: "light",
         theme: GITHUB_LIGHT,
     },
+    ThemeEntry {
+        name: "Kanagawa Wave",
+        id: "kanagawa-wave",
+        appearance: "dark",
+        theme: KANAGAWA_WAVE,
+    },
 ];
 
 pub fn entry_by_id(id: &str) -> Option<&'static ThemeEntry> {
@@ -1094,6 +1100,51 @@ pub const EVERFOREST_LIGHT_SOFT: Theme = Theme {
     unstaged: Color::Rgb(248, 85, 82),
     untracked: Color::Rgb(245, 125, 38),
     conflict: Color::Rgb(248, 85, 82),
+};
+
+pub const KANAGAWA_WAVE: Theme = Theme {
+    syntax_theme: "kanagawa-wave",
+    syntax_palette: Some(SyntaxPalette {
+        comment: Color::Rgb(114, 113, 105),
+        keyword: Color::Rgb(149, 127, 184),
+        function: Color::Rgb(126, 156, 216),
+        variable: Color::Rgb(210, 126, 153),
+        string: Color::Rgb(152, 187, 108),
+        number: Color::Rgb(230, 195, 132),
+        type_name: Color::Rgb(163, 212, 213),
+        operator: Color::Rgb(113, 124, 124),
+        punctuation: Color::Rgb(200, 192, 147),
+    }),
+
+    bg: Color::Rgb(31, 31, 40),
+    sidebar_bg: Color::Rgb(31, 31, 40),
+    line: Color::Rgb(54, 54, 70),
+
+    fg: Color::Rgb(220, 215, 186),
+    dim: Color::Rgb(114, 113, 105),
+
+    accent: Color::Rgb(126, 156, 216),
+    select: Color::Rgb(34, 50, 73),
+    select_hi: Color::Rgb(45, 79, 103),
+
+    file_header_bg: Color::Rgb(42, 42, 55),
+    hunk_header_bg: Color::Rgb(54, 54, 70),
+    active_file_fg: Color::Rgb(126, 156, 216),
+
+    add_bg: Color::Rgb(43, 51, 40),
+    add_inline_bg: Color::Rgb(58, 84, 62),
+    add_fg: Color::Rgb(152, 187, 108),
+    add_gutter: Color::Rgb(118, 148, 106),
+    del_bg: Color::Rgb(67, 36, 43),
+    del_inline_bg: Color::Rgb(90, 48, 55),
+    del_fg: Color::Rgb(228, 104, 118),
+    del_gutter: Color::Rgb(195, 64, 67),
+
+    staged: Color::Rgb(152, 187, 108),
+    partial: Color::Rgb(230, 195, 132),
+    unstaged: Color::Rgb(228, 104, 118),
+    untracked: Color::Rgb(255, 160, 102),
+    conflict: Color::Rgb(232, 36, 36),
 };
 
 impl Theme {
