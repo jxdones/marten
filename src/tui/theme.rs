@@ -196,6 +196,18 @@ pub const THEMES: &[ThemeEntry] = &[
         appearance: "light",
         theme: KANAGAWA_LOTUS,
     },
+    ThemeEntry {
+        name: "Matcha Latte",
+        id: "matcha-latte",
+        appearance: "dark",
+        theme: MATCHA_LATTE,
+    },
+    ThemeEntry {
+        name: "Matcha Foam",
+        id: "matcha-foam",
+        appearance: "light",
+        theme: MATCHA_FOAM,
+    },
 ];
 
 pub fn entry_by_id(id: &str) -> Option<&'static ThemeEntry> {
@@ -1196,6 +1208,96 @@ pub const KANAGAWA_LOTUS: Theme = Theme {
     unstaged: Color::Rgb(176, 58, 61),
     untracked: Color::Rgb(198, 106, 58),
     conflict: Color::Rgb(196, 42, 42),
+};
+
+pub const MATCHA_LATTE: Theme = Theme {
+    syntax_theme: "matcha-latte",
+    syntax_palette: Some(SyntaxPalette {
+        comment: Color::Rgb(138, 144, 119),
+        keyword: Color::Rgb(143, 176, 92),
+        function: Color::Rgb(124, 156, 174),
+        variable: Color::Rgb(222, 226, 204),
+        string: Color::Rgb(169, 206, 114),
+        number: Color::Rgb(226, 150, 62),
+        type_name: Color::Rgb(216, 185, 104),
+        operator: Color::Rgb(138, 144, 119),
+        punctuation: Color::Rgb(138, 144, 119),
+    }),
+
+    bg: Color::Rgb(29, 39, 34),
+    sidebar_bg: Color::Rgb(29, 39, 34),
+    line: Color::Rgb(77, 92, 72),
+
+    fg: Color::Rgb(222, 226, 204),
+    dim: Color::Rgb(138, 144, 119),
+
+    accent: Color::Rgb(143, 176, 92),
+    select: Color::Rgb(45, 57, 47),
+    select_hi: Color::Rgb(58, 71, 57),
+
+    file_header_bg: Color::Rgb(37, 48, 41),
+    hunk_header_bg: Color::Rgb(45, 57, 47),
+    active_file_fg: Color::Rgb(143, 176, 92),
+
+    add_bg: Color::Rgb(36, 49, 42),
+    add_inline_bg: Color::Rgb(53, 86, 60),
+    add_fg: Color::Rgb(169, 206, 114),
+    add_gutter: Color::Rgb(143, 176, 92),
+    del_bg: Color::Rgb(51, 39, 35),
+    del_inline_bg: Color::Rgb(90, 54, 46),
+    del_fg: Color::Rgb(201, 111, 88),
+    del_gutter: Color::Rgb(184, 90, 66),
+
+    staged: Color::Rgb(143, 176, 92),
+    partial: Color::Rgb(216, 185, 104),
+    unstaged: Color::Rgb(201, 111, 88),
+    untracked: Color::Rgb(226, 150, 62),
+    conflict: Color::Rgb(201, 111, 88),
+};
+
+pub const MATCHA_FOAM: Theme = Theme {
+    syntax_theme: "matcha-foam",
+    syntax_palette: Some(SyntaxPalette {
+        comment: Color::Rgb(110, 118, 86),
+        keyword: Color::Rgb(107, 143, 50),
+        function: Color::Rgb(66, 112, 138),
+        variable: Color::Rgb(39, 73, 60),
+        string: Color::Rgb(97, 139, 35),
+        number: Color::Rgb(196, 118, 28),
+        type_name: Color::Rgb(163, 129, 41),
+        operator: Color::Rgb(110, 118, 86),
+        punctuation: Color::Rgb(110, 118, 86),
+    }),
+
+    bg: Color::Rgb(227, 231, 210),
+    sidebar_bg: Color::Rgb(227, 231, 210),
+    line: Color::Rgb(189, 198, 149),
+
+    fg: Color::Rgb(39, 73, 60),
+    dim: Color::Rgb(110, 118, 86),
+
+    accent: Color::Rgb(107, 143, 50),
+    select: Color::Rgb(212, 219, 184),
+    select_hi: Color::Rgb(189, 198, 149),
+
+    file_header_bg: Color::Rgb(212, 219, 184),
+    hunk_header_bg: Color::Rgb(189, 198, 149),
+    active_file_fg: Color::Rgb(107, 143, 50),
+
+    add_bg: Color::Rgb(215, 225, 199),
+    add_inline_bg: Color::Rgb(189, 209, 158),
+    add_fg: Color::Rgb(97, 139, 35),
+    add_gutter: Color::Rgb(92, 126, 37),
+    del_bg: Color::Rgb(225, 204, 199),
+    del_inline_bg: Color::Rgb(209, 168, 158),
+    del_fg: Color::Rgb(166, 72, 48),
+    del_gutter: Color::Rgb(147, 59, 37),
+
+    staged: Color::Rgb(107, 143, 50),
+    partial: Color::Rgb(163, 129, 41),
+    unstaged: Color::Rgb(166, 72, 48),
+    untracked: Color::Rgb(196, 118, 28),
+    conflict: Color::Rgb(166, 72, 48),
 };
 
 impl Theme {

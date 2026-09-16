@@ -7,6 +7,7 @@ All notable changes to Marten will be documented in this file.
 ### Added
 
 - Add Kanagawa Wave and Kanagawa Lotus themes.
+- Add Matcha Latte and Matcha Foam, an original theme pair designed by [@jxdones](https://github.com/jxdones).
 
 ### Fixed
 
