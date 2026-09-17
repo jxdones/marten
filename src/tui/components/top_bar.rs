@@ -81,7 +81,7 @@ fn worktree_summary(status: Option<&RepositoryStatus>, theme: Theme) -> Line<'st
 
     let mut spans = vec![
         Span::styled(status.name.clone(), theme.repo_name()),
-        Span::styled("  ·  ", Style::default()),
+        Span::styled("  ·  ", theme.muted()),
         Span::styled(branch_label, branch_style),
     ];
 
@@ -126,7 +126,7 @@ fn worktree_summary(status: Option<&RepositoryStatus>, theme: Theme) -> Line<'st
     };
 
     spans.extend([
-        Span::styled("  ·  ", Style::default()),
+        Span::styled("  ·  ", theme.muted()),
         Span::styled(format!("↑{}", status.ahead), ahead_style),
         Span::styled(format!(" ↓{}", status.behind), behind_style),
     ]);
@@ -150,9 +150,9 @@ fn revision_summary(
 
     let prefix = vec![
         Span::styled(repository_name, theme.repo_name()),
-        Span::styled("  ·  ", Style::default()),
+        Span::styled("  ·  ", theme.muted()),
         Span::styled(revision.short_oid.clone(), theme.branch_name()),
-        Span::styled("  ·  ", Style::default()),
+        Span::styled("  ·  ", theme.muted()),
     ];
     let subject_width = max_width.saturating_sub(Line::from(prefix.clone()).width());
     let subject = truncate_with_ellipsis(subject, subject_width);
@@ -175,7 +175,7 @@ fn range_summary(
         status.map_or_else(|| "no repository".to_string(), |status| status.name.clone());
     let prefix = vec![
         Span::styled(repository_name, theme.repo_name()),
-        Span::styled("  ·  ", Style::default()),
+        Span::styled("  ·  ", theme.muted()),
     ];
     let separator = match range.kind {
         RangeKind::Direct => " → ",

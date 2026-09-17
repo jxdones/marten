@@ -12,6 +12,7 @@ All notable changes to Marten will be documented in this file.
 ### Fixed
 
 - `Esc` now also returns to current working-tree changes when viewing a revision range (`marten diff A..B`), not just a single commit.
+- Update `·` at the top bar left side to match the same color from the right side. 
 
 ## [0.1.18] - 2026-09-09
 
