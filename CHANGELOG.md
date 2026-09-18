@@ -4,6 +4,8 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.19] - 2026-09-18
+
 ### Added
 
 - Add Kanagawa Wave and Kanagawa Lotus themes.
