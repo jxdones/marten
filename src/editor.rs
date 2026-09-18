@@ -5,11 +5,25 @@ enum LineArg {
     Colon,
 }
 
-pub fn command(path: &Path, line: usize) -> Command {
-    command_for(&resolve_editor(), path, line)
+#[derive(Debug)]
+pub enum Source {
+    Variable(&'static str),
+    Fallback,
 }
 
-fn command_for(editor: &str, path: &Path, line: usize) -> Command {
+pub fn resolve() -> (String, Source) {
+    for variable in ["VISUAL", "EDITOR"] {
+        if let Ok(editor) = env::var(variable) {
+            if !editor.trim().is_empty() {
+                return (editor, Source::Variable(variable));
+            }
+        }
+    }
+
+    ("vi".into(), Source::Fallback)
+}
+
+pub fn command(editor: &str, path: &Path, line: usize) -> Command {
     let mut cmd = Command::new(editor);
 
     match line_arg_style(editor) {
@@ -21,12 +35,6 @@ fn command_for(editor: &str, path: &Path, line: usize) -> Command {
         }
     }
     cmd
-}
-
-fn resolve_editor() -> String {
-    env::var("VISUAL")
-        .or_else(|_| env::var("EDITOR"))
-        .unwrap_or_else(|_| "vi".into())
 }
 
 fn line_arg_style(editor: &str) -> LineArg {
