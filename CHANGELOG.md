@@ -4,6 +4,8 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.20] - 2026-09-23
+
 ### Added
 
 - Set the editor Marten opens with `[editor] command` in the config file, using `{file}` and `{line}` placeholders (e.g. `code --wait --goto {file}:{line}`).
