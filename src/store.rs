@@ -96,7 +96,8 @@ impl DiffStore {
             let queue = Arc::clone(&queue);
             let diff_source = diff_source.clone();
             std::thread::spawn(move || {
-                // Repository is !Send; open a fresh handle per worker thread.
+                // Repository is Send but not Sync: it can't be shared across threads, and
+                // App keeps its own handle, so each worker opens a fresh one.
                 let Ok(repo) = Repository::discover(".") else {
                     return;
                 };
