@@ -102,7 +102,7 @@ impl App {
 
         let mut store = DiffStore::new(entries, config.review.ignore.clone(), ignore_whitespace);
         store.continuous_diff.rebuild_index();
-        store.spawn_workers(&diff_source);
+        store.spawn_workers(&diff_source, &repo);
 
         let mut files = FilesPanel::new();
         files.ensure_rows(&store);

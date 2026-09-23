@@ -68,7 +68,7 @@ impl DiffStore {
         changed
     }
 
-    pub fn spawn_workers(&self, diff_source: &DiffSource) {
+    pub fn spawn_workers(&self, diff_source: &DiffSource, git_repo: &Repository) {
         let generation = self.continuous_diff.generation;
         let ignore_whitespace = self.ignore_whitespace;
         let jobs: Vec<_> = self
@@ -95,10 +95,11 @@ impl DiffStore {
             let tx = self.worker_tx.clone();
             let queue = Arc::clone(&queue);
             let diff_source = diff_source.clone();
+            let repo_path = git_repo.path().to_path_buf();
             std::thread::spawn(move || {
-                // Repository is Send but not Sync: it can't be shared across threads, and
+                // Repository is Send but not Sync. It can't be shared across threads, and
                 // App keeps its own handle, so each worker opens a fresh one.
-                let Ok(repo) = Repository::discover(".") else {
+                let Ok(repo) = Repository::open(&repo_path) else {
                     return;
                 };
                 loop {

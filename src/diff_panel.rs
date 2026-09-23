@@ -173,7 +173,9 @@ impl DiffPanel {
         self.sync_continuous_scroll_to_file(restored_file_idx, diff_ctx.store);
         self.reset();
 
-        diff_ctx.store.spawn_workers(diff_ctx.diff_source);
+        diff_ctx
+            .store
+            .spawn_workers(diff_ctx.diff_source, diff_ctx.repo);
 
         self.refresh(diff_ctx);
     }

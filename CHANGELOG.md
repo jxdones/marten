@@ -4,6 +4,10 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Background diff loading now always reads from the repository Marten opened, instead of searching for one again from the current directory.
+
 ## [0.1.19] - 2026-09-18
 
 ### Added
