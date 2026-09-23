@@ -51,6 +51,7 @@ pub struct App {
     overlay: Overlay,
 
     pending_editor: Option<(PathBuf, u32)>,
+    editor_command: Option<String>,
     terminal_area: Rect,
 }
 
@@ -154,6 +155,7 @@ impl App {
             diff_source,
             overlay,
             pending_editor: None,
+            editor_command: config.editor.command.clone(),
             terminal_area: Rect::new(0, 0, width, height),
         })
     }
@@ -263,6 +265,10 @@ impl App {
 
     pub fn take_pending_editor(&mut self) -> Option<(PathBuf, u32)> {
         self.pending_editor.take()
+    }
+
+    pub fn editor_command(&self) -> Option<&str> {
+        self.editor_command.as_deref()
     }
 
     pub fn set_terminal_area(&mut self, area: Rect) {

@@ -20,6 +20,7 @@ pub struct Config {
     pub ui: UI,
     pub review: Review,
     pub diff: Diff,
+    pub editor: Editor,
 }
 
 #[derive(Debug, Deserialize)]
@@ -45,6 +46,12 @@ pub struct Diff {
     pub tab_width: usize,
     pub layout: DiffLayoutSetting,
     pub show_line_numbers: bool,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+pub struct Editor {
+    pub command: Option<String>,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -206,6 +213,9 @@ fn default_template() -> String {
 # tab_width = {tab_width}
 # layout = "{layout}"          # auto | split | unified
 # show_line_numbers = {show_line_numbers}
+
+[editor]
+# command = "nvim +{{line}} {{file}}"   # default: $VISUAL, then $EDITOR, then vi
 "#,
         theme = ui.theme,
         transparent_background = ui.transparent_background,
@@ -438,8 +448,20 @@ mod tests {
 
     #[test]
     fn set_diff_ignore_whitespace_to_true() {
-        let config: Config = toml::from_str("[diff]\n ignore_whitespace = true").unwrap();
+        let config: Config = toml::from_str("[diff]\nignore_whitespace = true").unwrap();
         assert!(config.diff.ignore_whitespace);
+    }
+
+    #[test]
+    fn set_editor_command() {
+        let config: Config = toml::from_str("[editor]\ncommand = 'nvim'").unwrap();
+        assert_eq!(config.editor.command, Some("nvim".to_string()));
+    }
+
+    #[test]
+    fn editor_command_defaults_to_none() {
+        let config: Config = toml::from_str("[diff]\ntab_width = 2").unwrap();
+        assert_eq!(config.editor.command, None);
     }
 
     #[test]

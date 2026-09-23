@@ -4,8 +4,13 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Set the editor Marten opens with `[editor] command` in the config file, using `{file}` and `{line}` placeholders (e.g. `code --wait --goto {file}:{line}`).
+
 ### Fixed
 
+- Editor commands from `$VISUAL` or `$EDITOR` can now include arguments (like `code --wait`) and quoted paths with spaces. Blank values are skipped.
 - Background diff loading now always reads from the repository Marten opened, instead of searching for one again from the current directory.
 
 ## [0.1.19] - 2026-09-18

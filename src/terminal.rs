@@ -120,7 +120,7 @@ fn run_loop(
                         }
                         disable_raw_mode()?;
                         execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
-                        editor::command(None, &path, line as usize)?
+                        editor::command(app.editor_command(), &path, line as usize)?
                             .status()
                             .map_err(|source| {
                                 AppError::from(source).with_operation("open editor")

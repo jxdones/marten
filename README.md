@@ -124,6 +124,9 @@ ignore_whitespace = false
 tab_width = 4
 layout = "auto"
 show_line_numbers = true
+
+[editor]
+command = "nvim +{line} {file}"
 ```
 
 `theme` supports `marten`, `ermine`, `catppuccin`, `dracula`, and much more. When the setting is omitted, Marten uses `marten` by default. Choosing a theme from the in-app theme picker updates this setting.
@@ -151,6 +154,15 @@ Files containing only whitespace changes remain listed because Git still conside
 `layout` sets the diff view on startup: `"auto"` picks unified or side-by-side based on terminal width, `"split"` forces side-by-side, and `"unified"` forces unified. It defaults to `"auto"`. Press `v` while Marten is running to cycle through the three modes.
 
 `show_line_numbers` controls whether line numbers are shown in the diff view at startup. It defaults to `true`. Press `L` while Marten is running to toggle it.
+
+`command` sets the editor Marten opens when you press `e` on a hunk. `{file}` and `{line}` are replaced with the file path and the selected line.  
+When omitted, Marten uses `$VISUAL`, then `$EDITOR`, then `vi`, and adds the line in the format the editor expects (`+42 file` for most editors, `file:42` for Helix).
+
+- `command = "code --wait --goto {file}:{line}"` for VS Code
+- `command = "hx {file}:{line}"` for Helix
+- Quote an editor path that contains spaces: `command = "'/Applications/My Editor.app/Contents/MacOS/editor' {file}"`
+
+GUI editors need their wait flag (`--wait` for VS Code, Zed, and Sublime Text), otherwise Marten resumes before you finish editing.
 
 ## Development
 
