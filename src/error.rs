@@ -17,6 +17,10 @@ pub enum AppError {
     InvalidRange {
         range: String,
     },
+    InvalidEditorCommand {
+        command: String,
+    },
+    EmptyEditorCommand,
     Git {
         operation: &'static str,
         source: git2::Error,
@@ -91,6 +95,11 @@ impl std::fmt::Display for AppError {
                 formatter,
                 "invalid revision range '{range}' (expected FROM..TO or FROM...TO)"
             ),
+            Self::InvalidEditorCommand { command } => write!(
+                formatter,
+                "invalid editor command '{command}' (check for an unclosed quote)"
+            ),
+            Self::EmptyEditorCommand => write!(formatter, "editor command is empty"),
             Self::Git { operation, source } => {
                 write!(formatter, "could not {operation}: {}", source.message())
             }
@@ -109,7 +118,9 @@ impl std::error::Error for AppError {
             | Self::RevisionNotFound { source, .. }
             | Self::RevisionNotCommit { source, .. }
             | Self::Git { source, .. } => Some(source),
-            Self::InvalidRange { .. } => None,
+            Self::InvalidRange { .. }
+            | Self::InvalidEditorCommand { .. }
+            | Self::EmptyEditorCommand => None,
             Self::Io { source, .. } => Some(source),
         }
     }
