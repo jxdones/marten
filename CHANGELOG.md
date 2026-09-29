@@ -8,6 +8,7 @@ All notable changes to Marten will be documented in this file.
 
 - Filenames containing glob characters (such as `page[1].txt`) now show the correct file's diff in working-tree, revision, and revision-range views.
 - Filename search now matches Unicode case differences (such as `änderung` matching `Änderung.rs`) and preserves correct highlighting when lowercasing changes character lengths.
+- Untracked binary files no longer contribute text insertions to diff statistics.
 
 ## [0.1.20] - 2026-09-23
 

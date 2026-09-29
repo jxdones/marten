@@ -942,6 +942,9 @@ fn untracked_file_content(repo: &Repository, path: &str) -> AppResult<Option<Str
         return Ok(None);
     }
     let bytes = fs::read(path)?;
+    if bytes.contains(&0u8) {
+        return Ok(None);
+    }
     Ok(Some(String::from_utf8_lossy(&bytes).to_string()))
 }
 
@@ -1452,6 +1455,15 @@ mod tests {
         assert_eq!(hunk.insertions, 2);
         assert_eq!(hunk.deletions, 0);
         assert!(hunk.lines.iter().all(|line| line.origin == '+'));
+    }
+
+    #[test]
+    fn untracked_binary_files_have_no_text_insertions() {
+        let (_dir, repo) = init_repo("untracked-binary-stats");
+        write_file(&repo, "image.bin", "a\0\nb\n");
+
+        let entries = files(&repo, false).unwrap();
+        assert_eq!(entry(&entries, "image.bin").insertions, 0);
     }
 
     #[test]
