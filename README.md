@@ -149,7 +149,7 @@ Matching files are collapsed to their header and skipped by the diff loaders. Th
 `ignore_whitespace` hides whitespace-only changes from diff hunks and statistics in working-tree, revision, and revision-range views. It defaults to `false`.  
 Files containing only whitespace changes remain listed because Git still considers them modified, but their diff is empty while this option is enabled.
 
-`tab_width` defines the width of `\t`. It defaults to `0` in case is omitted.
+`tab_width` defines the width of `\t`. It defaults to `4` and must be greater than zero.
 
 `layout` sets the diff view on startup: `"auto"` picks unified or side-by-side based on terminal width, `"split"` forces side-by-side, and `"unified"` forces unified. It defaults to `"auto"`. Press `v` while Marten is running to cycle through the three modes.
 
