@@ -4,6 +4,8 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.20] - 2026-09-29
+
 ### Fixed
 
 - Filenames containing glob characters (such as `page[1].txt`) now show the correct file's diff in working-tree, revision, and revision-range views.
