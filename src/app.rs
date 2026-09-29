@@ -548,7 +548,7 @@ impl App {
             Action::OpenEditor => {
                 let scroll = diff.review().selected_row;
                 if let Some((path, line)) = store.continuous_diff.selected_line(scroll) {
-                    *pending_editor = Some((PathBuf::from(path), line));
+                    *pending_editor = repo.workdir().map(|workdir| (workdir.join(path), line));
                 }
             }
             _ => {
