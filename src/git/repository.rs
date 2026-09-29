@@ -1100,7 +1100,10 @@ fn diff_stats(diff: &Diff<'_>) -> Result<HashMap<String, (usize, usize)>, git2::
 
 fn diff_options(ignore_whitespace: bool) -> DiffOptions {
     let mut options = DiffOptions::new();
-    options.ignore_whitespace(ignore_whitespace);
+    // Per-file loaders pass repository filenames, which may contain glob characters.
+    options
+        .ignore_whitespace(ignore_whitespace)
+        .disable_pathspec_match(true);
     options
 }
 
@@ -1372,6 +1375,65 @@ mod tests {
         assert_eq!(sections[1].kind, DiffSectionKind::Unstaged);
         assert!(!sections[0].hunks.is_empty());
         assert!(!sections[1].hunks.is_empty());
+    }
+
+    fn added_lines(sections: &[DiffSection]) -> Vec<&str> {
+        sections
+            .iter()
+            .flat_map(|section| &section.hunks)
+            .flat_map(|hunk| &hunk.lines)
+            .filter(|line| line.origin == '+')
+            .map(|line| line.content.as_str())
+            .collect()
+    }
+
+    #[test]
+    fn staged_file_diff_matches_bracketed_paths_literally() {
+        let (_dir, repo) = init_repo("literal-staged-diff");
+        write_file(&repo, "page[1].txt", "literal bracket file\n");
+        write_file(&repo, "page1.txt", "different file\n");
+        stage_path(&repo, "page[1].txt");
+        stage_path(&repo, "page1.txt");
+
+        let sections = file_diff(&repo, "page[1].txt", FileStatus::Staged, false)
+            .unwrap()
+            .expect("not binary");
+
+        assert_eq!(added_lines(&sections), vec!["literal bracket file\n"]);
+    }
+
+    #[test]
+    fn unstaged_file_diff_matches_bracketed_paths_literally() {
+        let (_dir, repo) = init_repo("literal-unstaged-diff");
+        write_file(&repo, "page[1].txt", "base\n");
+        write_file(&repo, "page1.txt", "base\n");
+        stage_path(&repo, "page[1].txt");
+        stage_path(&repo, "page1.txt");
+        commit_index(&repo, "init");
+        write_file(&repo, "page[1].txt", "literal bracket file\n");
+        write_file(&repo, "page1.txt", "different file\n");
+
+        let sections = file_diff(&repo, "page[1].txt", FileStatus::Unstaged, false)
+            .unwrap()
+            .expect("not binary");
+
+        assert_eq!(added_lines(&sections), vec!["literal bracket file\n"]);
+    }
+
+    #[test]
+    fn revision_file_diff_matches_bracketed_paths_literally() {
+        let (_dir, repo) = init_repo("literal-revision-diff");
+        write_file(&repo, "page[1].txt", "literal bracket file\n");
+        write_file(&repo, "page1.txt", "different file\n");
+        stage_path(&repo, "page[1].txt");
+        stage_path(&repo, "page1.txt");
+        let oid = commit_index(&repo, "init");
+
+        let sections = files_diff_from_commit(&repo, oid, "page[1].txt", None, false)
+            .unwrap()
+            .expect("not binary");
+
+        assert_eq!(added_lines(&sections), vec!["literal bracket file\n"]);
     }
 
     #[test]
