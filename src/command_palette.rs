@@ -124,7 +124,7 @@ pub fn command_groups() -> &'static [CommandGroup] {
                 },
                 CommandItem {
                     label: "mark reviewed",
-                    description: "mark file as reviewd and collapses it",
+                    description: "mark file as reviewed and collapse it",
                     keybind: "m",
                     action: Action::ToggleReviewed,
                 },
