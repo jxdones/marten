@@ -21,6 +21,10 @@ pub enum AppError {
         command: String,
     },
     EmptyEditorCommand,
+    EditorLaunch {
+        program: String,
+        source: std::io::Error,
+    },
     Git {
         operation: &'static str,
         source: git2::Error,
@@ -100,6 +104,17 @@ impl std::fmt::Display for AppError {
                 "invalid editor command '{command}' (check for an unclosed quote)"
             ),
             Self::EmptyEditorCommand => write!(formatter, "editor command is empty"),
+            Self::EditorLaunch { program, source }
+                if source.kind() == std::io::ErrorKind::NotFound =>
+            {
+                write!(
+                    formatter,
+                    "editor '{program}' not found (set $VISUAL, $EDITOR, or [editor] command in config.toml)"
+                )
+            }
+            Self::EditorLaunch { program, source } => {
+                write!(formatter, "could not open editor '{program}': {source}")
+            }
             Self::Git { operation, source } => {
                 write!(formatter, "could not {operation}: {}", source.message())
             }
@@ -121,7 +136,7 @@ impl std::error::Error for AppError {
             Self::InvalidRange { .. }
             | Self::InvalidEditorCommand { .. }
             | Self::EmptyEditorCommand => None,
-            Self::Io { source, .. } => Some(source),
+            Self::EditorLaunch { source, .. } | Self::Io { source, .. } => Some(source),
         }
     }
 }

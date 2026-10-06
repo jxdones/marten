@@ -4,6 +4,10 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+
+- Editor launch errors now name the command Marten tried to run (like `editor 'vi' not found`), instead of a generic `No such file or directory`.
+
 ## [0.1.20] - 2026-09-29
 
 ### Fixed

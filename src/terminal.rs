@@ -120,11 +120,12 @@ fn run_loop(
                         }
                         disable_raw_mode()?;
                         execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
-                        editor::command(app.editor_command(), &path, line as usize)?
-                            .status()
-                            .map_err(|source| {
-                                AppError::from(source).with_operation("open editor")
-                            })?;
+                        let mut command =
+                            editor::command(app.editor_command(), &path, line as usize)?;
+                        command.status().map_err(|source| AppError::EditorLaunch {
+                            program: command.get_program().to_string_lossy().into_owned(),
+                            source,
+                        })?;
 
                         execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture)?;
                         enable_raw_mode()?;
