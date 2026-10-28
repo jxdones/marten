@@ -115,13 +115,13 @@ fn run_loop(
                     app.update(action)?;
 
                     if let Some((path, line)) = app.take_pending_editor() {
+                        let mut command =
+                            editor::command(app.editor_command(), &path, line as usize)?;
                         if terminal_background.take().is_some() {
                             reset_terminal_background(terminal.backend_mut())?;
                         }
                         disable_raw_mode()?;
                         execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture)?;
-                        let mut command =
-                            editor::command(app.editor_command(), &path, line as usize)?;
                         command.status().map_err(|source| AppError::EditorLaunch {
                             program: command.get_program().to_string_lossy().into_owned(),
                             source,
