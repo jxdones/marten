@@ -282,7 +282,7 @@ impl App {
             Event::Resize(width, height) => {
                 self.terminal_area = Rect::new(0, 0, width, height);
 
-                if width <= 120 && self.focus != Focus::Diff {
+                if width <= layout::SIDEBAR_NARROW_MAX &&self.focus != Focus::Diff {
                     Action::FocusPanel(Focus::Diff)
                 } else {
                     Action::Noop
