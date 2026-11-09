@@ -7,6 +7,7 @@ All notable changes to Marten will be documented in this file.
 ### Fixed
 
 - An invalid `[editor] command` template is now reported before Marten leaves its screen, instead of after tearing down the terminal for an editor that never launches.
+- Restore terminal state on panic.
 
 ## [0.1.22] - 2026-10-07
 

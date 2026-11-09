@@ -1,5 +1,6 @@
 use std::{
     io::{self, Write},
+    panic,
     time::{Duration, Instant},
 };
 
@@ -26,10 +27,11 @@ use crate::{
 };
 
 pub fn run(app: &mut App) -> AppResult<()> {
+    install_panic_hook();
     let mut terminal = init_terminal()?;
     let mut terminal_background = None;
     let result = run_loop(&mut terminal, app, &mut terminal_background);
-    restore_terminal(terminal, terminal_background.is_some())?;
+    restore_terminal(terminal_background.is_some())?;
     result
 }
 
@@ -43,6 +45,16 @@ fn init_terminal() -> io::Result<DefaultTerminal> {
             viewport: Viewport::Fullscreen,
         },
     )
+}
+
+fn install_panic_hook() {
+    let original = panic::take_hook();
+    panic::set_hook(Box::new(move |data| {
+        if std::thread::current().name() == Some("main") {
+            restore_terminal(true).ok();
+        }
+        original(data);
+    }));
 }
 
 // Mouse wheels/trackpads can emit events faster than once per frame. Drawing on
@@ -166,13 +178,13 @@ fn draw(
     Ok(())
 }
 
-fn restore_terminal(mut terminal: DefaultTerminal, reset_background: bool) -> io::Result<()> {
+fn restore_terminal(reset_background: bool) -> io::Result<()> {
     disable_raw_mode()?;
     if reset_background {
-        reset_terminal_background(terminal.backend_mut())?;
+        reset_terminal_background(&mut io::stdout())?;
     }
     execute!(
-        terminal.backend_mut(),
+        io::stdout(),
         DisableMouseCapture,
         LeaveAlternateScreen,
         SetTitle("")
