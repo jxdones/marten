@@ -16,8 +16,6 @@ pub struct FileKey {
 #[derive(Debug)]
 pub enum DiffLoadState {
     NotLoaded,
-    #[allow(dead_code)]
-    Loading,
     Loaded {
         hunks: Vec<DiffHunk>,
         index: LineIndex,
@@ -117,9 +115,7 @@ impl FileSlot {
         }
         match &self.load {
             DiffLoadState::Binary => HEADER_ROW,
-            DiffLoadState::NotLoaded | DiffLoadState::Loading | DiffLoadState::Error(_) => {
-                CONTENT_ROW + HEADER_ROW
-            }
+            DiffLoadState::NotLoaded | DiffLoadState::Error(_) => CONTENT_ROW + HEADER_ROW,
             DiffLoadState::Loaded { index, .. } => index.total_rows_for(layout) + HEADER_ROW,
         }
     }
@@ -173,7 +169,7 @@ impl ContinuousDiff {
                         }
                     }
                 }
-                DiffLoadState::Loading | DiffLoadState::NotLoaded => Some(RenderedRow::Loading),
+                DiffLoadState::NotLoaded => Some(RenderedRow::Loading),
                 DiffLoadState::Binary => {
                     debug_assert!(
                         false,
