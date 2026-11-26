@@ -8,6 +8,11 @@ All notable changes to Marten will be documented in this file.
 
 - Avoid spawning unused background diff worker threads when reviewing few or no changed files.
 
+### Fixed
+
+- Files matching [review] ignore are no longer diffed when selected in the sidebar.
+- Errors while loading a selected file's diff are now displayed instead of staying stuck on `Loading...`.
+
 ## [0.1.23] - 2026-11-26
 
 ### Fixed

@@ -202,10 +202,8 @@ impl DiffPanel {
         };
 
         if let Some(&slot_idx) = diff_ctx.store.continuous_diff.by_key.get(&cache_key) {
-            if matches!(
-                diff_ctx.store.continuous_diff.files[slot_idx].load,
-                DiffLoadState::NotLoaded
-            ) {
+            let slot = &diff_ctx.store.continuous_diff.files[slot_idx];
+            if !slot.ignored && matches!(slot.load, DiffLoadState::NotLoaded) {
                 let result = repository::file_diff_for_source(
                     diff_ctx.repo,
                     diff_ctx.diff_source,
@@ -215,25 +213,21 @@ impl DiffPanel {
                     diff_ctx.store.ignore_whitespace(),
                 );
 
-                match result {
+                diff_ctx.store.continuous_diff.files[slot_idx].load = match result {
                     Ok(Some(sections)) => {
                         let index = LineIndex::new(&sections);
                         let hunks = sections
                             .into_iter()
                             .flat_map(|section| section.hunks)
                             .collect();
-                        diff_ctx.store.continuous_diff.files[slot_idx].load =
-                            DiffLoadState::Loaded { hunks, index };
+                        DiffLoadState::Loaded { hunks, index }
                     }
-                    Ok(None) => {
-                        diff_ctx.store.continuous_diff.files[slot_idx].load = DiffLoadState::Binary;
-                    }
-                    Err(_) => {}
-                }
+                    Ok(None) => DiffLoadState::Binary,
+                    Err(error) => DiffLoadState::Error(error.to_string()),
+                };
+                diff_ctx.store.continuous_diff.index_dirty = true;
+                self.refresh_horizontal_scroll_bounds(diff_ctx.store);
             }
-
-            diff_ctx.store.continuous_diff.index_dirty = true;
-            self.refresh_horizontal_scroll_bounds(diff_ctx.store);
         }
     }
 
@@ -842,5 +836,41 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn refresh_skips_ignored_files() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let repo = Repository::init(dir.path()).unwrap();
+        std::fs::write(dir.path().join("Cargo.lock"), "version = 4\n").unwrap();
+
+        let entries = repository::files(&repo, false).unwrap();
+        let mut store = DiffStore::new(entries, vec!["*.lock".into()], false);
+        assert!(store.continuous_diff.files[0].ignored);
+
+        let mut files = FilesPanel::new();
+        files.ensure_rows(&store);
+        files.select_first();
+
+        let mut panel = DiffPanel::new(DiffOptions {
+            tab_width: DEFAULT_TAB_WIDTH,
+            layout_override: None,
+            show_line_numbers: true,
+        });
+        panel.refresh(&mut DiffContext {
+            files: &mut files,
+            store: &mut store,
+            repo: &repo,
+            diff_source: &DiffSource::Worktree,
+        });
+
+        assert!(
+            matches!(
+                store.continuous_diff.files[0].load,
+                DiffLoadState::NotLoaded
+            ),
+            "expected ignored file to remain NotLoaded, got {:?}",
+            store.continuous_diff.files[0].load
+        );
     }
 }
