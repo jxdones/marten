@@ -4,6 +4,8 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.23] - 2026-11-26
+
 ### Fixed
 
 - An invalid `[editor] command` template is now reported before Marten leaves its screen, instead of after tearing down the terminal for an editor that never launches.
