@@ -4,6 +4,10 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+
+- Read `config.toml` from `$XDG_CONFIG_HOME` when set, falling back to `~/.config/marten/config.toml`.
+
 ### Changed
 
 - Avoid spawning unused background diff worker threads when reviewing few or no changed files.

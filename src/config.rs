@@ -1,5 +1,7 @@
 use std::{
-    env, fs,
+    env,
+    ffi::OsString,
+    fs,
     io::{ErrorKind, Write},
     path::{Path, PathBuf},
 };
@@ -237,12 +239,18 @@ pub fn save_theme(entry: &theme::ThemeEntry) -> Result<(), ConfigError> {
 }
 
 fn config_path() -> Option<PathBuf> {
-    env::var_os("HOME").map(|home| {
-        PathBuf::from(home)
-            .join(CONFIG_DIR)
-            .join(APP_DIR)
-            .join(CONFIG_FILE)
-    })
+    config_path_from(env::var_os("XDG_CONFIG_HOME"), env::var_os("HOME"))
+}
+
+fn config_path_from(xdg_config_home: Option<OsString>, home: Option<OsString>) -> Option<PathBuf> {
+    xdg_config_home
+        .filter(|dir| !dir.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| {
+            home.filter(|dir| !dir.is_empty())
+                .map(|home| PathBuf::from(home).join(CONFIG_DIR))
+        })
+        .map(|base| base.join(APP_DIR).join(CONFIG_FILE))
 }
 
 fn load_from(path: PathBuf) -> Result<Config, ConfigError> {
@@ -691,5 +699,29 @@ mod tests {
         let config = load_from(path).unwrap();
         assert_eq!(config.ui.theme, "ermine");
         assert_eq!(config.review.ignore, vec!["*.lock"]);
+    }
+
+    #[test]
+    fn config_path_prefers_xdg_config_home() {
+        let path = config_path_from(Some("/custom/xdg".into()), Some("/Users/test".into()));
+        assert_eq!(path, Some(PathBuf::from("/custom/xdg/marten/config.toml")));
+    }
+
+    #[test]
+    fn config_path_falls_back_to_home_when_xdg_is_unset_or_empty() {
+        assert_eq!(
+            config_path_from(None, Some("/Users/test".into())),
+            Some(PathBuf::from("/Users/test/.config/marten/config.toml"))
+        );
+        assert_eq!(
+            config_path_from(Some("".into()), Some("/Users/test".into())),
+            Some(PathBuf::from("/Users/test/.config/marten/config.toml"))
+        );
+    }
+
+    #[test]
+    fn config_path_is_none_when_both_env_vars_are_missing_or_empty() {
+        assert_eq!(config_path_from(None, None), None);
+        assert_eq!(config_path_from(Some("".into()), Some("".into())), None);
     }
 }
