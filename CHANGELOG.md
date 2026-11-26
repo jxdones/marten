@@ -4,6 +4,10 @@ All notable changes to Marten will be documented in this file.
 
 ## [Unreleased]
 
+### Changed
+
+- Avoid spawning unused background diff worker threads when reviewing few or no changed files.
+
 ## [0.1.23] - 2026-11-26
 
 ### Fixed

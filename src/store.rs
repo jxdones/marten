@@ -86,10 +86,16 @@ impl DiffStore {
                 )
             })
             .collect();
-        let queue = Arc::new(Mutex::new(jobs.into_iter()));
+
+        if jobs.is_empty() {
+            return;
+        }
+
         let worker_count = std::thread::available_parallelism()
             .map_or(4, |n| n.get())
-            .min(8);
+            .min(8)
+            .min(jobs.len());
+        let queue = Arc::new(Mutex::new(jobs.into_iter()));
 
         for _ in 0..worker_count {
             let tx = self.worker_tx.clone();
